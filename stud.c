@@ -198,7 +198,7 @@ static int create_back_socket() {
     int t = 1;
     setnonblocking(s);
     t = connect(s, backaddr->ai_addr, backaddr->ai_addrlen);
-    if (t != -1 || errno == EINPROGRESS || errno == EINTR || errno == 0)
+    if (t == 0 || errno == EINPROGRESS || errno == EINTR)
         return s;
 
     perror("{backend-connect}");
