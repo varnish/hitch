@@ -152,6 +152,9 @@ static int create_main_socket() {
     int s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     int t = 1;
     setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(int));
+#ifdef SO_REUSEPORT
+    setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &t, sizeof(int));
+#endif
     setnonblocking(s);
 
     struct sockaddr_in addr;
