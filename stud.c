@@ -342,11 +342,11 @@ static void handle_connect(struct ev_loop *loop, ev_io *w, int revents) {
             if (ps->remote_ip.ss_family == AF_INET6) {
                 memcpy(ring_pnt, &((struct sockaddr_in6 *) &ps->remote_ip)
                        ->sin6_addr.s6_addr, 8U);
-                ringbuffer_write_append(&ps->ring_down, 8U);
+                ringbuffer_write_append(&ps->ring_down, 1U + 8U);
             } else {
                 memcpy(ring_pnt, &((struct sockaddr_in *) &ps->remote_ip)
                        ->sin_addr.s_addr, 4U);
-                ringbuffer_write_append(&ps->ring_down, 4U);
+                ringbuffer_write_append(&ps->ring_down, 1U + 4U);
             }
             ev_io_start(loop, &ps->ev_w_down);
         }
