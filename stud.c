@@ -112,7 +112,7 @@ typedef struct proxystate {
 
     SSL *ssl;             /* OpenSSL SSL state */
 
-    unsigned int remote_ip;  /* Remote ip returned from `accept` */
+    struct sockaddr_storage remote_ip;  /* Remote ip returned from `accept` */
 } proxystate;
 
 /* set a file descriptor (socket) to non-blocking mode */
@@ -165,11 +165,6 @@ static int create_main_socket() {
                                     &hints, &ai);
     if (gai_err != 0) {
         fprintf(stderr, "{getaddrinfo}: [%s]\n", gai_strerror(gai_err));
-        exit(1);
-    }
-    
-    if (ai->ai_family != AF_INET && OPTIONS.WRITE_IP_OCTET) {
-        fprintf(stderr, "--write-ipv4 is only compatible with IPv4\n");
         exit(1);
     }
     
@@ -340,8 +335,19 @@ static void handle_connect(struct ev_loop *loop, ev_io *w, int revents) {
         start_handshake(ps, SSL_ERROR_WANT_READ); /* for client-first handshake */
         ev_io_start(loop, &ps->ev_r_down);
         if (OPTIONS.WRITE_IP_OCTET) {
-            memcpy(ringbuffer_write_ptr(&ps->ring_down), (void *)&ps->remote_ip, sizeof(unsigned int));
-            ringbuffer_write_append(&ps->ring_down, sizeof(unsigned int));
+            char *ring_pnt = ringbuffer_write_ptr(&ps->ring_down);
+            assert(ps->remote_ip.ss_family == AF_INET ||
+                   ps->remote_ip.ss_family == AF_INET6);
+            *ring_pnt++ = (unsigned char) ps->remote_ip.ss_family;
+            if (ps->remote_ip.ss_family == AF_INET6) {
+                memcpy(ring_pnt, &((struct sockaddr_in6 *) &ps->remote_ip)
+                       ->sin6_addr.s6_addr, 8U);
+                ringbuffer_write_append(&ps->ring_down, 8U);
+            } else {
+                memcpy(ring_pnt, &((struct sockaddr_in *) &ps->remote_ip)
+                       ->sin_addr.s_addr, 4U);
+                ringbuffer_write_append(&ps->ring_down, 4U);
+            }
             ev_io_start(loop, &ps->ev_w_down);
         }
     }
@@ -499,9 +505,9 @@ static void client_write(struct ev_loop *loop, ev_io *w, int revents) {
  * connecting to the backend */
 static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     (void) revents;
-    struct sockaddr addr;
+    struct sockaddr_storage addr;
     socklen_t sl = sizeof(addr);
-    int client = accept(w->fd, &addr, &sl);
+    int client = accept(w->fd, (struct sockaddr *) &addr, &sl);
     if (client == -1) {
         assert(errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN);
         return;
@@ -528,7 +534,7 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     ps->fd_down = back;
     ps->ssl = ssl;
     ps->want_shutdown = 0;
-    ps->remote_ip = ((struct sockaddr_in*)&addr)->sin_addr.s_addr;
+    ps->remote_ip = addr;
     ringbuffer_init(&ps->ring_up);
     ringbuffer_init(&ps->ring_down);
 
@@ -604,8 +610,8 @@ static void usage_fail(char *prog, char *msg) {
 "  -n CORES                 (number of worker processes, default 1)\n"
 "\n"
 "Special:\n"
-"  --write-ipv4             (write remote IPv4 in first 4 octets\n"
-"                            little-endian to backend)\n"
+"  --write-ip               (write 1 octet with the IP family followed by 4 (IPv4) "
+"                            or 8 (IPv6) octets little-endian to backend)\n"
 );
     exit(1);
 }
@@ -665,7 +671,7 @@ static void parse_cli(int argc, char **argv) {
     {
         {"tls", 0, &tls, 1},
         {"ssl", 0, &ssl, 1},
-        {"write-ipv4", 0, &writeip, 1},
+        {"write-ip", 0, &writeip, 1},
         {0, 0, 0, 0}
     };
 
