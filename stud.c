@@ -175,8 +175,7 @@ static int create_back_socket() {
     int t = 1;
     setnonblocking(s);
     t = connect(s, (struct sockaddr *)&backaddr, sizeof(backaddr));
-    assert(t == -1);
-    if (errno == EINPROGRESS || errno == EINTR || errno == 0)
+    if (t != -1 || errno == EINPROGRESS || errno == EINTR || errno == 0)
         return s;
 
     perror("{backend-connect}");
