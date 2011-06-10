@@ -57,6 +57,7 @@ The entire set of arguments can be invoked with `stud -h`:
     Encryption Methods:
       --tls                    (TLSv1, default)
       --ssl                    (SSLv3)
+      -c CIPHER_SUITE          (set allowed ciphers)
 
     Socket:
       -b HOST,PORT             (backend [connect], default "127.0.0.1,8000")
