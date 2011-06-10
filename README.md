@@ -18,9 +18,9 @@ with this backend handler so that the backend can dictate throttling behavior,
 maxmium connection behavior, availability of service, etc.
 
 `stud` has one "cool trick"--it will optionally write the client IP address
-as the first four octets little endian.  In this way, backends who care about
-the client IP can still access it even though `stud` itself appears to be
-the connected client.
+as the first few octets (depending on IPv4 or IPv6) to the backend.  In this way,
+backends who care about the client IP can still access it even though `stud`
+itself appears to be the connected client.
 
 Requirements and Limitations
 ----------------------------
