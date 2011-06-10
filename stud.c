@@ -52,9 +52,6 @@
 #ifndef MSG_NOSIGNAL
 # define MSG_NOSIGNAL 0
 #endif
-#ifdef __linux__
-# define HAVE_SCHED_AFFINITY
-#endif
 
 /* Globals */
 static struct ev_loop *loop;
@@ -535,7 +532,7 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
  * on the bound socket, etc */
 static void handle_connections(int x, int sock, SSL_CTX *ctx) {
     fprintf(stderr, "{core} Process %d online\n", x);
-#ifdef HAVE_SCHED_AFFINITY    
+#if defined(CPU_ZERO) && defined(CPU_SET)
     cpu_set_t cpus;
 
     CPU_ZERO(&cpus);
