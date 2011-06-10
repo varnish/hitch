@@ -82,6 +82,6 @@ server-side TLS termination for over 40 million Bump users.
 
 Contributors:
 
-    * Colin Percival @cpercival -- early audit and code review
+    * Colin Percival @cperciva  -- early audit and code review
     * Frank DENIS @jedisct1     -- port to BSD, IPv6 support, various fixes
 
