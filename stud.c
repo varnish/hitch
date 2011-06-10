@@ -29,6 +29,7 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netdb.h>
 #include <sys/wait.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -55,7 +56,7 @@
 
 /* Globals */
 static struct ev_loop *loop;
-static struct sockaddr_in backaddr;
+static struct addrinfo *backaddr;
 
 /* Command line Options */
 typedef enum {
@@ -66,10 +67,10 @@ typedef enum {
 typedef struct stud_options {
     ENC_TYPE ETYPE;
     int WRITE_IP_OCTET;
-    int FRONT_IP;
-    int FRONT_PORT;
-    int BACK_IP;
-    int BACK_PORT;
+    char *FRONT_IP;
+    char *FRONT_PORT;
+    char *BACK_IP;
+    char *BACK_PORT;
     int NCORES;
     char *CERT_FILE;
     char *CIPHER_SUITE;
@@ -154,19 +155,28 @@ static SSL_CTX * init_openssl() {
 
 /* Create the bound IPv4 socket in the parent process */
 static int create_main_socket() {
-    int s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    struct addrinfo *ai, hints;
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
+    const int gai_err = getaddrinfo(OPTIONS.FRONT_IP,
+                                    OPTIONS.FRONT_PORT,
+                                    &hints, &ai);
+    if (gai_err != 0) {
+        fprintf(stderr, "{getaddrinfo}: [%s]", gai_strerror(gai_err));
+        exit(1);
+    }
+    
+    int s = socket(ai->ai_family, SOCK_STREAM, IPPROTO_TCP);
     int t = 1;
     setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(int));
 #ifdef SO_REUSEPORT
     setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &t, sizeof(int));
 #endif
-    setnonblocking(s);
-
-    struct sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = OPTIONS.FRONT_IP;
-    addr.sin_port = OPTIONS.FRONT_PORT;
-    if (bind(s, (struct sockaddr *)&addr, sizeof(addr))) {
+    setnonblocking(s);    
+    
+    if (bind(s, ai->ai_addr, ai->ai_addrlen)) {
         perror("{bind-socket}");
         exit(1);
     }
@@ -179,10 +189,10 @@ static int create_main_socket() {
 /* Initiate a clear-text nonblocking connect() to the backend IP on behalf
  * of a newly connected upstream (encrypted) client*/
 static int create_back_socket() {
-    int s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    int s = socket(backaddr->ai_family, SOCK_STREAM, IPPROTO_TCP);
     int t = 1;
     setnonblocking(s);
-    t = connect(s, (struct sockaddr *)&backaddr, sizeof(backaddr));
+    t = connect(s, backaddr->ai_addr, backaddr->ai_addrlen);
     if (t != -1 || errno == EINPROGRESS || errno == EINTR || errno == 0)
         return s;
 
@@ -315,7 +325,7 @@ static void handle_connect(struct ev_loop *loop, ev_io *w, int revents) {
     (void) revents;
     int t;
     proxystate *ps = (proxystate *)w->data;
-    t = connect(ps->fd_down, (struct sockaddr *)&backaddr, sizeof(backaddr));
+    t = connect(ps->fd_down, backaddr->ai_addr, backaddr->ai_addrlen);
     if (!t || errno == EISCONN || !errno) {
         /* INIT */
         ev_io_stop(loop, &ps->ev_w_down);
@@ -581,8 +591,8 @@ static void usage_fail(char *prog, char *msg) {
 "  -c CIPHER_SUITE          (set allowed ciphers)\n"            
 "\n"
 "Socket:\n"
-"  -b HOST:PORT             (backend [connect], default \"127.0.0.1:8000\")\n"
-"  -f HOST:PORT             (frontend [bind], default \"*:8443\")\n"
+"  -b HOST,PORT             (backend [connect], default \"127.0.0.1,8000\")\n"
+"  -f HOST,PORT             (frontend [bind], default \"*,8443\")\n"
 "\n"
 "Performance:\n"
 "  -n CORES                 (number of worker processes, default 1)\n"
@@ -595,20 +605,18 @@ static void usage_fail(char *prog, char *msg) {
 }
 
 
-static void parse_host_and_port(char *prog, char *name, char *inp, int wildcard_okay, int *ip, int *port) {
-    struct in_addr read_addr;
+static void parse_host_and_port(char *prog, char *name, char *inp, int wildcard_okay, char **ip, char **port) {
     char buf[150];
     char *sp;
-    int res;
 
     if (strlen(inp) >= sizeof buf) {
-        snprintf(buf, sizeof buf, "invalid option for %s HOST:PORT\n", name);
+        snprintf(buf, sizeof buf, "invalid option for %s HOST,PORT\n", name);
         usage_fail(prog, buf);
     }
 
-    sp = strchr(inp, ':');
+    sp = strchr(inp, ',');
     if (!sp) {
-        snprintf(buf, sizeof buf, "invalid option for %s HOST:PORT\n", name);
+        snprintf(buf, sizeof buf, "invalid option for %s HOST,PORT\n", name);
         usage_fail(prog, buf);
     }
 
@@ -617,35 +625,24 @@ static void parse_host_and_port(char *prog, char *name, char *inp, int wildcard_
             snprintf(buf, sizeof buf, "wildcard host specification invalid for %s\n", name);
             usage_fail(prog, buf);
         }
-        *ip = INADDR_ANY;
+        *ip = NULL;
     }
     else {
-        strncpy(buf, inp, sp-inp);
-        buf[sp-inp] = 0;
-        res = inet_pton(AF_INET, buf, &read_addr);
-        if (res != 1) {
-            snprintf(buf, sizeof buf,
-            "invalid format for %s HOST:PORT option; use \"127.0.0.1:8000\" or similar\n", name);
-            usage_fail(prog, buf);
-        }
-        *ip = read_addr.s_addr;
+        *sp = 0;
+        *ip = inp;
     }
-
-    *port = strtol(sp + 1, NULL, 10);
-    if (errno || *port < 1 || *port > 65536) 
-        usage_fail(prog, "invalid option for PORT; please provide a port number between 1 and 65536\n");
-    *port = htons(*port);
+    *port = sp + 1;
 }
 
 
 /* Handle command line arguments modifying behavior */
 static void parse_cli(int argc, char **argv) {
     char *prog = argv[0];
-    OPTIONS.FRONT_IP = INADDR_ANY;
-    OPTIONS.FRONT_PORT = htons(8443);
+    OPTIONS.FRONT_IP = NULL;
+    OPTIONS.FRONT_PORT = "8443";
 
-    OPTIONS.BACK_IP = (127 | 1 << 24);
-    OPTIONS.BACK_PORT = htons(8000);
+    OPTIONS.BACK_IP = "127.0.0.1";
+    OPTIONS.BACK_PORT = "8000";
 
     OPTIONS.ETYPE = ENC_TLS;
 
@@ -730,9 +727,18 @@ int main(int argc, char **argv) {
     int s = create_main_socket();
     int x;
 
-    backaddr.sin_family = AF_INET;
-    backaddr.sin_addr.s_addr = OPTIONS.BACK_IP;
-    backaddr.sin_port = OPTIONS.BACK_PORT;
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = 0;
+    const int gai_err = getaddrinfo(OPTIONS.FRONT_IP,
+                                    OPTIONS.FRONT_PORT,
+                                    &hints, &backaddr);
+    if (gai_err != 0) {
+        fprintf(stderr, "{getaddrinfo}: [%s]", gai_strerror(gai_err));
+        exit(1);
+    }
 
     /* load certificate, pass to handle_connections */
     SSL_CTX * ctx = init_openssl();
