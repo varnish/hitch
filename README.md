@@ -17,7 +17,7 @@ backend like haproxy or nginx.  It maintains a strict 1:1 connection pattern
 with this backend handler so that the backend can dictate throttling behavior,
 maxmium connection behavior, availability of service, etc.
 
-`stud` has one "cool trick"--it will optionally write the client IPv4 address
+`stud` has one "cool trick"--it will optionally write the client IP address
 as the first four octets little endian.  In this way, backends who care about
 the client IP can still access it even though `stud` itself appears to be
 the connected client.
@@ -67,8 +67,9 @@ The entire set of arguments can be invoked with `stud -h`:
       -n CORES                 (number of worker processes, default 1)
 
     Special:
-      --write-ipv4             (write remote IPv4 in first 4 octets
-                                little-endian to backend)
+      --write-ip               (write 1 octet with the IP family followed by
+                                4 (IPv4) or 8 (IPv6) octets little-endian
+                                to backend before the actual data)
 
 `stud` uses no configuration file.
 
