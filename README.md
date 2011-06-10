@@ -30,10 +30,10 @@ Requirements and Limitations
     libev >= 4
     openssl (recent, >=1.0.0 recommended)
 
-Stud does not yet support IPv6.
+Stud currently works on Linux, OpenBSD and MacOSX.
 
-Additionally, `stud` is currently Linux-only.  While porting it to other POSIX
-platforms is likely trivial, it hasn't be done yet.  Patches welcome!
+While porting it to other POSIX platforms is likely trivial, it hasn't be done
+yet. Patches welcome!
 
 If you're handling a large number of connections, you'll
 probably want to raise `ulimit -n` before running `stud`.
@@ -56,11 +56,11 @@ The entire set of arguments can be invoked with `stud -h`:
 
     Encryption Methods:
       --tls                    (TLSv1, default)
-      --ssl                    (SSLv2/SSLv3)
+      --ssl                    (SSLv3)
 
     Socket:
-      -b HOST:PORT             (backend [connect], default "127.0.0.1:8000")
-      -f HOST:PORT             (frontend [bind], default "*:8443")
+      -b HOST,PORT             (backend [connect], default "127.0.0.1,8000")
+      -f HOST,PORT             (frontend [bind], default "*,8443")
 
     Performance:
       -n CORES                 (number of worker processes, default 1)
