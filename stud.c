@@ -185,7 +185,8 @@ static int create_main_socket() {
         perror("{bind-socket}");
         exit(1);
     }
-
+    freeaddrinfo(ai);
+    
     listen(s, 100);
 
     return s;
