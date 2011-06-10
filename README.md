@@ -67,8 +67,9 @@ The entire set of arguments can be invoked with `stud -h`:
       -n CORES                 (number of worker processes, default 1)
 
     Special:
-      --write-ip               (write 1 octet with the IP family followed by 4 (IPv4)
-                                or 8 (IPv6) octets little-endian to backend)
+      --write-ip               (write 1 octet with the IP family followed by
+                                4 (IPv4) or 8 (IPv6) octets little-endian
+                                to backend before the actual data)
 
 `stud` uses no configuration file.
 

@@ -610,8 +610,9 @@ static void usage_fail(char *prog, char *msg) {
 "  -n CORES                 (number of worker processes, default 1)\n"
 "\n"
 "Special:\n"
-"  --write-ip               (write 1 octet with the IP family followed by 4 (IPv4) "
-"                            or 8 (IPv6) octets little-endian to backend)\n"
+"  --write-ip               (write 1 octet with the IP family followed by\n"
+"                            4 (IPv4) or 8 (IPv6) octets little-endian\n"
+"                            to backend before the actual data)\n"
 );
     exit(1);
 }
