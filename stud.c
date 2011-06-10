@@ -27,8 +27,8 @@
   *
   **/
 
-#include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/wait.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -48,6 +48,13 @@
 #include <ev.h>
 
 #include "ringbuffer.h"
+
+#ifndef MSG_NOSIGNAL
+# define MSG_NOSIGNAL 0
+#endif
+#ifdef __linux__
+# define HAVE_SCHED_AFFINITY
+#endif
 
 /* Globals */
 static struct ev_loop *loop;
@@ -519,6 +526,7 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
  * on the bound socket, etc */
 static void handle_connections(int x, int sock, SSL_CTX *ctx) {
     fprintf(stderr, "{core} Process %d online\n", x);
+#ifdef HAVE_SCHED_AFFINITY    
     cpu_set_t cpus;
 
     CPU_ZERO(&cpus);
@@ -529,7 +537,8 @@ static void handle_connections(int x, int sock, SSL_CTX *ctx) {
         fprintf(stderr, "{core} Successfully attached to CPU #%d\n", x);
     else
         fprintf(stderr, "{core-warning} Unable to attach to CPU #%d; do you have that many cores?\n", x);
-
+#endif
+    
     loop = ev_default_loop(EVFLAG_AUTO);
     ev_io listener;
 
