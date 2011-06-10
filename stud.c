@@ -135,7 +135,10 @@ static SSL_CTX * init_openssl() {
         ctx = SSL_CTX_new(SSLv23_server_method());
     else
         assert(OPTIONS.ETYPE == ENC_TLS || OPTIONS.ETYPE == ENC_SSL);
-
+    
+    SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_ALL |
+                        SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION);
+    
     if (SSL_CTX_use_certificate_file(ctx, OPTIONS.CERT_FILE, SSL_FILETYPE_PEM) <= 0)
         ERR_print_errors_fp(stderr);
     if (SSL_CTX_use_RSAPrivateKey_file(ctx, OPTIONS.CERT_FILE, SSL_FILETYPE_PEM) <= 0)
@@ -569,7 +572,7 @@ static void usage_fail(char *prog, char *msg) {
     fprintf(stderr,
 "Encryption Methods:\n"
 "  --tls                    (TLSv1, default)\n"
-"  --ssl                    (SSLv2/SSLv3)\n"
+"  --ssl                    (SSLv3)\n"
 "\n"
 "Socket:\n"
 "  -b HOST:PORT             (backend [connect], default \"127.0.0.1:8000\")\n"
