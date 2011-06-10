@@ -72,6 +72,7 @@ typedef struct stud_options {
     int BACK_PORT;
     int NCORES;
     char *CERT_FILE;
+    char *CIPHER_SUITE;
 } stud_options;
 
 static stud_options OPTIONS;
@@ -143,6 +144,10 @@ static SSL_CTX * init_openssl() {
         ERR_print_errors_fp(stderr);
     if (SSL_CTX_use_RSAPrivateKey_file(ctx, OPTIONS.CERT_FILE, SSL_FILETYPE_PEM) <= 0)
         ERR_print_errors_fp(stderr);
+    
+    if (OPTIONS.CIPHER_SUITE)
+        if (SSL_CTX_set_cipher_list(ctx, OPTIONS.CIPHER_SUITE) != 1)
+            ERR_print_errors_fp(stderr);            
 
     return ctx;
 }
@@ -573,6 +578,7 @@ static void usage_fail(char *prog, char *msg) {
 "Encryption Methods:\n"
 "  --tls                    (TLSv1, default)\n"
 "  --ssl                    (SSLv3)\n"
+"  -c CIPHER_SUITE          (set allowed ciphers)\n"            
 "\n"
 "Socket:\n"
 "  -b HOST:PORT             (backend [connect], default \"127.0.0.1:8000\")\n"
@@ -647,6 +653,8 @@ static void parse_cli(int argc, char **argv) {
 
     OPTIONS.WRITE_IP_OCTET = 0;
 
+    OPTIONS.CIPHER_SUITE = NULL;
+    
     static int tls = 0, ssl = 0, writeip = 0;
     int c;
 
@@ -660,7 +668,7 @@ static void parse_cli(int argc, char **argv) {
 
     while (1) {
         int option_index = 0;
-        c = getopt_long(argc, argv, "hf:b:n:",
+        c = getopt_long(argc, argv, "hf:b:n:c:",
                 long_options, &option_index);
 
         if (c == -1)
@@ -683,6 +691,10 @@ static void parse_cli(int argc, char **argv) {
 
         case 'f':
             parse_host_and_port(prog, "-f", optarg, 1, &(OPTIONS.FRONT_IP), &(OPTIONS.FRONT_PORT));
+            break;
+            
+        case 'c':
+            OPTIONS.CIPHER_SUITE = optarg;
             break;
 
         default:
