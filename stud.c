@@ -153,7 +153,7 @@ static SSL_CTX * init_openssl() {
     return ctx;
 }
 
-/* Create the bound IPv4 socket in the parent process */
+/* Create the bound socket in the parent process */
 static int create_main_socket() {
     struct addrinfo *ai, hints;
     memset(&hints, 0, sizeof hints);
@@ -164,7 +164,12 @@ static int create_main_socket() {
                                     OPTIONS.FRONT_PORT,
                                     &hints, &ai);
     if (gai_err != 0) {
-        fprintf(stderr, "{getaddrinfo}: [%s]", gai_strerror(gai_err));
+        fprintf(stderr, "{getaddrinfo}: [%s]\n", gai_strerror(gai_err));
+        exit(1);
+    }
+    
+    if (ai->ai_family != AF_INET && OPTIONS.WRITE_IP_OCTET) {
+        fprintf(stderr, "--write-ipv4 is only compatible with IPv4\n");
         exit(1);
     }
     
