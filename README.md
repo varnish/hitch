@@ -75,6 +75,12 @@ The entire set of arguments can be invoked with `stud -h`:
 Authors
 -------
 
-`stud` was initially written by Jamie Turner <jamie@bu.mp> and is maintained
-by the Bump server team.  It currently (6/11) provides server-side TLS
-termination for over 40 million Bump users.
+`stud` was originally written by Jamie Turner (@jamwt) and is maintained
+by the Bump (http://bu.mp) server team.  It currently (6/11) provides
+server-side TLS termination for over 40 million Bump users.
+
+Contributors:
+
+    * Colin Percival @cpercival -- early audit and code review
+    * Frank DENIS @jedisct1     -- port to BSD, IPv6 support, various fixes
+
