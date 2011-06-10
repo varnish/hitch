@@ -592,7 +592,7 @@ static void parse_host_and_port(char *prog, char *name, char *inp, int wildcard_
     char *sp;
     int res;
 
-    if (strlen(inp) > 149) {
+    if (strlen(inp) >= sizeof buf) {
         snprintf(buf, sizeof buf, "invalid option for %s HOST:PORT\n", name);
         usage_fail(prog, buf);
     }
