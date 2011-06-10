@@ -737,8 +737,8 @@ int main(int argc, char **argv) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = 0;
-    const int gai_err = getaddrinfo(OPTIONS.FRONT_IP,
-                                    OPTIONS.FRONT_PORT,
+    const int gai_err = getaddrinfo(OPTIONS.BACK_IP,
+                                    OPTIONS.BACK_PORT,
                                     &hints, &backaddr);
     if (gai_err != 0) {
         fprintf(stderr, "{getaddrinfo}: [%s]", gai_strerror(gai_err));
