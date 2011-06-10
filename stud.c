@@ -341,8 +341,8 @@ static void handle_connect(struct ev_loop *loop, ev_io *w, int revents) {
             *ring_pnt++ = (unsigned char) ps->remote_ip.ss_family;
             if (ps->remote_ip.ss_family == AF_INET6) {
                 memcpy(ring_pnt, &((struct sockaddr_in6 *) &ps->remote_ip)
-                       ->sin6_addr.s6_addr, 8U);
-                ringbuffer_write_append(&ps->ring_down, 1U + 8U);
+                       ->sin6_addr.s6_addr, 16U);
+                ringbuffer_write_append(&ps->ring_down, 1U + 16U);
             } else {
                 memcpy(ring_pnt, &((struct sockaddr_in *) &ps->remote_ip)
                        ->sin_addr.s_addr, 4U);
@@ -611,7 +611,7 @@ static void usage_fail(char *prog, char *msg) {
 "\n"
 "Special:\n"
 "  --write-ip               (write 1 octet with the IP family followed by\n"
-"                            4 (IPv4) or 8 (IPv6) octets little-endian\n"
+"                            4 (IPv4) or 16 (IPv6) octets little-endian\n"
 "                            to backend before the actual data)\n"
 );
     exit(1);

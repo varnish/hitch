@@ -68,7 +68,7 @@ The entire set of arguments can be invoked with `stud -h`:
 
     Special:
       --write-ip               (write 1 octet with the IP family followed by
-                                4 (IPv4) or 8 (IPv6) octets little-endian
+                                4 (IPv4) or 16 (IPv6) octets little-endian
                                 to backend before the actual data)
 
 `stud` uses no configuration file.
