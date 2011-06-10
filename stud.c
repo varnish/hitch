@@ -149,7 +149,7 @@ static SSL_CTX * init_openssl() {
 
 /* Create the bound IPv4 socket in the parent process */
 static int create_main_socket() {
-    int s = socket(AF_INET, SOCK_STREAM, 0);
+    int s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     int t = 1;
     setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(int));
     setnonblocking(s);
@@ -171,7 +171,7 @@ static int create_main_socket() {
 /* Initiate a clear-text nonblocking connect() to the backend IP on behalf
  * of a newly connected upstream (encrypted) client*/
 static int create_back_socket() {
-    int s = socket(AF_INET, SOCK_STREAM, 0);
+    int s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     int t = 1;
     setnonblocking(s);
     t = connect(s, (struct sockaddr *)&backaddr, sizeof(backaddr));
