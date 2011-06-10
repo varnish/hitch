@@ -599,7 +599,7 @@ static void parse_host_and_port(char *prog, char *name, char *inp, int wildcard_
 
     if (!strncmp(inp, "*", sp - inp)) {
         if (!wildcard_okay) {
-            sprintf(buf, "wildcard host specification invalid for %s\n", name);
+            snprintf(buf, sizeof buf, "wildcard host specification invalid for %s\n", name);
             usage_fail(prog, buf);
         }
         *ip = INADDR_ANY;
@@ -609,7 +609,7 @@ static void parse_host_and_port(char *prog, char *name, char *inp, int wildcard_
         buf[sp-inp] = 0;
         res = inet_pton(AF_INET, buf, &read_addr);
         if (res != 1) {
-            sprintf(buf, 
+            snprintf(buf, sizeof buf,
             "invalid format for %s HOST:PORT option; use \"127.0.0.1:8000\" or similar\n", name);
             usage_fail(prog, buf);
         }
