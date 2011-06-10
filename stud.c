@@ -238,6 +238,7 @@ static void handle_socket_errno(proxystate *ps) {
  * write it into the upstream buffer and make sure the write event is
  * enabled for the upstream socket */
 static void back_read(struct ev_loop *loop, ev_io *w, int revents) {
+    (void) revents;
     int t;
     proxystate *ps = (proxystate *)w->data;
     if (ps->want_shutdown) {
@@ -266,6 +267,7 @@ static void back_read(struct ev_loop *loop, ev_io *w, int revents) {
 /* Write some data, previously received on the secure upstream socket,
  * out of the downstream buffer and onto the backend socket */
 static void back_write(struct ev_loop *loop, ev_io *w, int revents) {
+    (void) revents;
     int t;
     proxystate *ps = (proxystate *)w->data;
     int fd = w->fd;
@@ -303,6 +305,7 @@ static void start_handshake(proxystate *ps, int err);
 /* Continue/complete the asynchronous connect() before starting data transmission
  * between front/backend */
 static void handle_connect(struct ev_loop *loop, ev_io *w, int revents) {
+    (void) revents;
     int t;
     proxystate *ps = (proxystate *)w->data;
     t = connect(ps->fd_down, (struct sockaddr *)&backaddr, sizeof(backaddr));
@@ -359,6 +362,7 @@ static void end_handshake(proxystate *ps) {
  * let OpenSSL do what it likes with the socket and obey its requests for reads
  * or writes */
 static void client_handshake(struct ev_loop *loop, ev_io *w, int revents) {
+    (void) revents;
     int t;
     proxystate *ps = (proxystate *)w->data;
 
@@ -404,7 +408,8 @@ static void handle_fatal_ssl_error(proxystate *ps, int err) {
 /* Read some data from the upstream secure socket via OpenSSL,
  * and buffer anything we get for writing to the backend */
 static void client_read(struct ev_loop *loop, ev_io *w, int revents) {
-    int t;
+    (void) revents;
+    int t;    
     proxystate *ps = (proxystate *)w->data;
     if (ps->want_shutdown) {
         ev_io_stop(loop, &ps->ev_r_up);
@@ -432,6 +437,7 @@ static void client_read(struct ev_loop *loop, ev_io *w, int revents) {
 /* Write some previously-buffered backend data upstream on the
  * secure socket using OpenSSL */
 static void client_write(struct ev_loop *loop, ev_io *w, int revents) {
+    (void) revents;
     int t;
     int sz;
     proxystate *ps = (proxystate *)w->data;
@@ -469,6 +475,7 @@ static void client_write(struct ev_loop *loop, ev_io *w, int revents) {
  * the proxystate is allocated and initalized, and we're off the races
  * connecting to the backend */
 static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
+    (void) revents;
     struct sockaddr addr;
     socklen_t sl = sizeof(addr);
     int client = accept(w->fd, &addr, &sl);
@@ -587,13 +594,13 @@ static void parse_host_and_port(char *prog, char *name, char *inp, int wildcard_
     int res;
 
     if (strlen(inp) > 149) {
-        sprintf(buf, "invalid option for %s HOST:PORT\n", name);
+        snprintf(buf, sizeof buf, "invalid option for %s HOST:PORT\n", name);
         usage_fail(prog, buf);
     }
 
     sp = strchr(inp, ':');
     if (!sp) {
-        sprintf(buf, "invalid option for %s HOST:PORT\n", name);
+        snprintf(buf, sizeof buf, "invalid option for %s HOST:PORT\n", name);
         usage_fail(prog, buf);
     }
 

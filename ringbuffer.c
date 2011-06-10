@@ -94,6 +94,7 @@ int ringbuffer_size(ringbuffer *rb) {
 
 /* Used size of the ringbuffer */
 int ringbuffer_capacity(ringbuffer *rb) {
+    (void) rb;
     return RING_SLOTS;
 }
 
