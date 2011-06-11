@@ -30,7 +30,8 @@ Requirements and Limitations
     libev >= 4
     openssl (recent, >=1.0.0 recommended)
 
-Stud currently works on Linux, OpenBSD and MacOSX.
+Stud currently works on Linux, OpenBSD, FreeBSD, and MacOSX.
+It has been tested the most heavily on Linux/x86_64.
 
 While porting it to other POSIX platforms is likely trivial, it hasn't be done
 yet. Patches welcome!
