@@ -28,6 +28,7 @@
   **/
 
 #include <sys/types.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <sys/wait.h>
@@ -117,11 +118,9 @@ typedef struct proxystate {
 
 /* set a file descriptor (socket) to non-blocking mode */
 static void setnonblocking(int fd) {
-    int flags;
-    if (-1 == (flags = fcntl(fd, F_GETFL, 0)))
-        flags = 0;
-    int fcntl_nonblocking_ok = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-    assert (fcntl_nonblocking_ok != -1);
+    int flag = 1;
+
+    assert (ioctl(fd, FIONBIO, &flag) == 0);
 }
 
 /* Init library and load specified certificate.
