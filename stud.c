@@ -69,6 +69,7 @@ typedef enum {
 typedef struct stud_options {
     ENC_TYPE ETYPE;
     int WRITE_IP_OCTET;
+    int WRITE_PROXY_LINE;
     char *FRONT_IP;
     char *FRONT_PORT;
     char *BACK_IP;
@@ -79,6 +80,8 @@ typedef struct stud_options {
 } stud_options;
 
 static stud_options OPTIONS;
+static char tcp4_proxy_line[64] = "";
+static char tcp6_proxy_line[128] = "";
 
 /* What agent/state requests the shutdown--for proper half-closed
  * handling */
@@ -153,6 +156,26 @@ static SSL_CTX * init_openssl() {
     return ctx;
 }
 
+static void prepare_proxy_line(struct sockaddr* ai_addr) {
+    tcp4_proxy_line[0] = 0;
+    tcp6_proxy_line[0] = 0;
+
+    if (ai_addr->sa_family == AF_INET) {
+        struct sockaddr_in* addr = (struct sockaddr_in*)ai_addr;
+        size_t res = snprintf(tcp4_proxy_line,
+                sizeof(tcp4_proxy_line),
+                "PROXY TCP4 %%s %s %%hu %hu\r\n",
+                inet_ntoa(addr->sin_addr),
+                ntohs(addr->sin_port));
+        assert(res < sizeof(tcp4_proxy_line));
+    }
+    else {
+        // TODO: AF_INET6
+        fprintf(stderr, "The --write-proxy mode is not implemented for this address family.\n");
+        exit(1);
+    }
+}
+
 /* Create the bound socket in the parent process */
 static int create_main_socket() {
     struct addrinfo *ai, hints;
@@ -179,6 +202,9 @@ static int create_main_socket() {
         perror("{bind-socket}");
         exit(1);
     }
+
+    prepare_proxy_line(ai->ai_addr);
+
     freeaddrinfo(ai);
     
     listen(s, 100);
@@ -333,7 +359,19 @@ static void handle_connect(struct ev_loop *loop, ev_io *w, int revents) {
         ev_io_init(&ps->ev_w_down, back_write, ps->fd_down, EV_WRITE);
         start_handshake(ps, SSL_ERROR_WANT_READ); /* for client-first handshake */
         ev_io_start(loop, &ps->ev_r_down);
-        if (OPTIONS.WRITE_IP_OCTET) {
+        if (OPTIONS.WRITE_PROXY_LINE) {
+            char *ring_pnt = ringbuffer_write_ptr(&ps->ring_down);
+            struct sockaddr_in* addr = (struct sockaddr_in*)&ps->remote_ip;
+            assert(ps->remote_ip.ss_family == AF_INET);
+            size_t written = snprintf(ring_pnt,
+                    RING_DATA_LEN,
+                    tcp4_proxy_line,
+                    inet_ntoa(addr->sin_addr),
+                    ntohs(addr->sin_port));
+            ringbuffer_write_append(&ps->ring_down, written);
+            ev_io_start(loop, &ps->ev_w_down);
+        }
+        else if (OPTIONS.WRITE_IP_OCTET) {
             char *ring_pnt = ringbuffer_write_ptr(&ps->ring_down);
             assert(ps->remote_ip.ss_family == AF_INET ||
                    ps->remote_ip.ss_family == AF_INET6);
@@ -612,6 +650,12 @@ static void usage_fail(char *prog, char *msg) {
 "  --write-ip               (write 1 octet with the IP family followed by\n"
 "                            4 (IPv4) or 16 (IPv6) octets little-endian\n"
 "                            to backend before the actual data)\n"
+"  --write-proxy            (write HaProxy's PROXY protocol line before actual data:\n"
+"                            \"PROXY TCP4 <source-ip> <dest-ip> <source-port> <dest-port>\\r\\n\"\n"
+"                            Note, that currently only TCP4 implemented. Also note, that dest-ip\n"
+"                            and dest-port are initialized once after the socket is bound. It means\n"
+"                            that you will get 0.0.0.0 as dest-ip instead of actual IP if that what\n"
+"                            the listening socket was bound to)\n"
 );
     exit(1);
 }
@@ -662,9 +706,11 @@ static void parse_cli(int argc, char **argv) {
 
     OPTIONS.WRITE_IP_OCTET = 0;
 
+    OPTIONS.WRITE_PROXY_LINE = 0;
+
     OPTIONS.CIPHER_SUITE = NULL;
-    
-    static int tls = 0, ssl = 0, writeip = 0;
+
+    static int tls = 0, ssl = 0, writeip = 0, writeproxy = 0;
     int c;
 
     static struct option long_options[] =
@@ -672,6 +718,7 @@ static void parse_cli(int argc, char **argv) {
         {"tls", 0, &tls, 1},
         {"ssl", 0, &ssl, 1},
         {"write-ip", 0, &writeip, 1},
+        {"write-proxy", 0, &writeproxy, 1},
         {0, 0, 0, 0}
     };
 
@@ -720,6 +767,9 @@ static void parse_cli(int argc, char **argv) {
 
     if (writeip)
         OPTIONS.WRITE_IP_OCTET = 1;
+
+    if (writeproxy)
+        OPTIONS.WRITE_PROXY_LINE = 1;
 
     argc -= optind;
     argv += optind;
