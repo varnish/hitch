@@ -39,6 +39,8 @@ yet. Patches welcome!
 
 If you're handling a large number of connections, you'll
 probably want to raise `ulimit -n` before running `stud`.
+It's very strongly recommended to not run `stud` as root; ideally, it would
+be run as a user ("stud", perhaps) that does nothing but run `stud`.
 
 Installing
 ----------
