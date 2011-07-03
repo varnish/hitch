@@ -18,9 +18,10 @@ with this backend handler so that the backend can dictate throttling behavior,
 maxmium connection behavior, availability of service, etc.
 
 `stud` has one "cool trick"--it will optionally write the client IP address
-as the first few octets (depending on IPv4 or IPv6) to the backend.  In this way,
-backends who care about the client IP can still access it even though `stud`
-itself appears to be the connected client.
+as the first few octets (depending on IPv4 or IPv6) to the backend--or provide
+that information using HAProxy's PROXY protocol.  In this way, backends
+who care about the client IP can still access it even though `stud` itself
+appears to be the connected client.
 
 Requirements and Limitations
 ----------------------------
@@ -71,6 +72,12 @@ The entire set of arguments can be invoked with `stud -h`:
       --write-ip               (write 1 octet with the IP family followed by
                                 4 (IPv4) or 16 (IPv6) octets little-endian
                                 to backend before the actual data)
+      --write-proxy            (write HaProxy's PROXY protocol line before actual data:
+                                "PROXY TCP4 <source-ip> <dest-ip> <source-port> <dest-port>\r\n"
+                                Note, that currently only TCP4 implemented. Also note, that dest-ip
+                                and dest-port are initialized once after the socket is bound. It means
+                                that you will get 0.0.0.0 as dest-ip instead of actual IP if that what
+                                the listening socket was bound to)
 
 `stud` uses no configuration file.
 
@@ -85,4 +92,5 @@ Contributors:
 
     * Colin Percival @cperciva  -- early audit and code review
     * Frank DENIS @jedisct1     -- port to BSD, IPv6 support, various fixes
+    * Denis Bilenko             -- HAProxy PROXY protocol support
 
