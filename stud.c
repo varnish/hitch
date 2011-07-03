@@ -771,6 +771,9 @@ static void parse_cli(int argc, char **argv) {
     if (writeproxy)
         OPTIONS.WRITE_PROXY_LINE = 1;
 
+    if (writeip && writeproxy)
+        usage_fail(prog, "Cannot specify both --write-ip and --write-proxy; pick one!");
+
     argc -= optind;
     argv += optind;
 
