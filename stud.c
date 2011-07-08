@@ -632,6 +632,7 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
 
 
 static void check_ppid(struct ev_loop *loop, ev_timer *w, int revents) {
+    (void) revents;
     pid_t ppid = getppid();
     if (ppid != master_pid) {
         fprintf(stderr, "{core} Process %d detected parent death, closing listener socket.\n", child_num);
