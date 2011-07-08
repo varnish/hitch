@@ -59,6 +59,10 @@
 /* Globals */
 static struct ev_loop *loop;
 static struct addrinfo *backaddr;
+static pid_t master_pid;
+static ev_io listener;
+static int listener_socket;
+static int child_num;
 
 /* Command line Options */
 typedef enum {
@@ -599,34 +603,48 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
 
 }
 
+
+static void check_ppid(struct ev_loop *loop, ev_timer *w, int revents) {
+    pid_t ppid = getppid();
+    if (ppid != master_pid) {
+        fprintf(stderr, "{core} Process %d detected parent death, closing listener socket.\n", child_num);
+        ev_timer_stop(loop, w);
+        ev_io_stop(loop, &listener);
+        close(listener_socket);
+    }
+
+}
+
+
 /* Set up the child (worker) process including libev event loop, read event
  * on the bound socket, etc */
-static void handle_connections(int x, int sock, SSL_CTX *ctx) {
-    fprintf(stderr, "{core} Process %d online\n", x);
+static void handle_connections(SSL_CTX *ctx) {
+    fprintf(stderr, "{core} Process %d online\n", child_num);
 #if defined(CPU_ZERO) && defined(CPU_SET)
     cpu_set_t cpus;
 
     CPU_ZERO(&cpus);
-    CPU_SET(x, &cpus);
+    CPU_SET(child_num, &cpus);
 
     int res = sched_setaffinity(0, sizeof(cpus), &cpus);
     if (!res)
-        fprintf(stderr, "{core} Successfully attached to CPU #%d\n", x);
+        fprintf(stderr, "{core} Successfully attached to CPU #%d\n", child_num);
     else
-        fprintf(stderr, "{core-warning} Unable to attach to CPU #%d; do you have that many cores?\n", x);
+        fprintf(stderr, "{core-warning} Unable to attach to CPU #%d; do you have that many cores?\n", child_num);
 #endif
     
     loop = ev_default_loop(EVFLAG_AUTO);
-    ev_io listener;
 
-    ev_ref(loop);
+    ev_timer timer_ppid_check;
+    ev_timer_init(&timer_ppid_check, check_ppid, 1.0, 1.0);
+    ev_timer_start(loop, &timer_ppid_check);
 
-    ev_io_init(&listener, handle_accept, sock, EV_READ);
+    ev_io_init(&listener, handle_accept, listener_socket, EV_READ);
     listener.data = ctx;
     ev_io_start(loop, &listener);
 
     ev_loop(loop, 0);
-    fprintf(stderr, "{core-error} Child %d returned from ev_loop()!\n", x);
+    fprintf(stderr, "{core} Child %d exiting.\n", child_num);
     exit(1);
 }
 
@@ -787,14 +805,14 @@ static void parse_cli(int argc, char **argv) {
     OPTIONS.CERT_FILE = argv[0];
 }
 
+
 /* Process command line args, create the bound socket,
  * spawn child (worker) processes, and wait for them all to die
  * (which they shouldn't!) */
 int main(int argc, char **argv) {
     parse_cli(argc, argv);
 
-    int s = create_main_socket();
-    int x;
+    listener_socket = create_main_socket();
 
     struct addrinfo hints;
     memset(&hints, 0, sizeof hints);
@@ -811,7 +829,9 @@ int main(int argc, char **argv) {
     /* load certificate, pass to handle_connections */
     SSL_CTX * ctx = init_openssl();
 
-    for (x=0; x < OPTIONS.NCORES; x++) {
+    master_pid = getpid();
+
+    for (child_num=0; child_num < OPTIONS.NCORES; child_num++) {
         int pid = fork();
         if (pid == -1) {
             fprintf(stderr, "{core} fork() failed! Goodbye cruel world!\n");
@@ -822,14 +842,14 @@ int main(int argc, char **argv) {
     }
 
     int child_status;
-    for (x=0; x < OPTIONS.NCORES; x++) {
+    for (child_num=0; child_num < OPTIONS.NCORES; child_num++) {
         wait(&child_status);
         fprintf(stderr, "{core} A child died!  This should not happen! Goodbye cruel world!\n");
         exit(2);
     }
 
 handle:
-    handle_connections(x, s, ctx);
+    handle_connections(ctx);
 
     return 0;
 }
