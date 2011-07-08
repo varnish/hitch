@@ -144,10 +144,14 @@ static SSL_CTX * init_openssl() {
     SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_ALL |
                         SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION);
     
-    if (SSL_CTX_use_certificate_file(ctx, OPTIONS.CERT_FILE, SSL_FILETYPE_PEM) <= 0)
+    if (SSL_CTX_use_certificate_file(ctx, OPTIONS.CERT_FILE, SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
-    if (SSL_CTX_use_RSAPrivateKey_file(ctx, OPTIONS.CERT_FILE, SSL_FILETYPE_PEM) <= 0)
+        exit(1);
+    }
+    if (SSL_CTX_use_RSAPrivateKey_file(ctx, OPTIONS.CERT_FILE, SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
+        exit(1);
+    }
     
     if (OPTIONS.CIPHER_SUITE)
         if (SSL_CTX_set_cipher_list(ctx, OPTIONS.CIPHER_SUITE) != 1)
