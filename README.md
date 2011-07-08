@@ -40,7 +40,8 @@ yet. Patches welcome!
 If you're handling a large number of connections, you'll
 probably want to raise `ulimit -n` before running `stud`.
 It's very strongly recommended to not run `stud` as root; ideally, it would
-be run as a user ("stud", perhaps) that does nothing but run `stud`.
+be run as a user ("stud", perhaps) that does nothing but run `stud`.  Stud
+will setuid (using -u) after binding if you need to bind to a low port (< 1024).
 
 Installing
 ----------
@@ -70,6 +71,10 @@ The entire set of arguments can be invoked with `stud -h`:
     Performance:
       -n CORES                 (number of worker processes, default 1)
 
+    Security:
+      -r PATH                  (chroot)
+      -u USERNAME              (set gid/uid after binding the socket)
+
     Special:
       --write-ip               (write 1 octet with the IP family followed by
                                 4 (IPv4) or 16 (IPv6) octets little-endian
@@ -94,5 +99,4 @@ Contributors:
 
     * Colin Percival @cperciva  -- early audit and code review
     * Frank DENIS @jedisct1     -- port to BSD, IPv6 support, various fixes
-    * Denis Bilenko             -- HAProxy PROXY protocol support
-
+    * Denis Bilenko             -- HAProxy PROXY protocol support, chroot/setuid
