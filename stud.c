@@ -43,6 +43,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <pwd.h>
+#include <limits.h>
 
 #include <sched.h>
 
@@ -55,6 +56,9 @@
 
 #ifndef MSG_NOSIGNAL
 # define MSG_NOSIGNAL 0
+#endif
+#ifndef AI_ADDRCONFIG
+# define AI_ADDRCONFIG 0
 #endif
 
 /* Globals */
@@ -82,7 +86,7 @@ typedef struct stud_options {
     char *FRONT_PORT;
     char *BACK_IP;
     char *BACK_PORT;
-    int NCORES;
+    long NCORES;
     char *CERT_FILE;
     char *CIPHER_SUITE;
 } stud_options;
@@ -776,9 +780,13 @@ static void parse_cli(int argc, char **argv) {
             break;
 
         case 'n':
+            errno = 0;
             OPTIONS.NCORES = strtol(optarg, NULL, 10);
-            if (errno || OPTIONS.NCORES < 1 || OPTIONS.NCORES > 128)
+            if ((errno == ERANGE &&
+                (OPTIONS.NCORES == LONG_MAX || OPTIONS.NCORES == LONG_MIN)) ||
+                OPTIONS.NCORES < 1 || OPTIONS.NCORES > 128) {
                 usage_fail(prog, "invalid option for -n CORES; please provide an integer between 1 and 128\n");
+            }
             break;
 
         case 'b':
