@@ -732,15 +732,15 @@ static void parse_cli(int argc, char **argv) {
 
     OPTIONS.CIPHER_SUITE = NULL;
 
-    static int tls = 0, ssl = 0, writeip = 0, writeproxy = 0;
+    static int tls = 0, ssl = 0;
     int c;
 
     static struct option long_options[] =
     {
         {"tls", 0, &tls, 1},
         {"ssl", 0, &ssl, 1},
-        {"write-ip", 0, &writeip, 1},
-        {"write-proxy", 0, &writeproxy, 1},
+        {"write-ip", 0, &OPTIONS.WRITE_IP_OCTET, 1},
+        {"write-proxy", 0, &OPTIONS.WRITE_PROXY_LINE, 1},
         {0, 0, 0, 0}
     };
 
@@ -787,13 +787,7 @@ static void parse_cli(int argc, char **argv) {
     if (ssl)
         OPTIONS.ETYPE = ENC_SSL; // implied.. else, TLS
 
-    if (writeip)
-        OPTIONS.WRITE_IP_OCTET = 1;
-
-    if (writeproxy)
-        OPTIONS.WRITE_PROXY_LINE = 1;
-
-    if (writeip && writeproxy)
+    if (OPTIONS.WRITE_IP_OCTET && OPTIONS.WRITE_PROXY_LINE)
         usage_fail(prog, "Cannot specify both --write-ip and --write-proxy; pick one!");
 
     argc -= optind;
