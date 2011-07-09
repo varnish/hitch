@@ -75,7 +75,9 @@ typedef struct stud_options {
     ENC_TYPE ETYPE;
     int WRITE_IP_OCTET;
     int WRITE_PROXY_LINE;
-    char* USERNAME;
+    char* CHROOT;
+    uid_t UID;
+    gid_t GID;
     char *FRONT_IP;
     char *FRONT_PORT;
     char *BACK_IP;
@@ -676,6 +678,7 @@ static void usage_fail(char *prog, char *msg) {
 "Performance:\n"
 "  -n CORES                 (number of worker processes, default 1)\n"
 "Security:\n"
+"  -r PATH                  (chroot)"
 "  -u USERNAME              (set gid/uid after binding the socket)"
 "\n"
 "Special:\n"
@@ -731,7 +734,9 @@ static void parse_cli(int argc, char **argv) {
 
     OPTIONS.BACK_IP = "127.0.0.1";
     OPTIONS.BACK_PORT = "8000";
-    OPTIONS.USERNAME = NULL;
+    
+    OPTIONS.UID = 0;
+    OPTIONS.GID = 0;
 
     OPTIONS.ETYPE = ENC_TLS;
 
@@ -745,6 +750,7 @@ static void parse_cli(int argc, char **argv) {
 
     static int tls = 0, ssl = 0;
     int c;
+    struct passwd* passwd;
 
     static struct option long_options[] =
     {
@@ -757,7 +763,7 @@ static void parse_cli(int argc, char **argv) {
 
     while (1) {
         int option_index = 0;
-        c = getopt_long(argc, argv, "hf:b:n:c:u:",
+        c = getopt_long(argc, argv, "hf:b:n:c:u:r:",
                 long_options, &option_index);
 
         if (c == -1)
@@ -787,7 +793,20 @@ static void parse_cli(int argc, char **argv) {
             break;
 
         case 'u':
-            OPTIONS.USERNAME = optarg;
+            passwd = getpwnam(optarg);
+            if (!passwd) {
+                if (errno)
+                    fail("getpwnam failed");
+                else
+                    fprintf(stderr, "user not found: %s\n", optarg);
+                exit(1);
+            }
+            OPTIONS.UID = passwd->pw_uid;
+            OPTIONS.GID = passwd->pw_gid;
+            break;
+
+        case 'r':
+            OPTIONS.CHROOT = optarg;
             break;
 
         default:
@@ -815,18 +834,17 @@ static void parse_cli(int argc, char **argv) {
 }
 
 
+void change_root() {
+    if (chroot(OPTIONS.CHROOT) == -1)
+        fail("chroot");
+    if (chdir("/"))
+        fail("chdir");
+}
+
 void drop_privileges() {
-    struct passwd* passwd = getpwnam(OPTIONS.USERNAME);
-    if (!passwd) {
-        if (errno)
-            fail("getpwnam failed");
-        else
-            fprintf(stderr, "user not found: %s\n", OPTIONS.USERNAME);
-        exit(1);
-    }
-    if (setgid(passwd->pw_gid))
+    if (setgid(OPTIONS.GID))
         fail("setgid failed");
-    if (setuid(passwd->pw_uid))
+    if (setuid(OPTIONS.UID))
         fail("setuid failed");
 }
 
@@ -855,8 +873,11 @@ int main(int argc, char **argv) {
     SSL_CTX * ctx = init_openssl();
 
     master_pid = getpid();
+
+    if (OPTIONS.CHROOT && OPTIONS.CHROOT[0])
+        change_root();
     
-    if (OPTIONS.USERNAME && OPTIONS.USERNAME[0])
+    if (OPTIONS.UID || OPTIONS.GID)
         drop_privileges();
 
     for (child_num=0; child_num < OPTIONS.NCORES; child_num++) {
