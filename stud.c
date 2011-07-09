@@ -42,6 +42,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <getopt.h>
+#include <pwd.h>
 
 #include <sched.h>
 
@@ -74,6 +75,7 @@ typedef struct stud_options {
     ENC_TYPE ETYPE;
     int WRITE_IP_OCTET;
     int WRITE_PROXY_LINE;
+    char* USERNAME;
     char *FRONT_IP;
     char *FRONT_PORT;
     char *BACK_IP;
@@ -673,6 +675,8 @@ static void usage_fail(char *prog, char *msg) {
 "\n"
 "Performance:\n"
 "  -n CORES                 (number of worker processes, default 1)\n"
+"Security:\n"
+"  -u USERNAME              (set gid/uid after binding the socket)"
 "\n"
 "Special:\n"
 "  --write-ip               (write 1 octet with the IP family followed by\n"
@@ -727,6 +731,7 @@ static void parse_cli(int argc, char **argv) {
 
     OPTIONS.BACK_IP = "127.0.0.1";
     OPTIONS.BACK_PORT = "8000";
+    OPTIONS.USERNAME = NULL;
 
     OPTIONS.ETYPE = ENC_TLS;
 
@@ -752,7 +757,7 @@ static void parse_cli(int argc, char **argv) {
 
     while (1) {
         int option_index = 0;
-        c = getopt_long(argc, argv, "hf:b:n:c:",
+        c = getopt_long(argc, argv, "hf:b:n:c:u:",
                 long_options, &option_index);
 
         if (c == -1)
@@ -781,6 +786,10 @@ static void parse_cli(int argc, char **argv) {
             OPTIONS.CIPHER_SUITE = optarg;
             break;
 
+        case 'u':
+            OPTIONS.USERNAME = optarg;
+            break;
+
         default:
             usage_fail(prog, NULL);
         }
@@ -803,6 +812,22 @@ static void parse_cli(int argc, char **argv) {
         usage_fail(prog, "exactly one argument is required: path to PEM file with cert/key");
 
     OPTIONS.CERT_FILE = argv[0];
+}
+
+
+void drop_privileges() {
+    struct passwd* passwd = getpwnam(OPTIONS.USERNAME);
+    if (!passwd) {
+        if (errno)
+            fail("getpwnam failed");
+        else
+            fprintf(stderr, "user not found: %s\n", OPTIONS.USERNAME);
+        exit(1);
+    }
+    if (setgid(passwd->pw_gid))
+        fail("setgid failed");
+    if (setuid(passwd->pw_uid))
+        fail("setuid failed");
 }
 
 
@@ -830,6 +855,9 @@ int main(int argc, char **argv) {
     SSL_CTX * ctx = init_openssl();
 
     master_pid = getpid();
+    
+    if (OPTIONS.USERNAME && OPTIONS.USERNAME[0])
+        drop_privileges();
 
     for (child_num=0; child_num < OPTIONS.NCORES; child_num++) {
         int pid = fork();
