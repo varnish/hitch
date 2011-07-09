@@ -805,7 +805,12 @@ static void parse_cli(int argc, char **argv) {
             break;
 
         case 'r':
-            OPTIONS.CHROOT = optarg;
+            if (optarg && optarg[0] == '/')
+                OPTIONS.CHROOT = optarg;
+            else {
+                fprintf(stderr, "chroot must be absolute path: \"%s\"\n", optarg);
+                exit(1);
+            }
             break;
 
         default:
