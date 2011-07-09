@@ -130,6 +130,13 @@ static void setnonblocking(int fd) {
     assert (ioctl(fd, FIONBIO, &flag) == 0);
 }
 
+
+static void fail(char* s) {
+    perror(s);
+    exit(1);
+}
+
+
 /* Init library and load specified certificate.
  * Establishes a SSL_ctx, to act as a template for
  * each connection */
@@ -207,8 +214,7 @@ static int create_main_socket() {
     setnonblocking(s);    
     
     if (bind(s, ai->ai_addr, ai->ai_addrlen)) {
-        perror("{bind-socket}");
-        exit(1);
+        fail("{bind-socket}");
     }
 
     prepare_proxy_line(ai->ai_addr);
