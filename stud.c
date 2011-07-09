@@ -87,7 +87,24 @@ typedef struct stud_options {
     char *CIPHER_SUITE;
 } stud_options;
 
-static stud_options OPTIONS;
+static stud_options OPTIONS = {
+    ENC_TLS,      // ETYPE
+    0,            // WRITE_IP_OCTET
+    0,            // WRITE_PROXY_LINE
+    NULL,         // CHROOT
+    0,            // UID
+    0,            // GID
+    NULL,         // FRONT_IP
+    "8443",       // FRONT_PORT
+    "127.0.0.1",  // BACK_IP
+    "8000",       // BACK_PORT
+    1,            // NCORES
+    NULL,         // CERT_FILE
+    NULL          // CIPHER_SUITE
+};
+
+
+
 static char tcp4_proxy_line[64] = "";
 static char tcp6_proxy_line[128] = "";
 
@@ -729,24 +746,6 @@ static void parse_host_and_port(char *prog, char *name, char *inp, int wildcard_
 /* Handle command line arguments modifying behavior */
 static void parse_cli(int argc, char **argv) {
     char *prog = argv[0];
-    OPTIONS.FRONT_IP = NULL;
-    OPTIONS.FRONT_PORT = "8443";
-
-    OPTIONS.BACK_IP = "127.0.0.1";
-    OPTIONS.BACK_PORT = "8000";
-    
-    OPTIONS.UID = 0;
-    OPTIONS.GID = 0;
-
-    OPTIONS.ETYPE = ENC_TLS;
-
-    OPTIONS.NCORES = 1;
-
-    OPTIONS.WRITE_IP_OCTET = 0;
-
-    OPTIONS.WRITE_PROXY_LINE = 0;
-
-    OPTIONS.CIPHER_SUITE = NULL;
 
     static int tls = 0, ssl = 0;
     int c;
