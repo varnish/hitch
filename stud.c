@@ -56,6 +56,9 @@
 #ifndef MSG_NOSIGNAL
 # define MSG_NOSIGNAL 0
 #endif
+#ifndef AI_ADDRCONFIG
+# define AI_ADDRCONFIG 0
+#endif
 
 /* Globals */
 static struct ev_loop *loop;
