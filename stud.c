@@ -89,6 +89,7 @@ typedef struct stud_options {
     long NCORES;
     char *CERT_FILE;
     char *CIPHER_SUITE;
+    int BACKLOG;
 } stud_options;
 
 static stud_options OPTIONS = {
@@ -104,7 +105,8 @@ static stud_options OPTIONS = {
     "8000",       // BACK_PORT
     1,            // NCORES
     NULL,         // CERT_FILE
-    NULL          // CIPHER_SUITE
+    NULL,         // CIPHER_SUITE
+    100           // BACKLOG
 };
 
 
@@ -246,7 +248,7 @@ static int create_main_socket() {
 
     freeaddrinfo(ai);
     
-    listen(s, 100);
+    listen(s, OPTIONS.BACKLOG);
 
     return s;
 }
@@ -700,6 +702,7 @@ static void usage_fail(char *prog, char *msg) {
 "\n"
 "Performance:\n"
 "  -n CORES                 (number of worker processes, default 1)\n"
+"  -B BACKLOG               (set listen backlog size, default 100)\n"
 "\n"
 "Security:\n"
 "  -r PATH                  (chroot)\n"
@@ -769,7 +772,7 @@ static void parse_cli(int argc, char **argv) {
 
     while (1) {
         int option_index = 0;
-        c = getopt_long(argc, argv, "hf:b:n:c:u:r:",
+        c = getopt_long(argc, argv, "hf:b:n:c:u:r:B:",
                 long_options, &option_index);
 
         if (c == -1)
@@ -820,6 +823,14 @@ static void parse_cli(int argc, char **argv) {
                 OPTIONS.CHROOT = optarg;
             else {
                 fprintf(stderr, "chroot must be absolute path: \"%s\"\n", optarg);
+                exit(1);
+            }
+            break;
+
+        case 'B':
+            OPTIONS.BACKLOG = atoi(optarg);
+            if ( OPTIONS.BACKLOG <= 0 ) {
+                fprintf(stderr, "listen backlog can not be set to %d\n", OPTIONS.BACKLOG);
                 exit(1);
             }
             break;
