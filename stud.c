@@ -79,16 +79,16 @@ typedef struct stud_options {
     ENC_TYPE ETYPE;
     int WRITE_IP_OCTET;
     int WRITE_PROXY_LINE;
-    char* CHROOT;
+    const char* CHROOT;
     uid_t UID;
     gid_t GID;
-    char *FRONT_IP;
-    char *FRONT_PORT;
-    char *BACK_IP;
-    char *BACK_PORT;
+    const char *FRONT_IP;
+    const char *FRONT_PORT;
+    const char *BACK_IP;
+    const char *BACK_PORT;
     long NCORES;
-    char *CERT_FILE;
-    char *CIPHER_SUITE;
+    const char *CERT_FILE;
+    const char *CIPHER_SUITE;
 } stud_options;
 
 static stud_options OPTIONS = {
@@ -156,7 +156,7 @@ static void setnonblocking(int fd) {
 }
 
 
-static void fail(char* s) {
+static void fail(const char* s) {
     perror(s);
     exit(1);
 }
@@ -682,7 +682,7 @@ static void handle_connections(SSL_CTX *ctx) {
 
 
 /* Print usage w/error message and exit failure */
-static void usage_fail(char *prog, char *msg) {
+static void usage_fail(const char *prog, const char *msg) {
     if (msg)
         fprintf(stderr, "%s: %s\n", prog, msg);
     fprintf(stderr, "usage: %s [OPTION] PEM\n", prog);
@@ -719,7 +719,7 @@ static void usage_fail(char *prog, char *msg) {
 }
 
 
-static void parse_host_and_port(char *prog, char *name, char *inp, int wildcard_okay, char **ip, char **port) {
+static void parse_host_and_port(const char *prog, const char *name, char *inp, int wildcard_okay, const char **ip, const char **port) {
     char buf[150];
     char *sp;
 
@@ -751,7 +751,7 @@ static void parse_host_and_port(char *prog, char *name, char *inp, int wildcard_
 
 /* Handle command line arguments modifying behavior */
 static void parse_cli(int argc, char **argv) {
-    char *prog = argv[0];
+    const char *prog = argv[0];
 
     static int tls = 0, ssl = 0;
     int c;
