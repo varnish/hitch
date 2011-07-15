@@ -109,3 +109,5 @@ Contributors:
     * Colin Percival @cperciva  -- early audit and code review
     * Frank DENIS @jedisct1     -- port to BSD, IPv6 support, various fixes
     * Denis Bilenko             -- HAProxy PROXY protocol support, chroot/setuid
+    * Joe Damato                -- Diffie-Hellman parameter loading
+    * Benjamin Pineau           -- Chained cert loading, various fixes
