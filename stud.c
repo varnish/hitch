@@ -53,6 +53,7 @@
 #include <ev.h>
 
 #include "ringbuffer.h"
+#include "shctx.h"
 
 #ifndef MSG_NOSIGNAL
 # define MSG_NOSIGNAL 0
@@ -90,6 +91,9 @@ typedef struct stud_options {
     char *CERT_FILE;
     char *CIPHER_SUITE;
     int BACKLOG;
+#ifdef USE_SHARED_CACHE
+    int SHARED_CACHE;
+#endif
 } stud_options;
 
 static stud_options OPTIONS = {
@@ -106,7 +110,10 @@ static stud_options OPTIONS = {
     1,            // NCORES
     NULL,         // CERT_FILE
     NULL,         // CIPHER_SUITE
-    100           // BACKLOG
+    100,          // BACKLOG
+#ifdef USE_SHARED_CACHE
+    0,            // SHARED_CACHE
+#endif
 };
 
 
@@ -194,6 +201,15 @@ static SSL_CTX * init_openssl() {
     if (OPTIONS.CIPHER_SUITE)
         if (SSL_CTX_set_cipher_list(ctx, OPTIONS.CIPHER_SUITE) != 1)
             ERR_print_errors_fp(stderr);            
+
+#ifdef USE_SHARED_CACHE
+    if (OPTIONS.SHARED_CACHE) {
+        if (shared_context_init(ctx, OPTIONS.SHARED_CACHE) < 0) {
+            fprintf(stderr, "Unable to alloc memory for shared cache.\n");
+            exit(1);
+        }
+    }
+#endif
 
     return ctx;
 }
@@ -703,6 +719,9 @@ static void usage_fail(char *prog, char *msg) {
 "Performance:\n"
 "  -n CORES                 (number of worker processes, default 1)\n"
 "  -B BACKLOG               (set listen backlog size, default 100)\n"
+#ifdef USE_SHARED_CACHE
+"  -C SHARED_CACHE          (set shared cache size in sessions, by default no shared cache)\n"
+#endif
 "\n"
 "Security:\n"
 "  -r PATH                  (chroot)\n"
@@ -772,7 +791,7 @@ static void parse_cli(int argc, char **argv) {
 
     while (1) {
         int option_index = 0;
-        c = getopt_long(argc, argv, "hf:b:n:c:u:r:B:",
+        c = getopt_long(argc, argv, "hf:b:n:c:u:r:B:C:",
                 long_options, &option_index);
 
         if (c == -1)
@@ -834,6 +853,16 @@ static void parse_cli(int argc, char **argv) {
                 exit(1);
             }
             break;
+
+#ifdef USE_SHARED_CACHE
+        case 'C':
+            OPTIONS.SHARED_CACHE = atoi(optarg);
+            if ( OPTIONS.SHARED_CACHE < 0 ) {
+                fprintf(stderr, "shared cache size can not be set to %d\n", OPTIONS.SHARED_CACHE);
+                exit(1);
+            }
+            break;
+#endif
 
         default:
             usage_fail(prog, NULL);
