@@ -88,6 +88,15 @@ The entire set of arguments can be invoked with `stud -h`:
 
 `stud` uses no configuration file.
 
+Diffie–Hellman
+--------------
+
+To use DH with stud, you will need to add some bytes to your pem file:
+
+% openssl dhparam -rand - 1024 >> PEMFILE
+
+Be sure to set your cipher suite appropriately: -c DHE-RSA-AES256-SHA
+
 Authors
 -------
 

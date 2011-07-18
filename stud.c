@@ -161,6 +161,37 @@ static void fail(char* s) {
     exit(1);
 }
 
+#ifndef OPENSSL_NO_DH
+static int init_dh(SSL_CTX *ctx, const char *cert) {
+    DH *dh;
+    BIO *bio;
+
+    if (!cert) {
+        fprintf(stderr, "No certificate available to load DH parameters\n");
+        return -1;
+    }
+
+    bio = BIO_new_file(cert, "r");
+    if (!bio) {
+      ERR_print_errors_fp(stderr);
+      return -1;
+    }
+
+    dh = PEM_read_bio_DHparams(bio, NULL, NULL, NULL);
+    BIO_free(bio);
+    if (!dh) {
+        fprintf(stderr, "Could not load DH parameters from %s\n", cert);
+        return -1;
+    }
+
+    fprintf(stderr, "Using DH parameters from %s\n", cert);
+    SSL_CTX_set_tmp_dh(ctx, dh);
+    fprintf(stderr, "DH initialized with %d bit key\n", 8*DH_size(dh));
+    DH_free(dh);
+
+    return 0;
+}
+#endif /* OPENSSL_NO_DH */
 
 /* Init library and load specified certificate.
  * Establishes a SSL_ctx, to act as a template for
@@ -188,7 +219,11 @@ static SSL_CTX * init_openssl() {
         ERR_print_errors_fp(stderr);
         exit(1);
     }
-    
+
+#ifndef OPENSSL_NO_DH
+    init_dh(ctx, OPTIONS.CERT_FILE);
+#endif /* OPENSSL_NO_DH */
+
     if (OPTIONS.CIPHER_SUITE)
         if (SSL_CTX_set_cipher_list(ctx, OPTIONS.CIPHER_SUITE) != 1)
             ERR_print_errors_fp(stderr);            
