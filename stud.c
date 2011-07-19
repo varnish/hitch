@@ -89,6 +89,7 @@ typedef struct stud_options {
     long NCORES;
     const char *CERT_FILE;
     const char *CIPHER_SUITE;
+    int QUIET;
 } stud_options;
 
 static stud_options OPTIONS = {
@@ -104,7 +105,8 @@ static stud_options OPTIONS = {
     "8000",       // BACK_PORT
     1,            // NCORES
     NULL,         // CERT_FILE
-    NULL          // CIPHER_SUITE
+    NULL,         // CIPHER_SUITE
+    0             // QUIET
 };
 
 
@@ -161,13 +163,19 @@ static void fail(const char* s) {
     exit(1);
 }
 
+#define LOG(...) \
+    do { if (!OPTIONS.QUIET) fprintf(stdout, __VA_ARGS__); } while(0)
+
+#define ERR(...) \
+    do { fprintf(stderr, __VA_ARGS__); } while(0)
+
 #ifndef OPENSSL_NO_DH
 static int init_dh(SSL_CTX *ctx, const char *cert) {
     DH *dh;
     BIO *bio;
 
     if (!cert) {
-        fprintf(stderr, "No certificate available to load DH parameters\n");
+        ERR("No certificate available to load DH parameters\n");
         return -1;
     }
 
@@ -180,13 +188,13 @@ static int init_dh(SSL_CTX *ctx, const char *cert) {
     dh = PEM_read_bio_DHparams(bio, NULL, NULL, NULL);
     BIO_free(bio);
     if (!dh) {
-        fprintf(stderr, "Could not load DH parameters from %s\n", cert);
+        ERR("Could not load DH parameters from %s\n", cert);
         return -1;
     }
 
-    fprintf(stderr, "Using DH parameters from %s\n", cert);
+    LOG("Using DH parameters from %s\n", cert);
     SSL_CTX_set_tmp_dh(ctx, dh);
-    fprintf(stderr, "DH initialized with %d bit key\n", 8*DH_size(dh));
+    LOG("DH initialized with %d bit key\n", 8*DH_size(dh));
     DH_free(dh);
 
     return 0;
@@ -207,10 +215,10 @@ static SSL_CTX * init_openssl() {
         ctx = SSL_CTX_new(SSLv23_server_method());
     else
         assert(OPTIONS.ETYPE == ENC_TLS || OPTIONS.ETYPE == ENC_SSL);
-    
+
     SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_ALL |
                         SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION);
-    
+
     if (SSL_CTX_use_certificate_chain_file(ctx, OPTIONS.CERT_FILE) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(1);
@@ -226,7 +234,7 @@ static SSL_CTX * init_openssl() {
 
     if (OPTIONS.CIPHER_SUITE)
         if (SSL_CTX_set_cipher_list(ctx, OPTIONS.CIPHER_SUITE) != 1)
-            ERR_print_errors_fp(stderr);            
+            ERR_print_errors_fp(stderr);
 
     return ctx;
 }
@@ -246,7 +254,7 @@ static void prepare_proxy_line(struct sockaddr* ai_addr) {
     }
     else {
         // TODO: AF_INET6
-        fprintf(stderr, "The --write-proxy mode is not implemented for this address family.\n");
+        ERR("The --write-proxy mode is not implemented for this address family.\n");
         exit(1);
     }
 }
@@ -261,18 +269,18 @@ static int create_main_socket() {
     const int gai_err = getaddrinfo(OPTIONS.FRONT_IP, OPTIONS.FRONT_PORT,
                                     &hints, &ai);
     if (gai_err != 0) {
-        fprintf(stderr, "{getaddrinfo}: [%s]\n", gai_strerror(gai_err));
+        ERR("{getaddrinfo}: [%s]\n", gai_strerror(gai_err));
         exit(1);
     }
-    
+
     int s = socket(ai->ai_family, SOCK_STREAM, IPPROTO_TCP);
     int t = 1;
     setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(int));
 #ifdef SO_REUSEPORT
     setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &t, sizeof(int));
 #endif
-    setnonblocking(s);    
-    
+    setnonblocking(s);
+
     if (bind(s, ai->ai_addr, ai->ai_addrlen)) {
         fail("{bind-socket}");
     }
@@ -280,7 +288,7 @@ static int create_main_socket() {
     prepare_proxy_line(ai->ai_addr);
 
     freeaddrinfo(ai);
-    
+
     listen(s, 100);
 
     return s;
@@ -341,11 +349,11 @@ static void handle_socket_errno(proxystate *ps) {
         return;
 
     if (errno == ECONNRESET)
-        fprintf(stderr, "{backend} Connection reset by peer\n");
+        ERR("{backend} Connection reset by peer\n");
     else if (errno == ETIMEDOUT)
-        fprintf(stderr, "{backend} Connection to backend timed out\n");
+        ERR("{backend} Connection to backend timed out\n");
     else if (errno == EPIPE)
-        fprintf(stderr, "{backend} Broken pipe to backend (EPIPE)\n");
+        ERR("{backend} Broken pipe to backend (EPIPE)\n");
     else
         perror("{backend} [errno]");
     shutdown_proxy(ps, SHUTDOWN_DOWN);
@@ -373,7 +381,7 @@ static void back_read(struct ev_loop *loop, ev_io *w, int revents) {
         safe_enable_io(ps, &ps->ev_w_up);
     }
     else if (t == 0) {
-        fprintf(stderr, "{backend} Connection closed\n");
+        LOG("{backend} Connection closed\n");
         shutdown_proxy(ps, SHUTDOWN_DOWN);
     }
     else {
@@ -521,11 +529,11 @@ static void client_handshake(struct ev_loop *loop, ev_io *w, int revents) {
             ev_io_start(loop, &ps->ev_w_handshake);
         }
         else if (err == SSL_ERROR_ZERO_RETURN) {
-            fprintf(stderr, "{client} Connection closed (in handshake)\n");
+            LOG("{client} Connection closed (in handshake)\n");
             shutdown_proxy(ps, SHUTDOWN_UP);
         }
         else {
-            fprintf(stderr, "{client} Unexpected SSL error (in handshake): %d\n", err);
+            LOG("{client} Unexpected SSL error (in handshake): %d\n", err);
             shutdown_proxy(ps, SHUTDOWN_UP);
         }
     }
@@ -534,14 +542,14 @@ static void client_handshake(struct ev_loop *loop, ev_io *w, int revents) {
 /* Handle a socket error condition passed to us from OpenSSL */
 static void handle_fatal_ssl_error(proxystate *ps, int err) {
     if (err == SSL_ERROR_ZERO_RETURN)
-        fprintf(stderr, "{client} Connection closed (in data)\n");
+        LOG("{client} Connection closed (in data)\n");
     else if (err == SSL_ERROR_SYSCALL)
         if (errno == 0)
-            fprintf(stderr, "{client} Connection closed (in data)\n");
+            LOG("{client} Connection closed (in data)\n");
         else
             perror("{client} [errno] ");
     else
-        fprintf(stderr, "{client} Unexpected SSL_read error: %d\n", err);
+        LOG("{client} Unexpected SSL_read error: %d\n", err);
     shutdown_proxy(ps, SHUTDOWN_UP);
 }
 
@@ -674,7 +682,7 @@ static void check_ppid(struct ev_loop *loop, ev_timer *w, int revents) {
     (void) revents;
     pid_t ppid = getppid();
     if (ppid != master_pid) {
-        fprintf(stderr, "{core} Process %d detected parent death, closing listener socket.\n", child_num);
+        LOG("{core} Process %d detected parent death, closing listener socket.\n", child_num);
         ev_timer_stop(loop, w);
         ev_io_stop(loop, &listener);
         close(listener_socket);
@@ -686,7 +694,7 @@ static void check_ppid(struct ev_loop *loop, ev_timer *w, int revents) {
 /* Set up the child (worker) process including libev event loop, read event
  * on the bound socket, etc */
 static void handle_connections(SSL_CTX *ctx) {
-    fprintf(stderr, "{core} Process %d online\n", child_num);
+    LOG("{core} Process %d online\n", child_num);
 #if defined(CPU_ZERO) && defined(CPU_SET)
     cpu_set_t cpus;
 
@@ -695,11 +703,11 @@ static void handle_connections(SSL_CTX *ctx) {
 
     int res = sched_setaffinity(0, sizeof(cpus), &cpus);
     if (!res)
-        fprintf(stderr, "{core} Successfully attached to CPU #%d\n", child_num);
+        LOG("{core} Successfully attached to CPU #%d\n", child_num);
     else
-        fprintf(stderr, "{core-warning} Unable to attach to CPU #%d; do you have that many cores?\n", child_num);
+        LOG("{core-warning} Unable to attach to CPU #%d; do you have that many cores?\n", child_num);
 #endif
-    
+
     loop = ev_default_loop(EVFLAG_AUTO);
 
     ev_timer timer_ppid_check;
@@ -711,7 +719,7 @@ static void handle_connections(SSL_CTX *ctx) {
     ev_io_start(loop, &listener);
 
     ev_loop(loop, 0);
-    fprintf(stderr, "{core} Child %d exiting.\n", child_num);
+    ERR("{core} Child %d exiting.\n", child_num);
     exit(1);
 }
 
@@ -719,14 +727,14 @@ static void handle_connections(SSL_CTX *ctx) {
 /* Print usage w/error message and exit failure */
 static void usage_fail(const char *prog, const char *msg) {
     if (msg)
-        fprintf(stderr, "%s: %s\n", prog, msg);
-    fprintf(stderr, "usage: %s [OPTION] PEM\n", prog);
+        ERR("%s: %s\n", prog, msg);
+    ERR("usage: %s [OPTION] PEM\n", prog);
 
-    fprintf(stderr,
+    ERR(
 "Encryption Methods:\n"
 "  --tls                    (TLSv1, default)\n"
 "  --ssl                    (SSLv3)\n"
-"  -c CIPHER_SUITE          (set allowed ciphers)\n"            
+"  -c CIPHER_SUITE          (set allowed ciphers)\n"
 "\n"
 "Socket:\n"
 "  -b HOST,PORT             (backend [connect], default \"127.0.0.1,8000\")\n"
@@ -738,6 +746,9 @@ static void usage_fail(const char *prog, const char *msg) {
 "Security:\n"
 "  -r PATH                  (chroot)\n"
 "  -u USERNAME              (set gid/uid after binding the socket)\n"
+"\n"
+"Logging:\n"
+"  -q                       Be quiet. Emit only error messages\n"
 "\n"
 "Special:\n"
 "  --write-ip               (write 1 octet with the IP family followed by\n"
@@ -842,7 +853,7 @@ static void parse_cli(int argc, char **argv) {
                 if (errno)
                     fail("getpwnam failed");
                 else
-                    fprintf(stderr, "user not found: %s\n", optarg);
+                    ERR("user not found: %s\n", optarg);
                 exit(1);
             }
             OPTIONS.UID = passwd->pw_uid;
@@ -853,9 +864,13 @@ static void parse_cli(int argc, char **argv) {
             if (optarg && optarg[0] == '/')
                 OPTIONS.CHROOT = optarg;
             else {
-                fprintf(stderr, "chroot must be absolute path: \"%s\"\n", optarg);
+                ERR("chroot must be absolute path: \"%s\"\n", optarg);
                 exit(1);
             }
+            break;
+
+        case 'q':
+            OPTIONS.QUIET = 1;
             break;
 
         default:
@@ -914,7 +929,7 @@ int main(int argc, char **argv) {
     const int gai_err = getaddrinfo(OPTIONS.BACK_IP, OPTIONS.BACK_PORT,
                                     &hints, &backaddr);
     if (gai_err != 0) {
-        fprintf(stderr, "{getaddrinfo}: [%s]", gai_strerror(gai_err));
+        ERR("{getaddrinfo}: [%s]", gai_strerror(gai_err));
         exit(1);
     }
 
@@ -925,14 +940,14 @@ int main(int argc, char **argv) {
 
     if (OPTIONS.CHROOT && OPTIONS.CHROOT[0])
         change_root();
-    
+
     if (OPTIONS.UID || OPTIONS.GID)
         drop_privileges();
 
     for (child_num=0; child_num < OPTIONS.NCORES; child_num++) {
         int pid = fork();
         if (pid == -1) {
-            fprintf(stderr, "{core} fork() failed! Goodbye cruel world!\n");
+            ERR("{core} fork() failed! Goodbye cruel world!\n");
             exit(1);
         }
         else if (pid == 0) // child
@@ -942,7 +957,7 @@ int main(int argc, char **argv) {
     int child_status;
     for (child_num=0; child_num < OPTIONS.NCORES; child_num++) {
         wait(&child_status);
-        fprintf(stderr, "{core} A child died!  This should not happen! Goodbye cruel world!\n");
+        ERR("{core} A child died!  This should not happen! Goodbye cruel world!\n");
         exit(2);
     }
 
