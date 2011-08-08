@@ -109,8 +109,7 @@ static stud_options OPTIONS = {
 
 
 
-static char tcp4_proxy_line[64] = "";
-static char tcp6_proxy_line[128] = "";
+static char tcp_proxy_line[128] = "";
 
 /* What agent/state requests the shutdown--for proper half-closed
  * handling */
@@ -232,20 +231,29 @@ static SSL_CTX * init_openssl() {
 }
 
 static void prepare_proxy_line(struct sockaddr* ai_addr) {
-    tcp4_proxy_line[0] = 0;
-    tcp6_proxy_line[0] = 0;
+    tcp_proxy_line[0] = 0;
+    char tcp6_address_string[INET6_ADDRSTRLEN];
 
     if (ai_addr->sa_family == AF_INET) {
         struct sockaddr_in* addr = (struct sockaddr_in*)ai_addr;
-        size_t res = snprintf(tcp4_proxy_line,
-                sizeof(tcp4_proxy_line),
-                "PROXY TCP4 %%s %s %%hu %hu\r\n",
+        size_t res = snprintf(tcp_proxy_line,
+                sizeof(tcp_proxy_line),
+                "PROXY %%s %%s %s %%hu %hu\r\n",
                 inet_ntoa(addr->sin_addr),
                 ntohs(addr->sin_port));
-        assert(res < sizeof(tcp4_proxy_line));
+        assert(res < sizeof(tcp_proxy_line));
+    }
+    else if (ai_addr->sa_family == AF_INET6 ) {
+      struct sockaddr_in6* addr = (struct sockaddr_in6*)ai_addr;
+      inet_ntop(AF_INET6,&(addr->sin6_addr),tcp6_address_string,INET6_ADDRSTRLEN);
+      size_t res = snprintf(tcp_proxy_line,
+			    sizeof(tcp_proxy_line),
+			    "PROXY %%s %%s %s %%hu %hu\r\n",
+			    tcp6_address_string,
+			    ntohs(addr->sin6_port));
+      assert(res < sizeof(tcp_proxy_line));
     }
     else {
-        // TODO: AF_INET6
         fprintf(stderr, "The --write-proxy mode is not implemented for this address family.\n");
         exit(1);
     }
@@ -425,6 +433,8 @@ static void handle_connect(struct ev_loop *loop, ev_io *w, int revents) {
     (void) revents;
     int t;
     proxystate *ps = (proxystate *)w->data;
+    char tcp6_address_string[INET6_ADDRSTRLEN];
+    size_t written = 0;
     t = connect(ps->fd_down, backaddr->ai_addr, backaddr->ai_addrlen);
     if (!t || errno == EISCONN || !errno) {
         /* INIT */
@@ -435,13 +445,27 @@ static void handle_connect(struct ev_loop *loop, ev_io *w, int revents) {
         ev_io_start(loop, &ps->ev_r_down);
         if (OPTIONS.WRITE_PROXY_LINE) {
             char *ring_pnt = ringbuffer_write_ptr(&ps->ring_down);
-            struct sockaddr_in* addr = (struct sockaddr_in*)&ps->remote_ip;
-            assert(ps->remote_ip.ss_family == AF_INET);
-            size_t written = snprintf(ring_pnt,
-                    RING_DATA_LEN,
-                    tcp4_proxy_line,
-                    inet_ntoa(addr->sin_addr),
-                    ntohs(addr->sin_port));
+            assert(ps->remote_ip.ss_family == AF_INET ||
+		   ps->remote_ip.ss_family == AF_INET6);
+	    if(ps->remote_ip.ss_family == AF_INET) {
+	      struct sockaddr_in* addr = (struct sockaddr_in*)&ps->remote_ip;
+	      written = snprintf(ring_pnt,
+				 RING_DATA_LEN,
+				 tcp_proxy_line,
+				 "TCP4",
+				 inet_ntoa(addr->sin_addr),
+				 ntohs(addr->sin_port));
+	    }
+	    else if (ps->remote_ip.ss_family == AF_INET6) {
+	      struct sockaddr_in6* addr = (struct sockaddr_in6*)&ps->remote_ip;
+	      inet_ntop(AF_INET6,&(addr->sin6_addr),tcp6_address_string,INET6_ADDRSTRLEN);
+	      written = snprintf(ring_pnt,
+				 RING_DATA_LEN,
+				 tcp_proxy_line,
+				 "TCP6",
+				 tcp6_address_string,
+				 ntohs(addr->sin6_port));
+	    }   
             ringbuffer_write_append(&ps->ring_down, written);
             ev_io_start(loop, &ps->ev_w_down);
         }
@@ -744,11 +768,10 @@ static void usage_fail(const char *prog, const char *msg) {
 "                            4 (IPv4) or 16 (IPv6) octets little-endian\n"
 "                            to backend before the actual data)\n"
 "  --write-proxy            (write HaProxy's PROXY protocol line before actual data:\n"
-"                            \"PROXY TCP4 <source-ip> <dest-ip> <source-port> <dest-port>\\r\\n\"\n"
-"                            Note, that currently only TCP4 implemented. Also note, that dest-ip\n"
-"                            and dest-port are initialized once after the socket is bound. It means\n"
-"                            that you will get 0.0.0.0 as dest-ip instead of actual IP if that what\n"
-"                            the listening socket was bound to)\n"
+"                            \"PROXY TCP[64] <source-ip> <dest-ip> <source-port> <dest-port>\\r\\n\"\n"
+"                            Note, that dest-ip and dest-port are initialized once after the socket\n"
+"                            is bound. This means that you will get 0.0.0.0 as dest-ip instead of \n"
+"                            actual IP if that what the listening socket was bound to)\n"
 );
     exit(1);
 }
