@@ -81,10 +81,9 @@ The entire set of arguments can be invoked with `stud -h`:
                                 to backend before the actual data)
       --write-proxy            (write HaProxy's PROXY protocol line before actual data:
                                 "PROXY TCP4 <source-ip> <dest-ip> <source-port> <dest-port>\r\n"
-                                Note, that currently only TCP4 implemented. Also note, that dest-ip
-                                and dest-port are initialized once after the socket is bound. It means
-                                that you will get 0.0.0.0 as dest-ip instead of actual IP if that what
-                                the listening socket was bound to)
+                                Note, that dest-ip and dest-port are initialized once after the socket
+                                is bound. It means that you will get 0.0.0.0 as dest-ip instead of 
+                                actual IP if that what the listening socket was bound to)
 
 `stud` uses no configuration file.
 
