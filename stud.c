@@ -904,6 +904,8 @@ void drop_privileges() {
 int main(int argc, char **argv) {
     parse_cli(argc, argv);
 
+    signal(SIGPIPE, SIG_IGN);
+
     listener_socket = create_main_socket();
 
     struct addrinfo hints;
