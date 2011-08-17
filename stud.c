@@ -943,7 +943,7 @@ int main(int argc, char **argv) {
     for (child_num=0; child_num < OPTIONS.NCORES; child_num++) {
         wait(&child_status);
         fprintf(stderr, "{core} A child died!  This should not happen! Goodbye cruel world!\n");
-        exit(2);
+	kill(0, SIGTERM);
     }
 
 handle:
