@@ -941,8 +941,8 @@ int main(int argc, char **argv) {
 
     int child_status;
     for (child_num=0; child_num < OPTIONS.NCORES; child_num++) {
-        wait(&child_status);
-        fprintf(stderr, "{core} A child died!  This should not happen! Goodbye cruel world!\n");
+        int dead_child_pid = wait(&child_status);
+        fprintf(stderr, "{core} A child (%d) died!  This should not happen! Goodbye cruel world!\n", dead_child_pid);
 	kill(0, SIGTERM);
     }
 
