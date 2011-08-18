@@ -193,13 +193,13 @@ static int init_dh(SSL_CTX *ctx, const char *cert) {
     dh = PEM_read_bio_DHparams(bio, NULL, NULL, NULL);
     BIO_free(bio);
     if (!dh) {
-        ERR("Could not load DH parameters from %s\n", cert);
+        LOG("{core} Note: no DH parameters found in %s\n", cert);
         return -1;
     }
 
-    LOG("Using DH parameters from %s\n", cert);
+    LOG("{core} Using DH parameters from %s\n", cert);
     SSL_CTX_set_tmp_dh(ctx, dh);
-    LOG("DH initialized with %d bit key\n", 8*DH_size(dh));
+    LOG("{core} DH initialized with %d bit key\n", 8*DH_size(dh));
     DH_free(dh);
 
     return 0;
