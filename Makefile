@@ -1,7 +1,7 @@
 all: stud
 
 stud: stud.c
-	gcc -O2 -g -std=c99 -fno-strict-aliasing -Wall -W -I/usr/local/include -L/usr/local/lib -I. -o stud ringbuffer.c stud.c -D_GNU_SOURCE -lssl -lcrypto -lev
+	gcc -O2 -g -std=c99 -fno-strict-aliasing -Wall -W -I/usr/include/libev -I/usr/local/include -L/usr/local/lib -I. -o stud ringbuffer.c stud.c -D_GNU_SOURCE -lssl -lcrypto -lev
 
 # The -shared targets use shared memory between child processes
 # for the SSL session cache--potentially a huge performance gain

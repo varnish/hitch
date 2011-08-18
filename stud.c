@@ -979,6 +979,8 @@ void drop_privileges() {
 int main(int argc, char **argv) {
     parse_cli(argc, argv);
 
+    signal(SIGPIPE, SIG_IGN);
+
     listener_socket = create_main_socket();
 
     struct addrinfo hints;
@@ -1015,11 +1017,10 @@ int main(int argc, char **argv) {
     }
 
     int child_status;
-    for (child_num=0; child_num < OPTIONS.NCORES; child_num++) {
-        wait(&child_status);
-        ERR("{core} A child died!  This should not happen! Goodbye cruel world!\n");
-        exit(2);
-    }
+    int dead_child_pid = wait(&child_status);
+    ERR("{core} A child (%d) died!  This should not happen! Goodbye cruel world!\n", dead_child_pid);
+    kill(0, SIGTERM);
+    exit(2);
 
 handle:
     handle_connections(ctx);
