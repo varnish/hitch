@@ -118,3 +118,4 @@ Contributors:
     * Carl Perry/Dreamhost      -- IPv6 PROXY support
     * Emeric Brun/Exceliance    -- Session resumption and shared-memory
                                    session cache
+    * Vladimir Dronnikov        -- Logging cleanup
