@@ -44,6 +44,7 @@
 #include <getopt.h>
 #include <pwd.h>
 #include <limits.h>
+#include <syslog.h>
 
 #include <sched.h>
 
@@ -171,11 +172,17 @@ static void fail(const char* s) {
     exit(1);
 }
 
-#define LOG(...) \
-    do { if (!OPTIONS.QUIET) fprintf(stdout, __VA_ARGS__); } while(0)
+#define LOG(...)                                        \
+    do {                                                \
+      if (!OPTIONS.QUIET) fprintf(stdout, __VA_ARGS__); \
+      syslog(LOG_INFO, __VA_ARGS__);                    \
+    } while(0)
 
-#define ERR(...) \
-    do { fprintf(stderr, __VA_ARGS__); } while(0)
+#define ERR(...)                    \
+    do {                            \
+      fprintf(stderr, __VA_ARGS__); \
+      syslog(LOG_ERR, __VA_ARGS__); \
+    } while(0)
 
 #ifndef OPENSSL_NO_DH
 static int init_dh(SSL_CTX *ctx, const char *cert) {
@@ -766,10 +773,10 @@ static void handle_connections(SSL_CTX *ctx) {
 /* Print usage w/error message and exit failure */
 static void usage_fail(const char *prog, const char *msg) {
     if (msg)
-        ERR("%s: %s\n", prog, msg);
-    ERR("usage: %s [OPTION] PEM\n", prog);
+        fprintf(stderr, "%s: %s\n", prog, msg);
+    fprintf(stderr, "usage: %s [OPTION] PEM\n", prog);
 
-    ERR(
+    fprintf(stderr,
 "Encryption Methods:\n"
 "  --tls                    (TLSv1, default)\n"
 "  --ssl                    (SSLv3)\n"
@@ -977,6 +984,8 @@ void drop_privileges() {
  * spawn child (worker) processes, and wait for them all to die
  * (which they shouldn't!) */
 int main(int argc, char **argv) {
+    openlog("stud", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_DAEMON);
+    
     parse_cli(argc, argv);
 
     listener_socket = create_main_socket();
