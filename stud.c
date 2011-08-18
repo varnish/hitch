@@ -182,10 +182,7 @@ static int init_dh(SSL_CTX *ctx, const char *cert) {
     DH *dh;
     BIO *bio;
 
-    if (!cert) {
-        ERR("No certificate available to load DH parameters\n");
-        return -1;
-    }
+    assert(cert);
 
     bio = BIO_new_file(cert, "r");
     if (!bio) {
