@@ -119,4 +119,4 @@ Contributors:
     * Emeric Brun/Exceliance        -- Session resumption and shared-memory
                                        session cache
     * Vladimir Dronnikov            -- Logging cleanup
-    * James Golick/Bit Love Media   -- SIGPIPE fixes and child-reaping
+    * James Golick/BitLove Inc.     -- SIGPIPE fixes and child-reaping
