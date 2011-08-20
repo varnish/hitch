@@ -53,6 +53,7 @@
 #include <ev.h>
 
 #include "ringbuffer.h"
+#include "shctx.h"
 
 #ifndef MSG_NOSIGNAL
 # define MSG_NOSIGNAL 0
@@ -89,6 +90,11 @@ typedef struct stud_options {
     long NCORES;
     const char *CERT_FILE;
     const char *CIPHER_SUITE;
+    int BACKLOG;
+#ifdef USE_SHARED_CACHE
+    int SHARED_CACHE;
+#endif
+    int QUIET;
 } stud_options;
 
 static stud_options OPTIONS = {
@@ -104,13 +110,17 @@ static stud_options OPTIONS = {
     "8000",       // BACK_PORT
     1,            // NCORES
     NULL,         // CERT_FILE
-    NULL          // CIPHER_SUITE
+    NULL,         // CIPHER_SUITE
+    100,          // BACKLOG
+#ifdef USE_SHARED_CACHE
+    0,            // SHARED_CACHE
+#endif
+    0             // QUIET
 };
 
 
 
-static char tcp4_proxy_line[64] = "";
-static char tcp6_proxy_line[128] = "";
+static char tcp_proxy_line[128] = "";
 
 /* What agent/state requests the shutdown--for proper half-closed
  * handling */
@@ -161,15 +171,18 @@ static void fail(const char* s) {
     exit(1);
 }
 
+#define LOG(...) \
+    do { if (!OPTIONS.QUIET) fprintf(stdout, __VA_ARGS__); } while(0)
+
+#define ERR(...) \
+    do { fprintf(stderr, __VA_ARGS__); } while(0)
+
 #ifndef OPENSSL_NO_DH
 static int init_dh(SSL_CTX *ctx, const char *cert) {
     DH *dh;
     BIO *bio;
 
-    if (!cert) {
-        fprintf(stderr, "No certificate available to load DH parameters\n");
-        return -1;
-    }
+    assert(cert);
 
     bio = BIO_new_file(cert, "r");
     if (!bio) {
@@ -180,13 +193,13 @@ static int init_dh(SSL_CTX *ctx, const char *cert) {
     dh = PEM_read_bio_DHparams(bio, NULL, NULL, NULL);
     BIO_free(bio);
     if (!dh) {
-        fprintf(stderr, "Could not load DH parameters from %s\n", cert);
+        LOG("{core} Note: no DH parameters found in %s\n", cert);
         return -1;
     }
 
-    fprintf(stderr, "Using DH parameters from %s\n", cert);
+    LOG("{core} Using DH parameters from %s\n", cert);
     SSL_CTX_set_tmp_dh(ctx, dh);
-    fprintf(stderr, "DH initialized with %d bit key\n", 8*DH_size(dh));
+    LOG("{core} DH initialized with %d bit key\n", 8*DH_size(dh));
     DH_free(dh);
 
     return 0;
@@ -207,10 +220,10 @@ static SSL_CTX * init_openssl() {
         ctx = SSL_CTX_new(SSLv23_server_method());
     else
         assert(OPTIONS.ETYPE == ENC_TLS || OPTIONS.ETYPE == ENC_SSL);
-    
+
     SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_ALL |
                         SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION);
-    
+
     if (SSL_CTX_use_certificate_chain_file(ctx, OPTIONS.CERT_FILE) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(1);
@@ -226,27 +239,45 @@ static SSL_CTX * init_openssl() {
 
     if (OPTIONS.CIPHER_SUITE)
         if (SSL_CTX_set_cipher_list(ctx, OPTIONS.CIPHER_SUITE) != 1)
-            ERR_print_errors_fp(stderr);            
+            ERR_print_errors_fp(stderr);
+
+#ifdef USE_SHARED_CACHE
+    if (OPTIONS.SHARED_CACHE) {
+        if (shared_context_init(ctx, OPTIONS.SHARED_CACHE) < 0) {
+            ERR("Unable to alloc memory for shared cache.\n");
+            exit(1);
+        }
+    }
+#endif
 
     return ctx;
 }
 
 static void prepare_proxy_line(struct sockaddr* ai_addr) {
-    tcp4_proxy_line[0] = 0;
-    tcp6_proxy_line[0] = 0;
+    tcp_proxy_line[0] = 0;
+    char tcp6_address_string[INET6_ADDRSTRLEN];
 
     if (ai_addr->sa_family == AF_INET) {
         struct sockaddr_in* addr = (struct sockaddr_in*)ai_addr;
-        size_t res = snprintf(tcp4_proxy_line,
-                sizeof(tcp4_proxy_line),
-                "PROXY TCP4 %%s %s %%hu %hu\r\n",
+        size_t res = snprintf(tcp_proxy_line,
+                sizeof(tcp_proxy_line),
+                "PROXY %%s %%s %s %%hu %hu\r\n",
                 inet_ntoa(addr->sin_addr),
                 ntohs(addr->sin_port));
-        assert(res < sizeof(tcp4_proxy_line));
+        assert(res < sizeof(tcp_proxy_line));
+    }
+    else if (ai_addr->sa_family == AF_INET6 ) {
+      struct sockaddr_in6* addr = (struct sockaddr_in6*)ai_addr;
+      inet_ntop(AF_INET6,&(addr->sin6_addr),tcp6_address_string,INET6_ADDRSTRLEN);
+      size_t res = snprintf(tcp_proxy_line,
+			    sizeof(tcp_proxy_line),
+			    "PROXY %%s %%s %s %%hu %hu\r\n",
+			    tcp6_address_string,
+			    ntohs(addr->sin6_port));
+      assert(res < sizeof(tcp_proxy_line));
     }
     else {
-        // TODO: AF_INET6
-        fprintf(stderr, "The --write-proxy mode is not implemented for this address family.\n");
+        ERR("The --write-proxy mode is not implemented for this address family.\n");
         exit(1);
     }
 }
@@ -261,18 +292,18 @@ static int create_main_socket() {
     const int gai_err = getaddrinfo(OPTIONS.FRONT_IP, OPTIONS.FRONT_PORT,
                                     &hints, &ai);
     if (gai_err != 0) {
-        fprintf(stderr, "{getaddrinfo}: [%s]\n", gai_strerror(gai_err));
+        ERR("{getaddrinfo}: [%s]\n", gai_strerror(gai_err));
         exit(1);
     }
-    
+
     int s = socket(ai->ai_family, SOCK_STREAM, IPPROTO_TCP);
     int t = 1;
     setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(int));
 #ifdef SO_REUSEPORT
     setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &t, sizeof(int));
 #endif
-    setnonblocking(s);    
-    
+    setnonblocking(s);
+
     if (bind(s, ai->ai_addr, ai->ai_addrlen)) {
         fail("{bind-socket}");
     }
@@ -280,8 +311,7 @@ static int create_main_socket() {
     prepare_proxy_line(ai->ai_addr);
 
     freeaddrinfo(ai);
-    
-    listen(s, 100);
+    listen(s, OPTIONS.BACKLOG);
 
     return s;
 }
@@ -322,6 +352,7 @@ static void shutdown_proxy(proxystate *ps, SHUTDOWN_REQUESTOR req) {
         close(ps->fd_up);
         close(ps->fd_down);
 
+        SSL_set_shutdown(ps->ssl, SSL_SENT_SHUTDOWN);
         SSL_free(ps->ssl);
 
         free(ps);
@@ -341,11 +372,11 @@ static void handle_socket_errno(proxystate *ps) {
         return;
 
     if (errno == ECONNRESET)
-        fprintf(stderr, "{backend} Connection reset by peer\n");
+        ERR("{backend} Connection reset by peer\n");
     else if (errno == ETIMEDOUT)
-        fprintf(stderr, "{backend} Connection to backend timed out\n");
+        ERR("{backend} Connection to backend timed out\n");
     else if (errno == EPIPE)
-        fprintf(stderr, "{backend} Broken pipe to backend (EPIPE)\n");
+        ERR("{backend} Broken pipe to backend (EPIPE)\n");
     else
         perror("{backend} [errno]");
     shutdown_proxy(ps, SHUTDOWN_DOWN);
@@ -373,7 +404,7 @@ static void back_read(struct ev_loop *loop, ev_io *w, int revents) {
         safe_enable_io(ps, &ps->ev_w_up);
     }
     else if (t == 0) {
-        fprintf(stderr, "{backend} Connection closed\n");
+        LOG("{backend} Connection closed\n");
         shutdown_proxy(ps, SHUTDOWN_DOWN);
     }
     else {
@@ -425,6 +456,8 @@ static void handle_connect(struct ev_loop *loop, ev_io *w, int revents) {
     (void) revents;
     int t;
     proxystate *ps = (proxystate *)w->data;
+    char tcp6_address_string[INET6_ADDRSTRLEN];
+    size_t written = 0;
     t = connect(ps->fd_down, backaddr->ai_addr, backaddr->ai_addrlen);
     if (!t || errno == EISCONN || !errno) {
         /* INIT */
@@ -435,13 +468,27 @@ static void handle_connect(struct ev_loop *loop, ev_io *w, int revents) {
         ev_io_start(loop, &ps->ev_r_down);
         if (OPTIONS.WRITE_PROXY_LINE) {
             char *ring_pnt = ringbuffer_write_ptr(&ps->ring_down);
-            struct sockaddr_in* addr = (struct sockaddr_in*)&ps->remote_ip;
-            assert(ps->remote_ip.ss_family == AF_INET);
-            size_t written = snprintf(ring_pnt,
-                    RING_DATA_LEN,
-                    tcp4_proxy_line,
-                    inet_ntoa(addr->sin_addr),
-                    ntohs(addr->sin_port));
+            assert(ps->remote_ip.ss_family == AF_INET ||
+		   ps->remote_ip.ss_family == AF_INET6);
+	    if(ps->remote_ip.ss_family == AF_INET) {
+	      struct sockaddr_in* addr = (struct sockaddr_in*)&ps->remote_ip;
+	      written = snprintf(ring_pnt,
+				 RING_DATA_LEN,
+				 tcp_proxy_line,
+				 "TCP4",
+				 inet_ntoa(addr->sin_addr),
+				 ntohs(addr->sin_port));
+	    }
+	    else if (ps->remote_ip.ss_family == AF_INET6) {
+	      struct sockaddr_in6* addr = (struct sockaddr_in6*)&ps->remote_ip;
+	      inet_ntop(AF_INET6,&(addr->sin6_addr),tcp6_address_string,INET6_ADDRSTRLEN);
+	      written = snprintf(ring_pnt,
+				 RING_DATA_LEN,
+				 tcp_proxy_line,
+				 "TCP6",
+				 tcp6_address_string,
+				 ntohs(addr->sin6_port));
+	    }   
             ringbuffer_write_append(&ps->ring_down, written);
             ev_io_start(loop, &ps->ev_w_down);
         }
@@ -521,11 +568,11 @@ static void client_handshake(struct ev_loop *loop, ev_io *w, int revents) {
             ev_io_start(loop, &ps->ev_w_handshake);
         }
         else if (err == SSL_ERROR_ZERO_RETURN) {
-            fprintf(stderr, "{client} Connection closed (in handshake)\n");
+            LOG("{client} Connection closed (in handshake)\n");
             shutdown_proxy(ps, SHUTDOWN_UP);
         }
         else {
-            fprintf(stderr, "{client} Unexpected SSL error (in handshake): %d\n", err);
+            LOG("{client} Unexpected SSL error (in handshake): %d\n", err);
             shutdown_proxy(ps, SHUTDOWN_UP);
         }
     }
@@ -534,14 +581,14 @@ static void client_handshake(struct ev_loop *loop, ev_io *w, int revents) {
 /* Handle a socket error condition passed to us from OpenSSL */
 static void handle_fatal_ssl_error(proxystate *ps, int err) {
     if (err == SSL_ERROR_ZERO_RETURN)
-        fprintf(stderr, "{client} Connection closed (in data)\n");
+        LOG("{client} Connection closed (in data)\n");
     else if (err == SSL_ERROR_SYSCALL)
         if (errno == 0)
-            fprintf(stderr, "{client} Connection closed (in data)\n");
+            LOG("{client} Connection closed (in data)\n");
         else
             perror("{client} [errno] ");
     else
-        fprintf(stderr, "{client} Unexpected SSL_read error: %d\n", err);
+        LOG("{client} Unexpected SSL_read error: %d\n", err);
     shutdown_proxy(ps, SHUTDOWN_UP);
 }
 
@@ -678,7 +725,7 @@ static void check_ppid(struct ev_loop *loop, ev_timer *w, int revents) {
     (void) revents;
     pid_t ppid = getppid();
     if (ppid != master_pid) {
-        fprintf(stderr, "{core} Process %d detected parent death, closing listener socket.\n", child_num);
+        LOG("{core} Process %d detected parent death, closing listener socket.\n", child_num);
         ev_timer_stop(loop, w);
         ev_io_stop(loop, &listener);
         close(listener_socket);
@@ -690,7 +737,7 @@ static void check_ppid(struct ev_loop *loop, ev_timer *w, int revents) {
 /* Set up the child (worker) process including libev event loop, read event
  * on the bound socket, etc */
 static void handle_connections(SSL_CTX *ctx) {
-    fprintf(stderr, "{core} Process %d online\n", child_num);
+    LOG("{core} Process %d online\n", child_num);
 #if defined(CPU_ZERO) && defined(CPU_SET)
     cpu_set_t cpus;
 
@@ -699,11 +746,11 @@ static void handle_connections(SSL_CTX *ctx) {
 
     int res = sched_setaffinity(0, sizeof(cpus), &cpus);
     if (!res)
-        fprintf(stderr, "{core} Successfully attached to CPU #%d\n", child_num);
+        LOG("{core} Successfully attached to CPU #%d\n", child_num);
     else
-        fprintf(stderr, "{core-warning} Unable to attach to CPU #%d; do you have that many cores?\n", child_num);
+        LOG("{core-warning} Unable to attach to CPU #%d; do you have that many cores?\n", child_num);
 #endif
-    
+
     loop = ev_default_loop(EVFLAG_AUTO);
 
     ev_timer timer_ppid_check;
@@ -715,7 +762,7 @@ static void handle_connections(SSL_CTX *ctx) {
     ev_io_start(loop, &listener);
 
     ev_loop(loop, 0);
-    fprintf(stderr, "{core} Child %d exiting.\n", child_num);
+    ERR("{core} Child %d exiting.\n", child_num);
     exit(1);
 }
 
@@ -723,14 +770,14 @@ static void handle_connections(SSL_CTX *ctx) {
 /* Print usage w/error message and exit failure */
 static void usage_fail(const char *prog, const char *msg) {
     if (msg)
-        fprintf(stderr, "%s: %s\n", prog, msg);
-    fprintf(stderr, "usage: %s [OPTION] PEM\n", prog);
+        ERR("%s: %s\n", prog, msg);
+    ERR("usage: %s [OPTION] PEM\n", prog);
 
-    fprintf(stderr,
+    ERR(
 "Encryption Methods:\n"
 "  --tls                    (TLSv1, default)\n"
 "  --ssl                    (SSLv3)\n"
-"  -c CIPHER_SUITE          (set allowed ciphers)\n"            
+"  -c CIPHER_SUITE          (set allowed ciphers)\n"
 "\n"
 "Socket:\n"
 "  -b HOST,PORT             (backend [connect], default \"127.0.0.1,8000\")\n"
@@ -738,21 +785,27 @@ static void usage_fail(const char *prog, const char *msg) {
 "\n"
 "Performance:\n"
 "  -n CORES                 (number of worker processes, default 1)\n"
+"  -B BACKLOG               (set listen backlog size, default 100)\n"
+#ifdef USE_SHARED_CACHE
+"  -C SHARED_CACHE          (set shared cache size in sessions, by default no shared cache)\n"
+#endif
 "\n"
 "Security:\n"
 "  -r PATH                  (chroot)\n"
 "  -u USERNAME              (set gid/uid after binding the socket)\n"
+"\n"
+"Logging:\n"
+"  -q                       Be quiet. Emit only error messages\n"
 "\n"
 "Special:\n"
 "  --write-ip               (write 1 octet with the IP family followed by\n"
 "                            4 (IPv4) or 16 (IPv6) octets little-endian\n"
 "                            to backend before the actual data)\n"
 "  --write-proxy            (write HaProxy's PROXY protocol line before actual data:\n"
-"                            \"PROXY TCP4 <source-ip> <dest-ip> <source-port> <dest-port>\\r\\n\"\n"
-"                            Note, that currently only TCP4 implemented. Also note, that dest-ip\n"
-"                            and dest-port are initialized once after the socket is bound. It means\n"
-"                            that you will get 0.0.0.0 as dest-ip instead of actual IP if that what\n"
-"                            the listening socket was bound to)\n"
+"                            \"PROXY TCP[64] <source-ip> <dest-ip> <source-port> <dest-port>\\r\\n\"\n"
+"                            Note, that dest-ip and dest-port are initialized once after the socket\n"
+"                            is bound. This means that you will get 0.0.0.0 as dest-ip instead of \n"
+"                            actual IP if that what the listening socket was bound to)\n"
 );
     exit(1);
 }
@@ -807,7 +860,7 @@ static void parse_cli(int argc, char **argv) {
 
     while (1) {
         int option_index = 0;
-        c = getopt_long(argc, argv, "hf:b:n:c:u:r:",
+        c = getopt_long(argc, argv, "hf:b:n:c:u:r:B:C:",
                 long_options, &option_index);
 
         if (c == -1)
@@ -846,7 +899,7 @@ static void parse_cli(int argc, char **argv) {
                 if (errno)
                     fail("getpwnam failed");
                 else
-                    fprintf(stderr, "user not found: %s\n", optarg);
+                    ERR("user not found: %s\n", optarg);
                 exit(1);
             }
             OPTIONS.UID = passwd->pw_uid;
@@ -857,9 +910,31 @@ static void parse_cli(int argc, char **argv) {
             if (optarg && optarg[0] == '/')
                 OPTIONS.CHROOT = optarg;
             else {
-                fprintf(stderr, "chroot must be absolute path: \"%s\"\n", optarg);
+                ERR("chroot must be absolute path: \"%s\"\n", optarg);
                 exit(1);
             }
+            break;
+
+        case 'B':
+            OPTIONS.BACKLOG = atoi(optarg);
+            if ( OPTIONS.BACKLOG <= 0 ) {
+                ERR("listen backlog can not be set to %d\n", OPTIONS.BACKLOG);
+                exit(1);
+            }
+            break;
+
+#ifdef USE_SHARED_CACHE
+        case 'C':
+            OPTIONS.SHARED_CACHE = atoi(optarg);
+            if ( OPTIONS.SHARED_CACHE < 0 ) {
+                ERR("shared cache size can not be set to %d\n", OPTIONS.SHARED_CACHE);
+                exit(1);
+            }
+            break;
+#endif
+
+        case 'q':
+            OPTIONS.QUIET = 1;
             break;
 
         default:
@@ -908,6 +983,8 @@ void drop_privileges() {
 int main(int argc, char **argv) {
     parse_cli(argc, argv);
 
+    signal(SIGPIPE, SIG_IGN);
+
     listener_socket = create_main_socket();
 
     struct addrinfo hints;
@@ -918,7 +995,7 @@ int main(int argc, char **argv) {
     const int gai_err = getaddrinfo(OPTIONS.BACK_IP, OPTIONS.BACK_PORT,
                                     &hints, &backaddr);
     if (gai_err != 0) {
-        fprintf(stderr, "{getaddrinfo}: [%s]", gai_strerror(gai_err));
+        ERR("{getaddrinfo}: [%s]", gai_strerror(gai_err));
         exit(1);
     }
 
@@ -929,14 +1006,14 @@ int main(int argc, char **argv) {
 
     if (OPTIONS.CHROOT && OPTIONS.CHROOT[0])
         change_root();
-    
+
     if (OPTIONS.UID || OPTIONS.GID)
         drop_privileges();
 
     for (child_num=0; child_num < OPTIONS.NCORES; child_num++) {
         int pid = fork();
         if (pid == -1) {
-            fprintf(stderr, "{core} fork() failed! Goodbye cruel world!\n");
+            ERR("{core} fork() failed! Goodbye cruel world!\n");
             exit(1);
         }
         else if (pid == 0) // child
@@ -944,11 +1021,10 @@ int main(int argc, char **argv) {
     }
 
     int child_status;
-    for (child_num=0; child_num < OPTIONS.NCORES; child_num++) {
-        wait(&child_status);
-        fprintf(stderr, "{core} A child died!  This should not happen! Goodbye cruel world!\n");
-        exit(2);
-    }
+    int dead_child_pid = wait(&child_status);
+    ERR("{core} A child (%d) died!  This should not happen! Goodbye cruel world!\n", dead_child_pid);
+    kill(0, SIGTERM);
+    exit(2);
 
 handle:
     handle_connections(ctx);

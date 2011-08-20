@@ -23,6 +23,11 @@ that information using HAProxy's PROXY protocol.  In this way, backends
 who care about the client IP can still access it even though `stud` itself
 appears to be the connected client.
 
+Thanks to a contribution from Emeric at Exceliance (the folks behind HAProxy),
+a special build of `stud` can be made that utilitizes shared memory to
+use a common session cache between all child processes.  This can speed up
+large `stud` deployments by avoiding client renegotiation.
+
 Requirements and Limitations
 ----------------------------
 
@@ -81,10 +86,9 @@ The entire set of arguments can be invoked with `stud -h`:
                                 to backend before the actual data)
       --write-proxy            (write HaProxy's PROXY protocol line before actual data:
                                 "PROXY TCP4 <source-ip> <dest-ip> <source-port> <dest-port>\r\n"
-                                Note, that currently only TCP4 implemented. Also note, that dest-ip
-                                and dest-port are initialized once after the socket is bound. It means
-                                that you will get 0.0.0.0 as dest-ip instead of actual IP if that what
-                                the listening socket was bound to)
+                                Note, that dest-ip and dest-port are initialized once after the socket
+                                is bound. It means that you will get 0.0.0.0 as dest-ip instead of 
+                                actual IP if that what the listening socket was bound to)
 
 `stud` uses no configuration file.
 
@@ -106,8 +110,13 @@ server-side TLS termination for over 40 million Bump users.
 
 Contributors:
 
-    * Colin Percival @cperciva  -- early audit and code review
-    * Frank DENIS @jedisct1     -- port to BSD, IPv6 support, various fixes
-    * Denis Bilenko             -- HAProxy PROXY protocol support, chroot/setuid
-    * Joe Damato                -- Diffie-Hellman parameter loading
-    * Benjamin Pineau           -- Chained cert loading, various fixes
+    * Colin Percival @cperciva      -- early audit and code review
+    * Frank DENIS @jedisct1         -- port to BSD, IPv6 support, various fixes
+    * Denis Bilenko                 -- HAProxy PROXY protocol support, chroot/setuid
+    * Joe Damato                    -- Diffie-Hellman parameter loading
+    * Benjamin Pineau               -- Chained cert loading, various fixes
+    * Carl Perry/Dreamhost          -- IPv6 PROXY support
+    * Emeric Brun/Exceliance        -- Session resumption and shared-memory
+                                       session cache
+    * Vladimir Dronnikov            -- Logging cleanup
+    * James Golick/BitLove Inc.     -- SIGPIPE fixes and child-reaping
