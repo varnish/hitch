@@ -33,6 +33,7 @@
 #include <netdb.h>
 #include <sys/wait.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -307,7 +308,8 @@ static int create_main_socket() {
     if (bind(s, ai->ai_addr, ai->ai_addrlen)) {
         fail("{bind-socket}");
     }
-
+    int timeout = 1; 
+    setsockopt(s, IPPROTO_TCP, TCP_DEFER_ACCEPT, &timeout, sizeof(int) );
     prepare_proxy_line(ai->ai_addr);
 
     freeaddrinfo(ai);
@@ -670,6 +672,13 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
         assert(errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN);
         return;
     }
+
+    int flag = 1;
+    int ret = setsockopt(client, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag) );
+    if (ret == -1) {
+      perror("Couldn't setsockopt(TCP_NODELAY)\n");
+    }
+    
 
     setnonblocking(client);
     int back = create_back_socket();
