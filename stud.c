@@ -678,7 +678,13 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     if (ret == -1) {
       perror("Couldn't setsockopt(TCP_NODELAY)\n");
     }
-    
+#ifdef TCP_CWND
+    int cwnd = 10;
+    ret = setsockopt(client, IPPROTO_TCP, TCP_CWND, &cwnd, sizeof(cwnd));
+    if (ret == -1) {
+      perror("Couldn't setsockopt(TCP_CWND)\n");
+    }
+#endif
 
     setnonblocking(client);
     int back = create_back_socket();
