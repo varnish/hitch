@@ -706,7 +706,11 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
 
     SSL_CTX * ctx = (SSL_CTX *)w->data;
     SSL *ssl = SSL_new(ctx);
-    SSL_set_mode(ssl, SSL_MODE_ENABLE_PARTIAL_WRITE);
+    long mode = SSL_MODE_ENABLE_PARTIAL_WRITE;
+#ifdef SSL_MODE_RELEASE_BUFFERS
+    mode |= SSL_MODE_RELEASE_BUFFERS;
+#endif
+    SSL_set_mode(ssl, mode);
     SSL_set_accept_state(ssl);
     SSL_set_fd(ssl, client);
 
