@@ -117,7 +117,7 @@ static stud_options OPTIONS = {
 #ifdef USE_SHARED_CACHE
     0,            // SHARED_CACHE
 #endif
-    0             // QUIET
+    0,             // QUIET
     0             // SYSLOG    
 };
 
