@@ -177,13 +177,13 @@ static void fail(const char* s) {
 #define LOG(...)                                        \
     do {                                                \
       if (!OPTIONS.QUIET) fprintf(stdout, __VA_ARGS__); \
-      if (!OPTIONS.SYSLOG) syslog(LOG_INFO, __VA_ARGS__);                    \
+      if (OPTIONS.SYSLOG) syslog(LOG_INFO, __VA_ARGS__);                    \
     } while(0)
 
 #define ERR(...)                    \
     do {                            \
       fprintf(stderr, __VA_ARGS__); \
-      if (!OPTIONS.SYSLOG) syslog(LOG_ERR, __VA_ARGS__); \
+      if (OPTIONS.SYSLOG) syslog(LOG_ERR, __VA_ARGS__); \
     } while(0)
 
 #ifndef OPENSSL_NO_DH
