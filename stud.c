@@ -868,7 +868,7 @@ static void parse_cli(int argc, char **argv) {
 
     while (1) {
         int option_index = 0;
-        c = getopt_long(argc, argv, "hf:b:n:c:u:r:B:C:",
+        c = getopt_long(argc, argv, "hf:b:n:c:u:r:B:C:s",
                 long_options, &option_index);
 
         if (c == -1)
