@@ -96,6 +96,7 @@ typedef struct stud_options {
     int SHARED_CACHE;
 #endif
     int QUIET;
+    int SYSLOG;
 } stud_options;
 
 static stud_options OPTIONS = {
@@ -117,6 +118,7 @@ static stud_options OPTIONS = {
     0,            // SHARED_CACHE
 #endif
     0             // QUIET
+    0             // SYSLOG    
 };
 
 
@@ -175,13 +177,13 @@ static void fail(const char* s) {
 #define LOG(...)                                        \
     do {                                                \
       if (!OPTIONS.QUIET) fprintf(stdout, __VA_ARGS__); \
-      syslog(LOG_INFO, __VA_ARGS__);                    \
+      if (!OPTIONS.SYSLOG) syslog(LOG_INFO, __VA_ARGS__);                    \
     } while(0)
 
 #define ERR(...)                    \
     do {                            \
       fprintf(stderr, __VA_ARGS__); \
-      syslog(LOG_ERR, __VA_ARGS__); \
+      if (!OPTIONS.SYSLOG) syslog(LOG_ERR, __VA_ARGS__); \
     } while(0)
 
 #ifndef OPENSSL_NO_DH
@@ -800,6 +802,9 @@ static void usage_fail(const char *prog, const char *msg) {
 "Logging:\n"
 "  -q                       Be quiet. Emit only error messages\n"
 "\n"
+"Syslog:\n"
+"  -s                       Send log message to syslog in addition to stderr/stdout\n"
+"\n"
 "Special:\n"
 "  --write-ip               (write 1 octet with the IP family followed by\n"
 "                            4 (IPv4) or 16 (IPv6) octets little-endian\n"
@@ -939,7 +944,11 @@ static void parse_cli(int argc, char **argv) {
         case 'q':
             OPTIONS.QUIET = 1;
             break;
-
+        
+        case 's':
+            OPTIONS.SYSLOG = 1;
+            break;
+            
         default:
             usage_fail(prog, NULL);
         }
