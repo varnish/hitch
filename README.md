@@ -110,12 +110,13 @@ server-side TLS termination for over 40 million Bump users.
 
 Contributors:
 
-    * Colin Percival @cperciva  -- early audit and code review
-    * Frank DENIS @jedisct1     -- port to BSD, IPv6 support, various fixes
-    * Denis Bilenko             -- HAProxy PROXY protocol support, chroot/setuid
-    * Joe Damato                -- Diffie-Hellman parameter loading
-    * Benjamin Pineau           -- Chained cert loading, various fixes
-    * Carl Perry/Dreamhost      -- IPv6 PROXY support
-    * Emeric Brun/Exceliance    -- Session resumption and shared-memory
-                                   session cache
-    * Vladimir Dronnikov        -- Logging cleanup
+    * Colin Percival @cperciva      -- early audit and code review
+    * Frank DENIS @jedisct1         -- port to BSD, IPv6 support, various fixes
+    * Denis Bilenko                 -- HAProxy PROXY protocol support, chroot/setuid
+    * Joe Damato                    -- Diffie-Hellman parameter loading
+    * Benjamin Pineau               -- Chained cert loading, various fixes
+    * Carl Perry/Dreamhost          -- IPv6 PROXY support
+    * Emeric Brun/Exceliance        -- Session resumption and shared-memory
+                                       session cache
+    * Vladimir Dronnikov            -- Logging cleanup
+    * James Golick/BitLove Inc.     -- SIGPIPE fixes and child-reaping

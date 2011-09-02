@@ -202,7 +202,7 @@ static int init_dh(SSL_CTX *ctx, const char *cert) {
     dh = PEM_read_bio_DHparams(bio, NULL, NULL, NULL);
     BIO_free(bio);
     if (!dh) {
-        LOG("{core} Note: no DH parameters found in %s\n", cert);
+        ERR("{core} Note: no DH parameters found in %s\n", cert);
         return -1;
     }
 
@@ -590,14 +590,14 @@ static void client_handshake(struct ev_loop *loop, ev_io *w, int revents) {
 /* Handle a socket error condition passed to us from OpenSSL */
 static void handle_fatal_ssl_error(proxystate *ps, int err) {
     if (err == SSL_ERROR_ZERO_RETURN)
-        LOG("{client} Connection closed (in data)\n");
+        ERR("{client} Connection closed (in data)\n");
     else if (err == SSL_ERROR_SYSCALL)
         if (errno == 0)
-            LOG("{client} Connection closed (in data)\n");
+            ERR("{client} Connection closed (in data)\n");
         else
             perror("{client} [errno] ");
     else
-        LOG("{client} Unexpected SSL_read error: %d\n", err);
+        ERR("{client} Unexpected SSL_read error: %d\n", err);
     shutdown_proxy(ps, SHUTDOWN_UP);
 }
 
@@ -730,7 +730,7 @@ static void check_ppid(struct ev_loop *loop, ev_timer *w, int revents) {
     (void) revents;
     pid_t ppid = getppid();
     if (ppid != master_pid) {
-        LOG("{core} Process %d detected parent death, closing listener socket.\n", child_num);
+        ERR("{core} Process %d detected parent death, closing listener socket.\n", child_num);
         ev_timer_stop(loop, w);
         ev_io_stop(loop, &listener);
         close(listener_socket);
@@ -753,7 +753,7 @@ static void handle_connections(SSL_CTX *ctx) {
     if (!res)
         LOG("{core} Successfully attached to CPU #%d\n", child_num);
     else
-        LOG("{core-warning} Unable to attach to CPU #%d; do you have that many cores?\n", child_num);
+        ERR("{core-warning} Unable to attach to CPU #%d; do you have that many cores?\n", child_num);
 #endif
 
     loop = ev_default_loop(EVFLAG_AUTO);
@@ -868,7 +868,7 @@ static void parse_cli(int argc, char **argv) {
 
     while (1) {
         int option_index = 0;
-        c = getopt_long(argc, argv, "hf:b:n:c:u:r:B:C:s",
+        c = getopt_long(argc, argv, "hf:b:n:c:u:r:B:C:q:s",
                 long_options, &option_index);
 
         if (c == -1)
@@ -997,6 +997,8 @@ int main(int argc, char **argv) {
     
     parse_cli(argc, argv);
 
+    signal(SIGPIPE, SIG_IGN);
+
     listener_socket = create_main_socket();
 
     struct addrinfo hints;
@@ -1033,11 +1035,10 @@ int main(int argc, char **argv) {
     }
 
     int child_status;
-    for (child_num=0; child_num < OPTIONS.NCORES; child_num++) {
-        wait(&child_status);
-        ERR("{core} A child died!  This should not happen! Goodbye cruel world!\n");
-        exit(2);
-    }
+    int dead_child_pid = wait(&child_status);
+    ERR("{core} A child (%d) died!  This should not happen! Goodbye cruel world!\n", dead_child_pid);
+    kill(0, SIGTERM);
+    exit(2);
 
 handle:
     handle_connections(ctx);
