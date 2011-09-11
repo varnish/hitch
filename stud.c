@@ -213,6 +213,8 @@ static SSL_CTX * init_openssl() {
     SSL_library_init();
     SSL_load_error_strings();
     SSL_CTX *ctx = NULL;
+    long ssloptions = SSL_OP_NO_SSLv2 | SSL_OP_ALL | 
+            SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION;
 
     if (OPTIONS.ETYPE == ENC_TLS)
         ctx = SSL_CTX_new(TLSv1_server_method());
@@ -221,8 +223,11 @@ static SSL_CTX * init_openssl() {
     else
         assert(OPTIONS.ETYPE == ENC_TLS || OPTIONS.ETYPE == ENC_SSL);
 
-    SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_ALL |
-                        SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION);
+#ifdef SSL_OP_NO_COMPRESSION
+    ssloptions |= SSL_OP_NO_COMPRESSION;
+#endif
+
+    SSL_CTX_set_options(ctx, ssloptions);
 
     if (SSL_CTX_use_certificate_chain_file(ctx, OPTIONS.CERT_FILE) <= 0) {
         ERR_print_errors_fp(stderr);
