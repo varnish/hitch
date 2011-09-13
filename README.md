@@ -82,7 +82,7 @@ Usage
 The only required argument is a path to a PEM file that contains the certificate
 (or a chain of certificates) and private key.
 
-The entire set of options can be invoked with `stud -h`:
+Detail about the entire set of options can be found by invoking `stud -h`:
 
     Encryption Methods:
       --tls                    TLSv1 (default)
