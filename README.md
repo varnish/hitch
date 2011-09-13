@@ -85,36 +85,32 @@ The only required argument is a path to a PEM file that contains the certificate
 The entire set of arguments can be invoked with `stud -h`:
 
     Encryption Methods:
-      --tls                    (TLSv1, default)
-      --ssl                    (SSLv3)
-      -c CIPHER_SUITE          (set allowed ciphers)
+      --tls                    TLSv1 (default)
+      --ssl                    SSLv3 (implies no TLSv1)
+      -c CIPHER_SUITE          set allowed ciphers (default is OpenSSL defaults)
 
     Socket:
-      -b HOST,PORT             (backend [connect], default "127.0.0.1,8000")
-      -f HOST,PORT             (frontend [bind], default "*,8443")
+      -b HOST,PORT             backend [connect] (default is "127.0.0.1,8000")
+      -f HOST,PORT             frontend [bind] (default is "*,8443")
 
     Performance:
-      -n CORES                 (number of worker processes, default 1)
-      -B BACKLOG               (set listen backlog size, default 100)
-      -C SHARED_CACHE          (set shared cache size in sessions, by default no shared cache.
-                               Only available if built with shared cache support)
+      -n CORES                 number of worker processes (default is 1)
+      -B BACKLOG               set listen backlog size (default is 100)
 
     Security:
-      -r PATH                  (chroot)
-      -u USERNAME              (set gid/uid after binding the socket)
+      -r PATH                  chroot
+      -u USERNAME              set gid/uid after binding the socket
 
     Logging:
-      -q                       (Be quiet. Emit only error messages)
+      -q                       Be quiet. Emit only error messages
+      -s                       Send log message to syslog in addition to stderr/stdout
 
     Special:
-      --write-ip               (write 1 octet with the IP family followed by
-                                4 (IPv4) or 16 (IPv6) octets little-endian
-                                to backend before the actual data)
-      --write-proxy            (write HaProxy's PROXY protocol line before actual data:
-                                "PROXY TCP4 <source-ip> <dest-ip> <source-port> <dest-port>\r\n"
-                                Note, that dest-ip and dest-port are initialized once after the socket
-                                is bound. It means that you will get 0.0.0.0 as dest-ip instead of 
-                                actual IP if that what the listening socket was bound to)
+      --write-ip               write 1 octet with the IP family followed by the IP
+                               address in 4 (IPv4) or 16 (IPv6) octets little-endian
+                               to backend before the actual data
+      --write-proxy            write HaProxy's PROXY (IPv4 or IPv6) protocol line
+                               before actual data
 
 `stud` uses no configuration file.
 
