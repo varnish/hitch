@@ -323,15 +323,10 @@ static int create_main_socket() {
         fail("{bind-socket}");
     }
 
-#ifdef SO_ACCEPTFILTER
-    accept_filter_arg afa;
-    bzero(&afa, sizeof(afa));
-    strcpy(afa.af_name, "httpready");
-    setsockopt(SOL_SOCKET, SO_ACCEPTFILTER, &afa, sizeof(afa));
-#elif TCP_DEFER_ACCEPT
+#if TCP_DEFER_ACCEPT
     int timeout = 1; 
     setsockopt(s, IPPROTO_TCP, TCP_DEFER_ACCEPT, &timeout, sizeof(int) );
-#endif /* SO_ACCEPTFILTER || TCP_DEFER_ACCEPT */
+#endif /* TCP_DEFER_ACCEPT */
 
     prepare_proxy_line(ai->ai_addr);
 
