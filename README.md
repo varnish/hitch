@@ -75,10 +75,16 @@ The entire set of arguments can be invoked with `stud -h`:
 
     Performance:
       -n CORES                 (number of worker processes, default 1)
+      -B BACKLOG               (set listen backlog size, default 100)
+      -C SHARED_CACHE          (set shared cache size in sessions, by default no shared cache.
+                               Only available if built with shared cache support)
 
     Security:
       -r PATH                  (chroot)
       -u USERNAME              (set gid/uid after binding the socket)
+
+    Logging:
+      -q                       (Be quiet. Emit only error messages)
 
     Special:
       --write-ip               (write 1 octet with the IP family followed by
