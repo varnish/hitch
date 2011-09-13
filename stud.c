@@ -1021,9 +1021,11 @@ void drop_privileges() {
  * spawn child (worker) processes, and wait for them all to die
  * (which they shouldn't!) */
 int main(int argc, char **argv) {
-    openlog("stud", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_DAEMON);
-    
+
     parse_cli(argc, argv);
+
+    if (OPTIONS.SYSLOG)
+        openlog("stud", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_DAEMON);
 
     signal(SIGPIPE, SIG_IGN);
 
