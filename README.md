@@ -10,7 +10,7 @@ each `accept()` on a common socket to distribute connected clients among them.
 Within each child, asynchronous socket I/O is conducted across the local
 connections using `libev` and `OpenSSL`'s nonblocking API.  By default,
 `stud` has an overhead of ~200KB per connection--it preallocates
-some buffer space for data in flight between frontend in backend.
+some buffer space for data in flight between frontend and backend.
 
 `stud` has very few features--it's designed to be paired with an intelligent
 backend like haproxy or nginx.  It maintains a strict 1:1 connection pattern
