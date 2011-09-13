@@ -33,6 +33,7 @@
 #include <netdb.h>
 #include <sys/wait.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -316,6 +317,16 @@ static int create_main_socket() {
     if (bind(s, ai->ai_addr, ai->ai_addrlen)) {
         fail("{bind-socket}");
     }
+
+#ifdef SO_ACCEPTFILTER
+    accept_filter_arg afa;
+    bzero(&afa, sizeof(afa));
+    strcpy(afa.af_name, "httpready");
+    setsockopt(SOL_SOCKET, SO_ACCEPTFILTER, &afa, sizeof(afa));
+#elif TCP_DEFER_ACCEPT
+    int timeout = 1; 
+    setsockopt(s, IPPROTO_TCP, TCP_DEFER_ACCEPT, &timeout, sizeof(int) );
+#endif /* SO_ACCEPTFILTER || TCP_DEFER_ACCEPT */
 
     prepare_proxy_line(ai->ai_addr);
 
@@ -680,6 +691,19 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
         return;
     }
 
+    int flag = 1;
+    int ret = setsockopt(client, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag) );
+    if (ret == -1) {
+      perror("Couldn't setsockopt(TCP_NODELAY)\n");
+    }
+#ifdef TCP_CWND
+    int cwnd = 10;
+    ret = setsockopt(client, IPPROTO_TCP, TCP_CWND, &cwnd, sizeof(cwnd));
+    if (ret == -1) {
+      perror("Couldn't setsockopt(TCP_CWND)\n");
+    }
+#endif
+
     setnonblocking(client);
     int back = create_back_socket();
 
@@ -691,7 +715,11 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
 
     SSL_CTX * ctx = (SSL_CTX *)w->data;
     SSL *ssl = SSL_new(ctx);
-    SSL_set_mode(ssl, SSL_MODE_ENABLE_PARTIAL_WRITE);
+    long mode = SSL_MODE_ENABLE_PARTIAL_WRITE;
+#ifdef SSL_MODE_RELEASE_BUFFERS
+    mode |= SSL_MODE_RELEASE_BUFFERS;
+#endif
+    SSL_set_mode(ssl, mode);
     SSL_set_accept_state(ssl);
     SSL_set_fd(ssl, client);
 
