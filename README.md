@@ -102,8 +102,8 @@ The entire set of arguments can be invoked with `stud -h`:
       -u USERNAME              set gid/uid after binding the socket
 
     Logging:
-      -q                       Be quiet. Emit only error messages
-      -s                       Send log message to syslog in addition to stderr/stdout
+      -q                       be quiet; emit only error messages
+      -s                       send log message to syslog in addition to stderr/stdout
 
     Special:
       --write-ip               write 1 octet with the IP family followed by the IP
