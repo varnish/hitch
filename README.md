@@ -17,16 +17,36 @@ backend like haproxy or nginx.  It maintains a strict 1:1 connection pattern
 with this backend handler so that the backend can dictate throttling behavior,
 maxmium connection behavior, availability of service, etc.
 
-`stud` has one "cool trick"--it will optionally write the client IP address
-as the first few octets (depending on IPv4 or IPv6) to the backend--or provide
-that information using HAProxy's PROXY protocol.  In this way, backends
-who care about the client IP can still access it even though `stud` itself
-appears to be the connected client.
+`stud` will optionally write the client IP address as the first few octets
+(depending on IPv4 or IPv6) to the backend--or provide that information
+using HAProxy's PROXY protocol.  In this way, backends who care about the
+client IP can still access it even though `stud` itself appears to be the
+connected client.
 
 Thanks to a contribution from Emeric at Exceliance (the folks behind HAProxy),
 a special build of `stud` can be made that utilitizes shared memory to
 use a common session cache between all child processes.  This can speed up
 large `stud` deployments by avoiding client renegotiation.
+
+Releases
+---------
+
+Please be aware of the policy regarding releases, code stability, and security:
+
+ * In git, the tip of the master branch should always build on Linux and
+   FreeBSD, and is likely to be as stable as any other changeset.  A
+   careful review of patches is conducted before being pushed to github
+ * Periodically, a version tag will be pushed to github for an old(er)
+   changeset--0.1, 0.2, etc.  These tags mark a particular release of
+   `stud` that has seen heavy testing and several weeks of production
+   stability.  Conservative users are advised to use a tag.
+ * `stud` has optional builds that utilize shared memory-based SSL contexts
+   to keep a session cache between many child processes.  The use of these
+   builds can potentially dramatically speed up SSL handshakes on many-core
+   deployments.  However, it's important to admit the inevitable theoretical
+   security tradeoff associated with the use of this (substantially more
+   complex) binary.  The deeply paranoid are advised to use only the standard
+   `stud` binary at the cost of some performance.
 
 Requirements and Limitations
 ----------------------------
@@ -116,13 +136,17 @@ server-side TLS termination for over 40 million Bump users.
 
 Contributors:
 
-    * Colin Percival @cperciva      -- early audit and code review
+    * Colin Percival @cperciva      -- early security audit and code review
     * Frank DENIS @jedisct1         -- port to BSD, IPv6 support, various fixes
     * Denis Bilenko                 -- HAProxy PROXY protocol support, chroot/setuid
     * Joe Damato                    -- Diffie-Hellman parameter loading
-    * Benjamin Pineau               -- Chained cert loading, various fixes
+    * Benjamin Pineau               -- Chained cert loading, various fixes,
+                                       performance tweaks
     * Carl Perry/Dreamhost          -- IPv6 PROXY support
     * Emeric Brun/Exceliance        -- Session resumption and shared-memory
                                        session cache
     * Vladimir Dronnikov            -- Logging cleanup
     * James Golick/BitLove Inc.     -- SIGPIPE fixes and child-reaping
+    * Joe Williams                  -- Syslog support
+    * Jason Cook                    -- SSL option tweaks (performance)
+    * Artur Bergman                 -- Socket tweaks (performance)
