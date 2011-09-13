@@ -35,18 +35,18 @@ Please be aware of the policy regarding releases, code stability, and security:
 
  * In git, the tip of the master branch should always build on Linux and
    FreeBSD, and is likely to be as stable as any other changeset.  A
-   careful review of patches is conducted before being pushed to github
+   careful review of patches is conducted before being pushed to github.
  * Periodically, a version tag will be pushed to github for an old(er)
    changeset--0.1, 0.2, etc.  These tags mark a particular release of
    `stud` that has seen heavy testing and several weeks of production
    stability.  Conservative users are advised to use a tag.
  * `stud` has optional builds that utilize shared memory-based SSL contexts
    to keep a session cache between many child processes.  The use of these
-   builds can potentially dramatically speed up SSL handshakes on many-core
-   deployments.  However, it's important to admit the inevitable theoretical
-   security tradeoff associated with the use of this (substantially more
-   complex) binary.  The deeply paranoid are advised to use only the standard
-   `stud` binary at the cost of some performance.
+   builds can dramatically speed up SSL handshakes on many-core deployments.
+   However, it's important to acknowledge the inevitable theoretical
+   security tradeoffs associated with the use of this (substantially more
+   complex) binary.  Therefore, the deeply paranoid are advised to use
+   only the standard `stud` binary at the cost of some performance.
 
 Requirements and Limitations
 ----------------------------
