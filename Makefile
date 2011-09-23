@@ -1,6 +1,6 @@
-# [g]make USE_xxxx=1 USE_xxxx=0
+# [g]make USE_xxxx=1
 #
-# USE_SHARED_CACHE   :   enable/disable a shared session cache (enabled by default)
+# USE_SHARED_CACHE   :   enable/disable a shared session cache (disabled by default)
 
 DESTDIR =
 PREFIX  = /usr/local
@@ -13,7 +13,7 @@ OBJS    = stud.o ringbuffer.o
 all: realall
 
 # Shared cache feature
-ifneq ($(USE_SHARED_CACHE),0)
+ifneq ($(USE_SHARED_CACHE),)
 CFLAGS += -DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX
 OBJS   += shctx.o ebtree/libebtree.a
 ALL    += ebtree
