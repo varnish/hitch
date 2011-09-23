@@ -6,8 +6,6 @@
  * Author: Emeric Brun - emeric@exceliance.fr
  *
  */
-#include <ebtree/ebmbtree.h>
-#include <shctx.h>
 #include <sys/mman.h>
 #ifdef USE_SYSCALL_FUTEX
 #include <unistd.h>
@@ -17,6 +15,8 @@
 #include <pthread.h>
 #endif /* USE_SYSCALL_FUTEX */
 
+#include "ebtree/ebmbtree.h"
+#include "shctx.h"
 
 #ifndef SHSESS_MAX_DATA_LEN
 #define SHSESS_MAX_DATA_LEN 512
