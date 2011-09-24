@@ -39,6 +39,7 @@
 .Op Fl f Ar host,port
 .Op Fl n Ar cores
 .Op Fl B Ar backlog
+.Op Fl C Ar cache
 .Op Fl r Ar path
 .Op Fl u Ar username
 .Op Fl qs
@@ -87,6 +88,8 @@ Use
 worker processes. Default is 1.
 .It Fl B Ar backlog
 Set listen backlog size. Default is 100.
+.It Fl C Ar cache
+Set shared cache size in sessions. By default, no shared cache is used.
 .It Fl r Ar path
 Chroot to the given path. By default, no chroot is done.
 .It Fl u Ar username
