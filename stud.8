@@ -35,6 +35,7 @@
 .Op Fl -tls
 .Op Fl -ssl
 .Op Fl c Ar ciphers
+.Op Fl e Ar engine
 .Op Fl b Ar host,port
 .Op Fl f Ar host,port
 .Op Fl n Ar cores
@@ -73,6 +74,11 @@ Set allowed ciphers using the same format as
 .Ic openssl ciphers .
 For example, you can use
 .Ar RSA:!COMPLEMENTOFALL .
+.It Fl e Ar engine
+Specify an OpenSSL engine by its unique ID. The engine will be used by
+default for all algorithms.  The keyword
+.Ar auto
+can be used to load all available engines.
 .It Fl b Ar host,port
 Define backend. Default is
 .Ar 127.0.0.1,8000 .

@@ -52,6 +52,7 @@
 #include <openssl/x509.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <openssl/engine.h>
 #include <ev.h>
 
 #include "ringbuffer.h"
@@ -92,6 +93,7 @@ typedef struct stud_options {
     long NCORES;
     const char *CERT_FILE;
     const char *CIPHER_SUITE;
+    const char *ENGINE;
     int BACKLOG;
 #ifdef USE_SHARED_CACHE
     int SHARED_CACHE;
@@ -114,6 +116,7 @@ static stud_options OPTIONS = {
     1,            // NCORES
     NULL,         // CERT_FILE
     NULL,         // CIPHER_SUITE
+    NULL,         // ENGINE
     100,          // BACKLOG
 #ifdef USE_SHARED_CACHE
     0,            // SHARED_CACHE
@@ -251,6 +254,24 @@ static SSL_CTX * init_openssl() {
 #ifndef OPENSSL_NO_DH
     init_dh(ctx, OPTIONS.CERT_FILE);
 #endif /* OPENSSL_NO_DH */
+
+    if (OPTIONS.ENGINE) {
+        ENGINE *e = NULL;
+        ENGINE_load_builtin_engines();
+        if (!strcmp(OPTIONS.ENGINE, "auto"))
+            ENGINE_register_all_complete();
+        else {
+            if ((e = ENGINE_by_id(OPTIONS.ENGINE)) == NULL ||
+                !ENGINE_init(e) ||
+                !ENGINE_set_default(e, ENGINE_METHOD_ALL)) {
+                ERR_print_errors_fp(stderr);
+                exit(1);
+            }
+            LOG("{core} will use OpenSSL engine %s.\n", ENGINE_get_id(e));
+            ENGINE_finish(e);
+            ENGINE_free(e);
+        }
+    }
 
     if (OPTIONS.CIPHER_SUITE)
         if (SSL_CTX_set_cipher_list(ctx, OPTIONS.CIPHER_SUITE) != 1)
@@ -811,6 +832,7 @@ static void usage_fail(const char *prog, const char *msg) {
 "  --tls                    TLSv1 (default)\n"
 "  --ssl                    SSLv3 (implies no TLSv1)\n"
 "  -c CIPHER_SUITE          set allowed ciphers (default is OpenSSL defaults)\n"
+"  -e ENGINE                set OpenSSL engine\n"
 "\n"
 "Socket:\n"
 "  -b HOST,PORT             backend [connect] (default is \"127.0.0.1,8000\")\n"
@@ -891,7 +913,7 @@ static void parse_cli(int argc, char **argv) {
 
     while (1) {
         int option_index = 0;
-        c = getopt_long(argc, argv, "hf:b:n:c:u:r:B:C:q:s",
+        c = getopt_long(argc, argv, "hf:b:n:c:e:u:r:B:C:q:s",
                 long_options, &option_index);
 
         if (c == -1)
@@ -922,6 +944,10 @@ static void parse_cli(int argc, char **argv) {
             
         case 'c':
             OPTIONS.CIPHER_SUITE = optarg;
+            break;
+
+        case 'e':
+            OPTIONS.ENGINE = optarg;
             break;
 
         case 'u':

@@ -88,6 +88,7 @@ Detail about the entire set of options can be found by invoking `stud -h`:
       --tls                    TLSv1 (default)
       --ssl                    SSLv3 (implies no TLSv1)
       -c CIPHER_SUITE          set allowed ciphers (default is OpenSSL defaults)
+      -e ENGINE                set OpenSSL engine
 
     Socket:
       -b HOST,PORT             backend [connect] (default is "127.0.0.1,8000")
