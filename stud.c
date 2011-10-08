@@ -741,6 +741,7 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     ev_io_init(&ps->ev_w_handshake, client_handshake, client, EV_WRITE);
 
     ev_io_init(&ps->ev_w_down, handle_connect, back, EV_WRITE);
+    ev_io_init(&ps->ev_r_down, back_read, back, EV_READ);
 
     ev_io_start(loop, &ps->ev_w_down);
 
