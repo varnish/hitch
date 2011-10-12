@@ -48,6 +48,7 @@
 #include <syslog.h>
 
 #include <sched.h>
+#include <signal.h>
 
 #include <openssl/x509.h>
 #include <openssl/ssl.h>
@@ -71,6 +72,8 @@ static pid_t master_pid;
 static ev_io listener;
 static int listener_socket;
 static int child_num;
+static pid_t *child_pids;
+static SSL_CTX *ssl_ctx;
 
 /* Command line Options */
 typedef enum {
@@ -312,6 +315,10 @@ static int create_main_socket() {
     }
 
     int s = socket(ai->ai_family, SOCK_STREAM, IPPROTO_TCP);
+    
+    if (s == -1)
+      fail("{socket: main}");
+
     int t = 1;
     setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(int));
 #ifdef SO_REUSEPORT
@@ -340,6 +347,10 @@ static int create_main_socket() {
  * of a newly connected upstream (encrypted) client*/
 static int create_back_socket() {
     int s = socket(backaddr->ai_family, SOCK_STREAM, IPPROTO_TCP);
+
+    if (s == -1)
+      return -1;
+      
     int t = 1;
     setnonblocking(s);
     t = connect(s, backaddr->ai_addr, backaddr->ai_addrlen);
@@ -769,7 +780,7 @@ static void check_ppid(struct ev_loop *loop, ev_timer *w, int revents) {
 
 /* Set up the child (worker) process including libev event loop, read event
  * on the bound socket, etc */
-static void handle_connections(SSL_CTX *ctx) {
+static void handle_connections() {
     LOG("{core} Process %d online\n", child_num);
 #if defined(CPU_ZERO) && defined(CPU_SET)
     cpu_set_t cpus;
@@ -791,7 +802,7 @@ static void handle_connections(SSL_CTX *ctx) {
     ev_timer_start(loop, &timer_ppid_check);
 
     ev_io_init(&listener, handle_accept, listener_socket, EV_READ);
-    listener.data = ctx;
+    listener.data = ssl_ctx;
     ev_io_start(loop, &listener);
 
     ev_loop(loop, 0);
@@ -1012,20 +1023,8 @@ void drop_privileges() {
 }
 
 
-/* Process command line args, create the bound socket,
- * spawn child (worker) processes, and wait for them all to die
- * (which they shouldn't!) */
-int main(int argc, char **argv) {
-
-    parse_cli(argc, argv);
-
-    if (OPTIONS.SYSLOG)
-        openlog("stud", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_DAEMON);
-
-    signal(SIGPIPE, SIG_IGN);
-
-    listener_socket = create_main_socket();
-
+void init_globals() {
+    /* backaddr */
     struct addrinfo hints;
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
@@ -1038,35 +1037,130 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    /* load certificate, pass to handle_connections */
-    SSL_CTX * ctx = init_openssl();
+    /* child_pids */
+    if ((child_pids = calloc(OPTIONS.NCORES, sizeof(pid_t))) == NULL)
+        fail("calloc");
 
-    master_pid = getpid();
+    if (OPTIONS.SYSLOG)
+        openlog("stud", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_DAEMON);
+}
 
-    if (OPTIONS.CHROOT && OPTIONS.CHROOT[0])
-        change_root();
-
-    if (OPTIONS.UID || OPTIONS.GID)
-        drop_privileges();
-
-    for (child_num=0; child_num < OPTIONS.NCORES; child_num++) {
-        int pid = fork();
-        if (pid == -1) {
-            ERR("{core} fork() failed! Goodbye cruel world!\n");
-            exit(1);
-        }
-        else if (pid == 0) // child
-            goto handle;
+/* Forks COUNT children starting with START_INDEX.
+ * Each child's index is stored in child_num and its pid is stored in child_pids[child_num]
+ * so the parent can manage it later. */
+void start_children(int start_index, int count) {
+  for (child_num = start_index; child_num < start_index + count; child_num++) {
+    int pid = fork();
+    if (pid == -1) {
+      ERR("{core} fork() failed! Goodbye cruel world!\n");
+      exit(1);
     }
+    else if (pid == 0) { /* child */
+      handle_connections();
+      exit(0);
+    }
+    else { /* parent. Track new child. */
+      child_pids[child_num] = pid;
+    }
+  }
+}
 
-    int child_status;
-    int dead_child_pid = wait(&child_status);
-    ERR("{core} A child (%d) died!  This should not happen! Goodbye cruel world!\n", dead_child_pid);
-    kill(0, SIGTERM);
-    exit(2);
+/* Forks a new child to replace the old, dead, one with the given PID.*/
+void replace_child_with_pid(pid_t pid) {
+  int i;
 
-handle:
-    handle_connections(ctx);
+  /* find old child's slot and put a new child there */ 
+  for (i = 0; i < OPTIONS.NCORES; i++) {
+    if (child_pids[i] == pid) {
+      start_children(i, 1);
+      return;
+    }
+  }
 
-    return 0;
+  ERR("Cannot find index for child pid %d", pid);
+}
+
+/* Manage status changes in child processes */
+static void do_wait(int __attribute__ ((unused)) signo) {
+  
+  int status;
+  int pid = wait(&status);
+
+  if (pid == -1) {
+    if (errno == ECHILD) {
+      ERR("{core} All children have exited! Restarting...\n");
+      start_children(0, OPTIONS.NCORES);
+    }
+    else if (errno == EINTR) {
+      ERR("{core} Interrupted wait\n");
+    }
+    else {
+      fail("wait");
+    }
+  }
+  else {
+    if (WIFEXITED(status)) {
+      ERR("{core} Child %d exited with status %d. Replacing...\n", pid, WEXITSTATUS(status));
+      replace_child_with_pid(pid);
+    }
+    else if (WIFSIGNALED(status)) {
+      ERR("{core} Child %d was terminated by signal %d. Replacing...\n", pid, WTERMSIG(status));
+      replace_child_with_pid(pid);
+    }
+  }
+}
+
+void init_signals() {
+  struct sigaction act;
+
+  sigemptyset(&act.sa_mask);
+  act.sa_flags = 0;
+  act.sa_handler = SIG_IGN;
+
+  /* Avoid getting PIPE signal when writing to a closed file descriptor */
+  if (sigaction(SIGPIPE, &act, NULL) < 0)
+    fail("sigaction - sigpipe");
+
+  /* We don't care if someone stops and starts a child process with kill (1) */
+  act.sa_flags = SA_NOCLDSTOP;
+
+  act.sa_handler = do_wait;
+
+  /* We do care when child processes change status */
+  if (sigaction(SIGCHLD, &act, NULL) < 0)
+    fail("sigaction - sigchld");
+}
+
+
+/* Process command line args, create the bound socket,
+ * spawn child (worker) processes, and respawn if any die */
+int main(int argc, char **argv) {
+  parse_cli(argc, argv);
+
+  init_signals();
+
+  init_globals();
+
+  listener_socket = create_main_socket();
+
+  /* load certificate, pass to handle_connections */
+  ssl_ctx = init_openssl();
+
+  master_pid = getpid();
+
+  if (OPTIONS.CHROOT && OPTIONS.CHROOT[0])
+    change_root();
+
+  if (OPTIONS.UID || OPTIONS.GID)
+    drop_privileges();
+
+  start_children(0, OPTIONS.NCORES);
+
+  for (;;) {
+    /* Sleep and let the children work.
+     * Parent will be woken up if a signal arrives */
+    pause();
+  }
+
+  exit(0); /* just a formality; we never get here */
 }
