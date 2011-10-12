@@ -1,25 +1,44 @@
-all: stud
+# [g]make USE_xxxx=1
+#
+# USE_SHARED_CACHE   :   enable/disable a shared session cache (disabled by default)
 
-stud: stud.c ringbuffer.c ringbuffer.h
-	gcc -O2 -g -std=c99 -fno-strict-aliasing -Wall -W -I/usr/include/libev -I/usr/local/include -L/usr/local/lib -I. -o stud ringbuffer.c stud.c -D_GNU_SOURCE -lssl -lcrypto -lev
+DESTDIR =
+PREFIX  = /usr/local
+BINDIR  = $(PREFIX)/bin
 
-# The -shared targets use shared memory between child processes
-# for the SSL session cache--potentially a huge performance gain
-# for large stud deployments with many children
-ebtree/libebtree.a: ebtree/*.c
+CFLAGS  = -O2 -g -std=c99 -fno-strict-aliasing -Wall -W -D_GNU_SOURCE
+LDFLAGS = -lssl -lcrypto -lev
+OBJS    = stud.o ringbuffer.o
+
+all: realall
+
+# Shared cache feature
+ifneq ($(USE_SHARED_CACHE),)
+CFLAGS += -DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX
+OBJS   += shctx.o ebtree/libebtree.a
+ALL    += ebtree
+
+ebtree/libebtree.a: $(wildcard ebtree/*.c)
 	make -C ebtree
+ebtree:
+	@[ -d ebtree ] || ( \
+		echo "*** Download libebtree at http://1wt.eu/tools/ebtree/" ; \
+		echo "*** Untar it and make a link named 'ebtree' to point on it"; \
+		exit 1 )
+endif
 
-ebtree: ebtree/libebtree.a
-	@echo "Please download libebtree at http://1wt.eu/tools/ebtree/ untar it. and create a symbolik link named 'ebtree' to point on it"
+ALL += stud
+realall: $(ALL)
 
-stud-shared: stud.c ringbuffer.c ringbuffer.h shctx.c shctx.h
-	gcc -O2 -g -std=c99 -fno-strict-aliasing -Wall -W -I/usr/include/libev -I/usr/local/include -L/usr/local/lib -Lebtree -I. -DUSE_SHARED_CACHE -o stud ringbuffer.c shctx.c stud.c -D_GNU_SOURCE -lssl -lcrypto -lev -lpthread -lebtree
+stud: $(OBJS)
+	$(CC) $(LDFLAGS) -o $@ $^
 
-stud-shared-futex: stud.c ringbuffer.c ringbuffer.h shctx.c shctx.h
-	gcc -O2 -g -std=c99 -fno-strict-aliasing -Wall -W -I/usr/include/libev -I/usr/local/include -L/usr/local/lib -Lebtree -I. -DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX -o stud ringbuffer.c shctx.c stud.c -D_GNU_SOURCE -lssl -lcrypto -lev -lebtree
-
-install: stud
-	cp stud /usr/local/bin
+install: $(ALL)
+	install -d $(DESTDIR)$(BINDIR)
+	install stud $(DESTDIR)$(BINDIR)
 
 clean:
-	rm -f stud *.o
+	rm -f stud $(OBJS)
+
+
+.PHONY: all realall

@@ -6,8 +6,6 @@
  * Author: Emeric Brun - emeric@exceliance.fr
  *
  */
-#include <ebtree/ebmbtree.h>
-#include <shctx.h>
 #include <sys/mman.h>
 #ifdef USE_SYSCALL_FUTEX
 #include <unistd.h>
@@ -17,6 +15,8 @@
 #include <pthread.h>
 #endif /* USE_SYSCALL_FUTEX */
 
+#include "ebtree/ebmbtree.h"
+#include "shctx.h"
 
 #ifndef SHSESS_MAX_DATA_LEN
 #define SHSESS_MAX_DATA_LEN 512
@@ -143,6 +143,7 @@ static inline void shared_context_unlock(void)
 /* SSL context callbacks */
 
 int shctx_new_cb(SSL *ssl, SSL_SESSION *sess) {
+	(void)ssl;
 	struct shared_session *retshs;
 	struct shared_session *lastshs;
 	unsigned char *val_tmp;
@@ -181,6 +182,7 @@ int shctx_new_cb(SSL *ssl, SSL_SESSION *sess) {
 }
 
 SSL_SESSION *shctx_get_cb(SSL *ssl, unsigned char *key, int key_len, int *do_copy) {
+	(void)ssl;
 	struct shared_session *retshs;
 	unsigned char *val_tmp=NULL;
 	SSL_SESSION *sess;
@@ -226,6 +228,7 @@ SSL_SESSION *shctx_get_cb(SSL *ssl, unsigned char *key, int key_len, int *do_cop
 
 void shctx_remove_cb(SSL_CTX *ctx, SSL_SESSION *sess)
 {
+	(void)ctx;
 	struct shared_session *retshs;
 
 	if (sess->session_id_length == SSL_MAX_SSL_SESSION_ID_LENGTH) {
