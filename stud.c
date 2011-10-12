@@ -1111,56 +1111,55 @@ static void do_wait(int __attribute__ ((unused)) signo) {
 }
 
 void init_signals() {
-  struct sigaction act;
+    struct sigaction act;
 
-  sigemptyset(&act.sa_mask);
-  act.sa_flags = 0;
-  act.sa_handler = SIG_IGN;
+    sigemptyset(&act.sa_mask);
+    act.sa_flags = 0;
+    act.sa_handler = SIG_IGN;
 
-  /* Avoid getting PIPE signal when writing to a closed file descriptor */
-  if (sigaction(SIGPIPE, &act, NULL) < 0)
-    fail("sigaction - sigpipe");
+    /* Avoid getting PIPE signal when writing to a closed file descriptor */
+    if (sigaction(SIGPIPE, &act, NULL) < 0)
+        fail("sigaction - sigpipe");
 
-  /* We don't care if someone stops and starts a child process with kill (1) */
-  act.sa_flags = SA_NOCLDSTOP;
+    /* We don't care if someone stops and starts a child process with kill (1) */
+    act.sa_flags = SA_NOCLDSTOP;
 
-  act.sa_handler = do_wait;
+    act.sa_handler = do_wait;
 
-  /* We do care when child processes change status */
-  if (sigaction(SIGCHLD, &act, NULL) < 0)
-    fail("sigaction - sigchld");
+    /* We do care when child processes change status */
+    if (sigaction(SIGCHLD, &act, NULL) < 0)
+        fail("sigaction - sigchld");
 }
-
 
 /* Process command line args, create the bound socket,
  * spawn child (worker) processes, and respawn if any die */
 int main(int argc, char **argv) {
-  parse_cli(argc, argv);
+    parse_cli(argc, argv);
 
-  init_signals();
+    init_signals();
 
-  init_globals();
+    init_globals();
 
-  listener_socket = create_main_socket();
+    listener_socket = create_main_socket();
 
-  /* load certificate, pass to handle_connections */
-  ssl_ctx = init_openssl();
+    /* load certificate, pass to handle_connections */
+    ssl_ctx = init_openssl();
 
-  master_pid = getpid();
+    master_pid = getpid();
 
-  if (OPTIONS.CHROOT && OPTIONS.CHROOT[0])
-    change_root();
+    if (OPTIONS.CHROOT && OPTIONS.CHROOT[0])
+        change_root();
 
-  if (OPTIONS.UID || OPTIONS.GID)
-    drop_privileges();
+    if (OPTIONS.UID || OPTIONS.GID)
+        drop_privileges();
 
-  start_children(0, OPTIONS.NCORES);
+    start_children(0, OPTIONS.NCORES);
 
-  for (;;) {
-    /* Sleep and let the children work.
-     * Parent will be woken up if a signal arrives */
-    pause();
-  }
+    for (;;) {
+        /* Sleep and let the children work.
+         * Parent will be woken up if a signal arrives */
+        pause();
+    }
 
-  exit(0); /* just a formality; we never get here */
+    exit(0); /* just a formality; we never get here */
 }
