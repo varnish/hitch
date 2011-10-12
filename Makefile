@@ -5,6 +5,7 @@
 DESTDIR =
 PREFIX  = /usr/local
 BINDIR  = $(PREFIX)/bin
+MANDIR  = $(PREFIX)/share/man
 
 CFLAGS  = -O2 -g -std=c99 -fno-strict-aliasing -Wall -W -D_GNU_SOURCE
 LDFLAGS = -lssl -lcrypto -lev
@@ -36,6 +37,8 @@ stud: $(OBJS)
 install: $(ALL)
 	install -d $(DESTDIR)$(BINDIR)
 	install stud $(DESTDIR)$(BINDIR)
+	install -d $(DESTDIR)$(MANDIR)/man8
+	install -m 644 doc/stud.8 $(DESTDIR)$(MANDIR)/man8
 
 clean:
 	rm -f stud $(OBJS)
