@@ -1049,65 +1049,65 @@ void init_globals() {
  * Each child's index is stored in child_num and its pid is stored in child_pids[child_num]
  * so the parent can manage it later. */
 void start_children(int start_index, int count) {
-  for (child_num = start_index; child_num < start_index + count; child_num++) {
-    int pid = fork();
-    if (pid == -1) {
-      ERR("{core} fork() failed! Goodbye cruel world!\n");
-      exit(1);
+    for (child_num = start_index; child_num < start_index + count; child_num++) {
+        int pid = fork();
+        if (pid == -1) {
+            ERR("{core} fork() failed! Goodbye cruel world!\n");
+            exit(1);
+        }
+        else if (pid == 0) { /* child */
+            handle_connections();
+            exit(0);
+        }
+        else { /* parent. Track new child. */
+            child_pids[child_num] = pid;
+        }
     }
-    else if (pid == 0) { /* child */
-      handle_connections();
-      exit(0);
-    }
-    else { /* parent. Track new child. */
-      child_pids[child_num] = pid;
-    }
-  }
 }
 
 /* Forks a new child to replace the old, dead, one with the given PID.*/
 void replace_child_with_pid(pid_t pid) {
-  int i;
+    int i;
 
-  /* find old child's slot and put a new child there */ 
-  for (i = 0; i < OPTIONS.NCORES; i++) {
-    if (child_pids[i] == pid) {
-      start_children(i, 1);
-      return;
+    /* find old child's slot and put a new child there */ 
+    for (i = 0; i < OPTIONS.NCORES; i++) {
+        if (child_pids[i] == pid) {
+            start_children(i, 1);
+            return;
+        }
     }
-  }
 
-  ERR("Cannot find index for child pid %d", pid);
+    ERR("Cannot find index for child pid %d", pid);
 }
 
 /* Manage status changes in child processes */
 static void do_wait(int __attribute__ ((unused)) signo) {
-  
-  int status;
-  int pid = wait(&status);
 
-  if (pid == -1) {
-    if (errno == ECHILD) {
-      ERR("{core} All children have exited! Restarting...\n");
-      start_children(0, OPTIONS.NCORES);
-    }
-    else if (errno == EINTR) {
-      ERR("{core} Interrupted wait\n");
+    int status;
+    int pid = wait(&status);
+
+    if (pid == -1) {
+        if (errno == ECHILD) {
+            ERR("{core} All children have exited! Restarting...\n");
+            start_children(0, OPTIONS.NCORES);
+        }
+        else if (errno == EINTR) {
+            ERR("{core} Interrupted wait\n");
+        }
+        else {
+            fail("wait");
+        }
     }
     else {
-      fail("wait");
+        if (WIFEXITED(status)) {
+            ERR("{core} Child %d exited with status %d. Replacing...\n", pid, WEXITSTATUS(status));
+            replace_child_with_pid(pid);
+        }
+        else if (WIFSIGNALED(status)) {
+            ERR("{core} Child %d was terminated by signal %d. Replacing...\n", pid, WTERMSIG(status));
+            replace_child_with_pid(pid);
+        }
     }
-  }
-  else {
-    if (WIFEXITED(status)) {
-      ERR("{core} Child %d exited with status %d. Replacing...\n", pid, WEXITSTATUS(status));
-      replace_child_with_pid(pid);
-    }
-    else if (WIFSIGNALED(status)) {
-      ERR("{core} Child %d was terminated by signal %d. Replacing...\n", pid, WTERMSIG(status));
-      replace_child_with_pid(pid);
-    }
-  }
 }
 
 void init_signals() {
