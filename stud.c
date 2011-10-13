@@ -719,7 +719,19 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     socklen_t sl = sizeof(addr);
     int client = accept(w->fd, (struct sockaddr *) &addr, &sl);
     if (client == -1) {
-        assert(errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN);
+        switch (errno) {
+        case EMFILE:
+            ERR("{client} accept() failed; too many open files for this process\n");
+            break;
+
+        case ENFILE:
+            ERR("{client} accept() failed; too many open files for this system\n");
+            break;
+
+        default:
+            assert(errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN);
+            break;
+        }
         return;
     }
 
