@@ -115,6 +115,12 @@ Detail about the entire set of options can be found by invoking `stud -h`:
 
 `stud` uses no configuration file.
 
+Serving HTTPS
+-------------
+
+If you're using `stud` for HTTPS, please make sure to use the `--ssl` option!
+
+
 Diffie–Hellman
 --------------
 
