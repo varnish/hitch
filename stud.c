@@ -371,7 +371,13 @@ static int create_back_socket() {
 
     if (s == -1)
       return -1;
-      
+
+    int flag = 1;
+    int ret = setsockopt(s, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag));
+    if (ret == -1) {
+      perror("Couldn't setsockopt to backend (TCP_NODELAY)\n");
+    }
+
     int t = 1;
     setnonblocking(s);
     t = connect(s, backaddr->ai_addr, backaddr->ai_addrlen);
@@ -738,13 +744,13 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     int flag = 1;
     int ret = setsockopt(client, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag) );
     if (ret == -1) {
-      perror("Couldn't setsockopt(TCP_NODELAY)\n");
+      perror("Couldn't setsockopt on client (TCP_NODELAY)\n");
     }
 #ifdef TCP_CWND
     int cwnd = 10;
     ret = setsockopt(client, IPPROTO_TCP, TCP_CWND, &cwnd, sizeof(cwnd));
     if (ret == -1) {
-      perror("Couldn't setsockopt(TCP_CWND)\n");
+      perror("Couldn't setsockopt on client (TCP_CWND)\n");
     }
 #endif
 
