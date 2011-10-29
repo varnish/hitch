@@ -34,6 +34,7 @@
 #include <sys/wait.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <net/if.h>
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -122,6 +123,8 @@ typedef struct stud_options {
     const char *SHCUPD_IP;
     const char *SHCUPD_PORT;
     shcupd_peer_opt SHCUPD_PEERS[MAX_SHCUPD_PEERS+1];
+    const char *SHCUPD_MCASTIF;
+    const char *SHCUPD_MCASTTTL;
 #endif
     int QUIET;
     int SYSLOG;
@@ -149,6 +152,8 @@ static stud_options OPTIONS = {
     NULL,         // SHCUPD_IP
     NULL,         // SHCUPD_PORT
     { { NULL, NULL } }, // SHCUPD_PEERS
+    NULL,         // SHCUPD_MCASTIF
+    NULL,         // SHCUPD_MCASTTTL
 #endif
     0,            // QUIET
     0,            // SYSLOG
@@ -405,6 +410,128 @@ static int create_shcupd_socket() {
 #endif
 
     setnonblocking(s);
+
+    if (ai->ai_addr->sa_family == AF_INET) {
+        struct ip_mreqn mreqn;
+
+        memset(&mreqn, 0, sizeof(mreqn));
+        mreqn.imr_multiaddr.s_addr = ((struct sockaddr_in *)ai->ai_addr)->sin_addr.s_addr;
+
+        if (OPTIONS.SHCUPD_MCASTIF) {
+            if (isalpha(*OPTIONS.SHCUPD_MCASTIF)) { /* appears to be an iface name */
+                struct ifreq ifr;
+
+                memset(&ifr, 0, sizeof(ifr));
+                if (strlen(OPTIONS.SHCUPD_MCASTIF) > IFNAMSIZ) {
+                    ERR("Error iface name is too long [%s]\n",OPTIONS.SHCUPD_MCASTIF);
+                    exit(1);
+                }
+
+                memcpy(ifr.ifr_name, OPTIONS.SHCUPD_MCASTIF, strlen(OPTIONS.SHCUPD_MCASTIF));
+                if (ioctl(s, SIOCGIFINDEX, &ifr)) {
+                    fail("{ioctl: SIOCGIFINDEX}");
+                }
+
+                mreqn.imr_ifindex = ifr.ifr_ifindex;
+            }
+            else if (strchr(OPTIONS.SHCUPD_MCASTIF,'.')) { /* appears to be an ipv4 address */
+                mreqn.imr_address.s_addr = inet_addr(OPTIONS.SHCUPD_MCASTIF);
+            }
+            else { /* appears to be an iface index */
+                mreqn.imr_ifindex = atoi(OPTIONS.SHCUPD_MCASTIF);
+            }
+        }
+
+        if (setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreqn, sizeof(mreqn)) < 0) {
+            if (errno != EINVAL) { /* EINVAL if it is not a multicast address,
+						not an error we consider unicast */
+                fail("{setsockopt: IP_ADD_MEMBERSIP}");
+            }
+        }
+        else { /* this is a multicast address */
+            unsigned char loop = 0;
+
+            if(setsockopt(s, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop)) < 0) {
+               fail("{setsockopt: IP_MULTICAST_LOOP}");
+            }
+        }
+
+        /* optional set sockopts for sending to multicast msg */
+        if (OPTIONS.SHCUPD_MCASTIF &&
+            setsockopt(s, IPPROTO_IP, IP_MULTICAST_IF, &mreqn, sizeof(mreqn)) < 0) {
+            fail("{setsockopt: IP_MULTICAST_IF}");
+        }
+
+        if (OPTIONS.SHCUPD_MCASTTTL) {
+             unsigned char ttl;
+
+             ttl = (unsigned char)atoi(OPTIONS.SHCUPD_MCASTTTL);
+             if (setsockopt(s, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) < 0) {
+                 fail("{setsockopt: IP_MULTICAST_TTL}");
+             }
+        }
+
+     }
+#ifdef IPV6_ADD_MEMBERSHIP
+     else if (ai->ai_addr->sa_family == AF_INET6) {
+        struct ipv6_mreq mreq;
+
+        memset(&mreq, 0, sizeof(mreq));
+        memcpy(&mreq.ipv6mr_multiaddr, &((struct sockaddr_in6 *)ai->ai_addr)->sin6_addr,
+                                       sizeof(mreq.ipv6mr_multiaddr));
+
+        if (OPTIONS.SHCUPD_MCASTIF) {
+            if (isalpha(*OPTIONS.SHCUPD_MCASTIF)) { /* appears to be an iface name */
+                struct ifreq ifr;
+
+                memset(&ifr, 0, sizeof(ifr));
+                if (strlen(OPTIONS.SHCUPD_MCASTIF) > IFNAMSIZ) {
+                    ERR("Error iface name is too long [%s]\n",OPTIONS.SHCUPD_MCASTIF);
+                    exit(1);
+                }
+
+                memcpy(ifr.ifr_name, OPTIONS.SHCUPD_MCASTIF, strlen(OPTIONS.SHCUPD_MCASTIF));
+                if (ioctl(s, SIOCGIFINDEX, &ifr)) {
+                    fail("{ioctl: SIOCGIFINDEX}");
+                }
+
+                mreq.ipv6mr_interface = ifr.ifr_ifindex;
+            }
+            else { /* option appears to be an iface index */
+                mreq.ipv6mr_interface = atoi(OPTIONS.SHCUPD_MCASTIF);
+            }
+        }
+
+        if (setsockopt(s, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
+            if (errno != EINVAL) { /* EINVAL if it is not a multicast address,
+						not an error we consider unicast */
+                fail("{setsockopt: IPV6_ADD_MEMBERSIP}");
+            }
+        }
+        else { /* this is a multicast address */
+            unsigned int loop = 0;
+
+            if(setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &loop, sizeof(loop)) < 0) {
+               fail("{setsockopt: IPV6_MULTICAST_LOOP}");
+            }
+        } 
+
+        /* optional set sockopts for sending to multicast msg */
+        if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_IF,
+                               &mreq.ipv6mr_interface, sizeof(mreq.ipv6mr_interface)) < 0) {
+            fail("{setsockopt: IPV6_MULTICAST_IF}");
+        }
+
+        if (OPTIONS.SHCUPD_MCASTTTL) {
+            int hops;
+
+            hops = atoi(OPTIONS.SHCUPD_MCASTTTL);
+            if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &hops, sizeof(hops)) < 0) {
+                fail("{setsockopt: IPV6_MULTICAST_HOPS}");
+            }
+        }
+    }
+#endif /* IPV6_ADD_MEMBERSHIP */
 
     if (bind(s, ai->ai_addr, ai->ai_addrlen)) {
         fail("{bind-socket}");
@@ -1126,6 +1253,7 @@ static void usage_fail(const char *prog, const char *msg) {
 #ifdef USE_SHARED_CACHE
 "  -U HOST,PORT             accept cache updates on udp (default disabled, needs shared cache enabled)\n"
 "  -P HOST[,PORT]           send cache updates to peer (multiple option, needs updates enabled)\n"
+"  -M IFACE[,TTL]           force iface and ttl to receive and send multicast updates\n"
 #endif
 "\n"
 "Performance:\n"
@@ -1185,6 +1313,34 @@ static void parse_host_and_port(const char *prog, const char *name, char *inp, i
 }
 
 #ifdef USE_SHARED_CACHE
+/* Parse mcast and ttl options */
+static void parse_mcast_iface_and_ttl(const char *prog, const char *name, char *inp, const char **iface, const char **ttl) {
+    char buf[150];
+    char *sp;
+
+    if (strlen(inp) >= sizeof buf) {
+        snprintf(buf, sizeof buf, "invalid option for %s IFACE[,TTL]\n", name);
+        usage_fail(prog, buf);
+    }
+
+    sp = strchr(inp, ',');
+    if (!sp) {
+        if (!strcmp(inp, "*"))
+            *iface = NULL;
+        else
+            *iface = inp;
+        *ttl = NULL;
+        return;
+    }
+    else if (!strncmp(inp, "*", sp - inp)) {
+        *iface = NULL;
+    }
+    else {
+        *sp = 0;
+        *iface = inp;
+    }
+    *ttl = sp + 1;
+}
 
 static void parse_peer(const char *prog, const char *name, char *inp, const char **ip, const char **port) {
     char buf[150];
@@ -1255,7 +1411,7 @@ static void parse_cli(int argc, char **argv) {
 
     while (1) {
         int option_index = 0;
-        c = getopt_long(argc, argv, "hf:b:n:c:e:u:r:B:C:k:qsU:P:",
+        c = getopt_long(argc, argv, "hf:b:n:c:e:u:r:B:C:k:qsU:P:M:",
                 long_options, &option_index);
 
         if (c == -1)
@@ -1339,6 +1495,9 @@ static void parse_cli(int argc, char **argv) {
             parse_peers(prog, "-P", optarg);
             break;
 
+        case 'M':
+            parse_mcast_iface_and_ttl(prog, "-M", optarg, &(OPTIONS.SHCUPD_MCASTIF), &(OPTIONS.SHCUPD_MCASTTTL));
+            break;
 #endif
 
         case 'q':
