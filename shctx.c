@@ -321,6 +321,9 @@ int shared_context_init(SSL_CTX *ctx, int size)
 		ret = size;
 	}
 
+	/* set SSL internal cache size to external cache / 8  + 123 */
+	SSL_CTX_sess_set_cache_size(ctx, size >> 3 | 0x3ff);
+
 	/* Set callbacks */
 	SSL_CTX_sess_set_new_cb(ctx, shctx_new_cb);
 	SSL_CTX_sess_set_get_cb(ctx, shctx_get_cb);
