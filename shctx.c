@@ -38,7 +38,8 @@ struct shared_context {
 #else /* USE_SYSCALL_FUTEX */
         pthread_mutex_t mutex;
 #endif
-        struct shared_session head;
+        struct shared_session active;
+        struct shared_session free;
 };
 
 /* Static shared context */
@@ -122,147 +123,152 @@ static inline void shared_context_unlock(void)
 
 /* List Macros */
 
-#define shared_session_remove(a)	(a)->n->p = (a)->p; \
-					(a)->p->n = (a)->n;
+#define shsess_unset(s)		(s)->n->p = (s)->p; \
+				(s)->p->n = (s)->n;
 
-#define shared_session_movelast(a)	shared_session_remove(a) \
-					(a)->n = &shctx->head; \
-					(a)->p = shctx->head.p; \
-					shctx->head.p->n = a; \
-					shctx->head.p = a;
-
-#define shared_session_movefirst(a)	shared_session_remove(a) \
-					(a)->p = &shctx->head; \
-					(a)->n = shctx->head.n; \
-					shctx->head.n->p = a; \
-					shctx->head.n = a;
+#define shsess_set_free(s)	shsess_unset(s) \
+				(s)->p = &shctx->free; \
+				(s)->n = shctx->free.n; \
+				shctx->free.n->p = s; \
+				shctx->free.n = s;
 
 
+#define shsess_set_active(s)	shsess_unset(s) \
+				(s)->p = &shctx->active; \
+				(s)->n = shctx->active.n; \
+				shctx->active.n->p = s; \
+				shctx->active.n = s;
+
+
+#define shsess_get_next()	(shctx->free.p == shctx->free.n) ? \
+					shctx->active.p : shctx->free.p;
+
+/* Tree Macros */
+
+#define shsess_tree_delete(s)	ebmb_delete(&(s)->key);
+
+#define shsess_tree_insert(s)	(struct shared_session *)ebmb_insert(&shctx->active.key.node.branches, \
+							     &(s)->key, SSL_MAX_SSL_SESSION_ID_LENGTH);
+
+#define shsess_tree_lookup(k)	(struct shared_session *)ebmb_lookup(&shctx->active.key.node.branches, \
+							(k), SSL_MAX_SSL_SESSION_ID_LENGTH);
+
+/* Other Macros */
+
+#define shsess_set_key(s,k,l)	{ memcpy((s)->key_data, (k), (l)); \
+					if ((l) < SSL_MAX_SSL_SESSION_ID_LENGTH) \
+						memset((s)->key_data+(l), 0, SSL_MAX_SSL_SESSION_ID_LENGTH-(l)); }; 
 
 
 /* SSL context callbacks */
 
+/* SSL callback used on new session creation */
 int shctx_new_cb(SSL *ssl, SSL_SESSION *sess) {
 	(void)ssl;
-	struct shared_session *retshs;
-	struct shared_session *lastshs;
-	unsigned char *val_tmp;
-	int val_len;
+	struct shared_session *shsess;
+	unsigned char data[SHSESS_MAX_DATA_LEN],*p;
+	unsigned int data_len;
 
-	if (sess->session_id_length > SSL_MAX_SSL_SESSION_ID_LENGTH)
+	/* check if session reserved size in aligned buffer is large enougth for the ASN1 encode session */
+	data_len=i2d_SSL_SESSION(sess, NULL);
+	if(data_len > SHSESS_MAX_DATA_LEN)
 		return 1;
 
-	val_len=i2d_SSL_SESSION(sess, NULL);
-	if(val_len > SHSESS_MAX_DATA_LEN)
-		return 1;
+	/* process ASN1 session encoding before the lock: lower cost */
+	p = data;
+	i2d_SSL_SESSION(sess, &p);
 
 	shared_context_lock();
     
-	lastshs = shctx->head.p;
-	ebmb_delete(&lastshs->key);
+	shsess = shsess_get_next();
 
-	memset(lastshs->key_data, 0, SSL_MAX_SSL_SESSION_ID_LENGTH);
-	memcpy(lastshs->key_data, sess->session_id, sess->session_id_length);
+	shsess_tree_delete(shsess);
 
+	shsess_set_key(shsess, sess->session_id, sess->session_id_length);
 
-	retshs = (struct shared_session *)ebmb_insert(&shctx->head.key.node.branches, &lastshs->key, SSL_MAX_SSL_SESSION_ID_LENGTH);
+	/* it returns the already existing node or current node if none, never returns null */
+	shsess = shsess_tree_insert(shsess);
 
-	retshs->data_len = val_len;
-	val_tmp=retshs->data;
-	i2d_SSL_SESSION(sess, &val_tmp);
+	/* store ASN1 encoded session into cache */
+	shsess->data_len = data_len;
+	memcpy(shsess->data, data, data_len);
     
-	shared_session_movefirst(retshs);
+	shsess_set_active(shsess);
 
 	shared_context_unlock();
 
 	return 1; /* leave the session in local cache for reuse */
-
-	/* Avoid warnings */
-	ssl = NULL;
 }
 
+/* SSL callback used on lookup an existing session cause none found in internal cache */
 SSL_SESSION *shctx_get_cb(SSL *ssl, unsigned char *key, int key_len, int *do_copy) {
 	(void)ssl;
-	struct shared_session *retshs;
-	unsigned char *val_tmp=NULL;
+	struct shared_session *shsess;
+	unsigned char data[SHSESS_MAX_DATA_LEN], *p;
+	unsigned char tmpkey[SSL_MAX_SSL_SESSION_ID_LENGTH];
+	unsigned int data_len;
 	SSL_SESSION *sess;
 
-	*do_copy = 0; /* allow the session to be freed autmatically */
+        /* allow the session to be freed automatically by openssl */
+	*do_copy = 0;
 
-	if (key_len == SSL_MAX_SSL_SESSION_ID_LENGTH) {
-
-		shared_context_lock();
-  		retshs = (struct shared_session *)ebmb_lookup(&shctx->head.key.node.branches, key, key_len);
-	
+	/* tree key is zeros padded sessionid */
+	if ( key_len < SSL_MAX_SSL_SESSION_ID_LENGTH ) {
+		memcpy(tmpkey, key, key_len);
+		memset(tmpkey+key_len, 0, SSL_MAX_SSL_SESSION_ID_LENGTH-key_len); 
+		key = tmpkey;
 	}
-	else if (key_len < SSL_MAX_SSL_SESSION_ID_LENGTH) {
 
-		unsigned char tmp_key[SSL_MAX_SSL_SESSION_ID_LENGTH];
+        /* lock cache */
+	shared_context_lock();
 
-		memset(tmp_key, 0, SSL_MAX_SSL_SESSION_ID_LENGTH);
-		memcpy(tmp_key, key, key_len);
-		
-		shared_context_lock();
-		retshs = (struct shared_session *)ebmb_lookup(&shctx->head.key.node.branches, tmp_key, SSL_MAX_SSL_SESSION_ID_LENGTH);
-	}
-	else
-		return NULL;
-
-	if(!retshs) {
+	/* lookup for session */
+	shsess = shsess_tree_lookup(key);
+	if(!shsess) {
+		/* no session found: unlock cache and exit */
 		shared_context_unlock();
 		return NULL;
 	}
 
-	val_tmp=retshs->data;
-	sess=d2i_SSL_SESSION(NULL, (const unsigned char **)&val_tmp, retshs->data_len);
+	/* copy ASN1 session data to decode outside the lock */
+	data_len = shsess->data_len;
+	memcpy(data, shsess->data, shsess->data_len);
 
-	shared_session_movefirst(retshs);
+	shsess_set_active(shsess);
 
 	shared_context_unlock();
+
+	/* decode ASN1 session */
+        p = data;
+	sess = d2i_SSL_SESSION(NULL, (const unsigned char **)&p, data_len);
 
 	return sess;
-
-	/* Avoid warnings */
-	ssl = NULL;
 }
 
-void shctx_remove_cb(SSL_CTX *ctx, SSL_SESSION *sess)
-{
+/* SSL callback used to signal session is no more used in internal cache */
+void shctx_remove_cb(SSL_CTX *ctx, SSL_SESSION *sess) {
 	(void)ctx;
-	struct shared_session *retshs;
+	struct shared_session *shsess;
+	unsigned char tmpkey[SSL_MAX_SSL_SESSION_ID_LENGTH];
+	unsigned char *key = sess->session_id;
 
-	if (sess->session_id_length == SSL_MAX_SSL_SESSION_ID_LENGTH) {
-
-		shared_context_lock();
-		retshs = (struct shared_session *)ebmb_lookup(&shctx->head.key.node.branches, sess->session_id, sess->session_id_length);
-	}
-	else if (sess->session_id_length < SSL_MAX_SSL_SESSION_ID_LENGTH) {
-
-		unsigned char key[SSL_MAX_SSL_SESSION_ID_LENGTH];
-
-		memset(key, 0, SSL_MAX_SSL_SESSION_ID_LENGTH);
-		memcpy(key, sess->session_id, sess->session_id_length);
-
-		shared_context_lock();
-		retshs = (struct shared_session *)ebmb_lookup(&shctx->head.key.node.branches, key, SSL_MAX_SSL_SESSION_ID_LENGTH);
-	}
-	else
-		return;
-
-	if(!retshs) {
-		shared_context_unlock();
-		return;
+	/* tree key is zeros padded sessionid */
+	if ( sess->session_id_length < SSL_MAX_SSL_SESSION_ID_LENGTH ) {
+		memcpy(tmpkey, sess->session_id, sess->session_id_length);
+		memset(tmpkey+sess->session_id_length, 0, SSL_MAX_SSL_SESSION_ID_LENGTH-sess->session_id_length); 
+		key = tmpkey;
 	}
 
-	ebmb_delete(&retshs->key);
-	shared_session_movelast(retshs);
+	shared_context_lock();
 
+	/* lookup for session */
+	shsess = shsess_tree_lookup(key);
+        if ( shsess )  {
+		shsess_set_free(shsess);
+	}
+
+	/* unlock cache */
 	shared_context_unlock();
-
-	return;
-
-	/* Avoid warnings */
-	ctx = NULL;
 }
 
 /* Init shared memory context if not allocated and set SSL context callbacks
@@ -278,7 +284,7 @@ int shared_context_init(SSL_CTX *ctx, int size)
 
 #ifndef USE_SYSCALL_FUTEX
 		pthread_mutexattr_t attr;
-#endif
+#endif /* USE_SYSCALL_FUTEX */
 		struct shared_session *prev,*cur;
 
 		shctx = (struct shared_context *)mmap(NULL, sizeof(struct shared_context)+(size*sizeof(struct shared_session)),
@@ -288,24 +294,29 @@ int shared_context_init(SSL_CTX *ctx, int size)
 
 #ifdef USE_SYSCALL_FUTEX
 		shctx->waiters = 0;
-#else /* USE_SYSCALL_FUTEX */
+#else
 		pthread_mutexattr_init(&attr);
 		pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
 		pthread_mutex_init(&shctx->mutex, &attr);
 #endif
-		memset(&shctx->head.key, 0, sizeof(struct ebmb_node));
-		/* No duplicate authorized: */
-		shctx->head.key.node.branches.b[1] = (void *)1;
+		memset(&shctx->active.key, 0, sizeof(struct ebmb_node));
+		memset(&shctx->free.key, 0, sizeof(struct ebmb_node));
 
-		cur = &shctx->head;
+		/* No duplicate authorized in tree: */
+		shctx->active.key.node.branches.b[1] = (void *)1;
+
+		cur = &shctx->active; 
+		cur->n = cur->p = cur;
+		
+		cur = &shctx->free;
 		for ( i = 0 ; i < size ; i++) {
 			prev = cur;
 			cur = (struct shared_session *)((char *)prev + sizeof(struct shared_session));
 			prev->n = cur;
 			cur->p = prev;
 		}
-		cur->n = &shctx->head;
-		shctx->head.p = cur;
+		cur->n = &shctx->free;
+		shctx->free.p = cur;
 
 		ret = size;
 	}
@@ -315,6 +326,6 @@ int shared_context_init(SSL_CTX *ctx, int size)
 	SSL_CTX_sess_set_get_cb(ctx, shctx_get_cb);
 	SSL_CTX_sess_set_remove_cb(ctx, shctx_remove_cb);
 
-        return ret;
+	return ret;
 }
 
