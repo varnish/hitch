@@ -47,6 +47,7 @@
 #include <limits.h>
 #include <syslog.h>
 
+#include <ctype.h>
 #include <sched.h>
 #include <signal.h>
 
@@ -66,6 +67,12 @@
 # define AI_ADDRCONFIG 0
 #endif
 
+#ifdef USE_SHARED_CACHE
+#ifndef MAX_SHCUPD_PEERS
+# define MAX_SHCUPD_PEERS 15
+#endif
+#endif
+
 /* Globals */
 static struct ev_loop *loop;
 static struct addrinfo *backaddr;
@@ -75,6 +82,18 @@ static int listener_socket;
 static int child_num;
 static pid_t *child_pids;
 static SSL_CTX *ssl_ctx;
+#ifdef USE_SHARED_CACHE
+static ev_io shcupd_listener;
+static int shcupd_socket;
+struct addrinfo *shcupd_peers[MAX_SHCUPD_PEERS+1];
+static unsigned char shared_secret[SHA_DIGEST_LENGTH];
+
+typedef struct shcupd_peer_opt {
+     const char *ip;
+     const char *port;
+} shcupd_peer_opt;
+
+#endif /*USE_SHARED_CACHE*/
 
 /* Command line Options */
 typedef enum {
@@ -100,6 +119,9 @@ typedef struct stud_options {
     int BACKLOG;
 #ifdef USE_SHARED_CACHE
     int SHARED_CACHE;
+    const char *SHCUPD_IP;
+    const char *SHCUPD_PORT;
+    shcupd_peer_opt SHCUPD_PEERS[MAX_SHCUPD_PEERS+1];
 #endif
     int QUIET;
     int SYSLOG;
@@ -124,6 +146,9 @@ static stud_options OPTIONS = {
     100,          // BACKLOG
 #ifdef USE_SHARED_CACHE
     0,            // SHARED_CACHE
+    NULL,         // SHCUPD_IP
+    NULL,         // SHCUPD_PORT
+    { { NULL, NULL } }, // SHCUPD_PEERS
 #endif
     0,            // QUIET
     0,            // SYSLOG
@@ -257,6 +282,158 @@ static void info_callback(const SSL *ssl, int where, int ret) {
     }
 }
 
+#ifdef USE_SHARED_CACHE
+
+/* Handle incoming message updates */
+static void handle_shcupd(struct ev_loop *loop, ev_io *w, int revents) {
+    (void) revents;
+    unsigned char msg[SHSESS_MAX_ENCODED_LEN], hash[EVP_MAX_MD_SIZE];
+    ssize_t r;
+    unsigned int hash_len;
+    uint32_t encdate;
+    long now = (time_t)ev_now(loop);
+
+    while ( ( r = recv(w->fd, msg, sizeof(msg), 0) ) > 0 ) {
+
+        /* msg len must be greater than 1 Byte of data + sig length */
+        if (r < (int)(1+sizeof(shared_secret)))  
+           continue;
+
+        /* compute sig */
+        r -= sizeof(shared_secret);
+        HMAC(EVP_sha1(), shared_secret, sizeof(shared_secret), msg, r, hash, &hash_len);
+
+        if (hash_len != sizeof(shared_secret)) /* should never append */
+           continue;
+
+        /* check sign */
+        if(memcmp(msg+r, hash, hash_len))
+           continue;
+
+        /* msg len must be greater than 1 Byte of data + encdate length */
+        if (r < (int)(1+sizeof(uint32_t)))  
+           continue;
+
+        /* drop too unsync updates */ 
+        r -= sizeof(uint32_t);
+        encdate = *((uint32_t *)&msg[r]);
+        if (!(abs((int)(int32_t)now-ntohl(encdate)) < SSL_CTX_get_timeout(ssl_ctx)))
+           continue;
+
+        shctx_sess_add(msg, r, now);
+    }
+}
+
+/* Send remote updates messages callback */
+void shcupd_session_new(unsigned char *msg, unsigned int len, long cdate) {
+    unsigned int hash_len;
+    struct addrinfo **pai = shcupd_peers;
+    uint32_t ncdate;
+
+    /* add session creation encoded date to footer */
+    ncdate = htonl((uint32_t)cdate);
+    memcpy(msg+len, &ncdate, sizeof(ncdate));
+    len += sizeof(ncdate);
+
+    /* add msg sign */
+    HMAC(EVP_sha1(), shared_secret, sizeof(shared_secret),
+                     msg, len, msg+len, &hash_len);
+    len += hash_len;
+
+    /* send msg to peers */
+    while (*pai) {
+        sendto(shcupd_socket, msg, len, 0, (*pai)->ai_addr, (*pai)->ai_addrlen);
+        pai++;
+    }
+}
+
+/* Compute a sha1 secret from an ASN1 rsa private key */
+static int compute_secret(RSA *rsa, unsigned char *secret) {
+    unsigned char *buf,*p;
+    unsigned int length;
+
+    length = i2d_RSAPrivateKey(rsa, NULL);
+    if (length <= 0)
+        return -1;
+
+    p = buf = (unsigned char *)malloc(length*sizeof(unsigned char));
+    if (!buf)
+        return -1;
+
+    i2d_RSAPrivateKey(rsa,&p);
+
+    SHA1(buf, length, secret);
+
+    free(buf);
+
+    return 0;
+}
+
+/* Create udp socket to receive and send updates */
+static int create_shcupd_socket() {
+    struct addrinfo *ai, hints;
+    struct addrinfo **pai = shcupd_peers;
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
+    const int gai_err = getaddrinfo(OPTIONS.SHCUPD_IP, OPTIONS.SHCUPD_PORT,
+                                    &hints, &ai);
+    if (gai_err != 0) {
+        ERR("{getaddrinfo}: [%s]\n", gai_strerror(gai_err));
+        exit(1);
+    }
+
+    /* check if peers inet family addresses match */
+    while (*pai) {
+        if ((*pai)->ai_family != ai->ai_family) {
+            ERR("Share host and peers inet family differs\n");
+            exit(1);
+        }
+        pai++;
+    }
+
+    int s = socket(ai->ai_family, SOCK_DGRAM, IPPROTO_UDP);
+    
+    if (s == -1)
+      fail("{socket: shared cache updates}");
+
+    int t = 1;
+    setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(int));
+#ifdef SO_REUSEPORT
+    setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &t, sizeof(int));
+#endif
+
+    setnonblocking(s);
+
+    if (bind(s, ai->ai_addr, ai->ai_addrlen)) {
+        fail("{bind-socket}");
+    }
+
+    freeaddrinfo(ai);
+
+    return s;
+}
+
+#endif /*USE_SHARED_CACHE */
+
+RSA *load_rsa_privatekey(SSL_CTX *ctx, const char *file) {
+    BIO *bio;
+    RSA *rsa;
+
+    bio = BIO_new_file(file, "r");
+    if (!bio) {
+      ERR_print_errors_fp(stderr);
+      return NULL;
+    }
+
+    rsa = PEM_read_bio_RSAPrivateKey(bio, NULL,
+          ctx->default_passwd_callback, ctx->default_passwd_callback_userdata);
+    BIO_free(bio);
+ 
+    return rsa;
+}
+
 /* Init library and load specified certificate.
  * Establishes a SSL_ctx, to act as a template for
  * each connection */
@@ -264,6 +441,8 @@ static SSL_CTX * init_openssl() {
     SSL_library_init();
     SSL_load_error_strings();
     SSL_CTX *ctx = NULL;
+    RSA *rsa;
+
     long ssloptions = SSL_OP_NO_SSLv2 | SSL_OP_ALL | 
             SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION;
 
@@ -285,7 +464,14 @@ static SSL_CTX * init_openssl() {
         ERR_print_errors_fp(stderr);
         exit(1);
     }
-    if (SSL_CTX_use_RSAPrivateKey_file(ctx, OPTIONS.CERT_FILE, SSL_FILETYPE_PEM) <= 0) {
+
+    rsa = load_rsa_privatekey(ctx, OPTIONS.CERT_FILE);
+    if(!rsa) {
+       ERR("Error loading rsa private key\n");
+       exit(1);
+    }
+
+    if (SSL_CTX_use_RSAPrivateKey(ctx,rsa) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(1);
     }
@@ -322,9 +508,20 @@ static SSL_CTX * init_openssl() {
             ERR("Unable to alloc memory for shared cache.\n");
             exit(1);
         }
+	if (OPTIONS.SHCUPD_PORT) {
+            if (compute_secret(rsa, shared_secret) < 0) {
+                ERR("Unable to compute shared secret.\n");
+                exit(1);
+            }
+
+            if (*shcupd_peers) {
+                shsess_set_new_cbk(shcupd_session_new);
+            }
+        }
     }
 #endif
 
+    RSA_free(rsa);
     return ctx;
 }
 
@@ -926,6 +1123,10 @@ static void usage_fail(const char *prog, const char *msg) {
 "Socket:\n"
 "  -b HOST,PORT             backend [connect] (default is \"127.0.0.1,8000\")\n"
 "  -f HOST,PORT             frontend [bind] (default is \"*,8443\")\n"
+#ifdef USE_SHARED_CACHE
+"  -U HOST,PORT             accept cache updates on udp (default disabled, needs shared cache enabled)\n"
+"  -P HOST[,PORT]           send cache updates to peer (multiple option, needs updates enabled)\n"
+#endif
 "\n"
 "Performance:\n"
 "  -n CORES                 number of worker processes (default is 1)\n"
@@ -983,6 +1184,57 @@ static void parse_host_and_port(const char *prog, const char *name, char *inp, i
     *port = sp + 1;
 }
 
+#ifdef USE_SHARED_CACHE
+
+static void parse_peer(const char *prog, const char *name, char *inp, const char **ip, const char **port) {
+    char buf[150];
+    char *sp;
+
+    if (strlen(inp) >= sizeof buf) {
+        snprintf(buf, sizeof buf, "invalid option for %s HOST[,PORT]\n", name);
+        usage_fail(prog, buf);
+    }
+
+    sp = strchr(inp, ',');
+    if (!sp) {
+        if (!strcmp(inp, "*")) {
+            snprintf(buf, sizeof buf, "wildcard host specification invalid for %s\n", name);
+            usage_fail(prog, buf);
+        }
+        else
+            *ip = inp;
+        *port = NULL;
+        return;
+    }
+    else if (!strncmp(inp, "*", sp - inp)) {
+        snprintf(buf, sizeof buf, "wildcard host specification invalid for %s\n", name);
+        usage_fail(prog, buf);
+    }
+    else {
+        *sp = 0;
+        *ip = inp;
+    }
+    *port = sp + 1;
+}
+
+/* Add shcupd peer to options */
+static void parse_peers(const char *prog, const char *name, char *inp) {
+    int i;
+
+    for (i = 0 ; i < MAX_SHCUPD_PEERS; i++) {
+         if (!OPTIONS.SHCUPD_PEERS[i].ip) {
+             parse_peer(prog, name, inp, &(OPTIONS.SHCUPD_PEERS[i].ip), &(OPTIONS.SHCUPD_PEERS[i].port));
+             memset(&(OPTIONS.SHCUPD_PEERS[i+1]), 0, sizeof(shcupd_peer_opt));
+             break;
+         }
+    }
+    if (i == MAX_SHCUPD_PEERS ) {
+        ERR("Maximum %s peers reach (%d)\n", name, MAX_SHCUPD_PEERS);
+        exit(1);
+    }
+}
+
+#endif /* USE_SHARED_CACHE */
 
 /* Handle command line arguments modifying behavior */
 static void parse_cli(int argc, char **argv) {
@@ -1003,7 +1255,7 @@ static void parse_cli(int argc, char **argv) {
 
     while (1) {
         int option_index = 0;
-        c = getopt_long(argc, argv, "hf:b:n:c:e:u:r:B:C:k:qs",
+        c = getopt_long(argc, argv, "hf:b:n:c:e:u:r:B:C:k:qsU:P:",
                 long_options, &option_index);
 
         if (c == -1)
@@ -1078,6 +1330,15 @@ static void parse_cli(int argc, char **argv) {
                 exit(1);
             }
             break;
+
+        case 'U':
+            parse_host_and_port(prog, "-U", optarg, 1, &(OPTIONS.SHCUPD_IP), &(OPTIONS.SHCUPD_PORT));
+            break;
+
+        case 'P':
+            parse_peers(prog, "-P", optarg);
+            break;
+
 #endif
 
         case 'q':
@@ -1142,6 +1403,28 @@ void init_globals() {
         exit(1);
     }
 
+#ifdef USE_SHARED_CACHE
+    if (OPTIONS.SHARED_CACHE) {
+        /* cache update peers addresses */
+        shcupd_peer_opt *spo = OPTIONS.SHCUPD_PEERS;
+        struct addrinfo **pai = shcupd_peers;
+
+        while (spo->ip) {
+            memset(&hints, 0, sizeof hints);
+            hints.ai_family = AF_UNSPEC;
+            hints.ai_socktype = SOCK_DGRAM;
+            hints.ai_flags = 0;
+            const int gai_err = getaddrinfo(spo->ip,
+                                spo->port ? spo->port : OPTIONS.SHCUPD_PORT, &hints, pai);
+            if (gai_err != 0) {
+                ERR("{getaddrinfo}: [%s]", gai_strerror(gai_err));
+                exit(1);
+            }
+            spo++;
+            pai++;
+        }
+    }
+#endif
     /* child_pids */
     if ((child_pids = calloc(OPTIONS.NCORES, sizeof(pid_t))) == NULL)
         fail("calloc");
@@ -1247,6 +1530,14 @@ int main(int argc, char **argv) {
 
     listener_socket = create_main_socket();
 
+#ifdef USE_SHARED_CACHE
+    if (OPTIONS.SHCUPD_PORT) {
+        /* create socket to send(children) and
+               receive(parent) cache updates */
+    	shcupd_socket = create_shcupd_socket();
+    }
+#endif /* USE_SHARED_CACHE */
+
     /* load certificate, pass to handle_connections */
     ssl_ctx = init_openssl();
 
@@ -1259,6 +1550,19 @@ int main(int argc, char **argv) {
         drop_privileges();
 
     start_children(0, OPTIONS.NCORES);
+
+#ifdef USE_SHARED_CACHE
+    if (OPTIONS.SHCUPD_PORT) {
+        /* start event loop to receive cache updates */
+
+        loop = ev_default_loop(EVFLAG_AUTO);
+
+        ev_io_init(&shcupd_listener, handle_shcupd, shcupd_socket, EV_READ);
+        ev_io_start(loop, &shcupd_listener);
+            
+        ev_loop(loop, 0);
+    }
+#endif /* USE_SHARED_CACHE */
 
     for (;;) {
         /* Sleep and let the children work.
