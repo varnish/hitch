@@ -18,13 +18,10 @@
 #include "ebtree/ebmbtree.h"
 #include "shctx.h"
 
-#ifndef SHSESS_MAX_DATA_LEN
-#define SHSESS_MAX_DATA_LEN 512
-#endif
-
 struct shared_session {
         struct ebmb_node key;
         unsigned char key_data[SSL_MAX_SSL_SESSION_ID_LENGTH];
+        long c_date;
         int data_len;
         unsigned char data[SHSESS_MAX_DATA_LEN];
         struct shared_session *p;
@@ -44,6 +41,9 @@ struct shared_context {
 
 /* Static shared context */
 static struct shared_context *shctx = NULL;
+
+/* Callbacks */
+static void (*shared_session_new_cbk)(unsigned char *session, unsigned int session_len, long cdate);
 
 
 /* Lock functions */
@@ -166,8 +166,9 @@ static inline void shared_context_unlock(void)
 int shctx_new_cb(SSL *ssl, SSL_SESSION *sess) {
 	(void)ssl;
 	struct shared_session *shsess;
-	unsigned char data[SHSESS_MAX_DATA_LEN],*p;
+	unsigned char *data,*p;
 	unsigned int data_len;
+	unsigned char encsess[SHSESS_MAX_ENCODED_LEN];
 
 	/* check if session reserved size in aligned buffer is large enougth for the ASN1 encode session */
 	data_len=i2d_SSL_SESSION(sess, NULL);
@@ -175,7 +176,7 @@ int shctx_new_cb(SSL *ssl, SSL_SESSION *sess) {
 		return 1;
 
 	/* process ASN1 session encoding before the lock: lower cost */
-	p = data;
+	p = data = encsess+SSL_MAX_SSL_SESSION_ID_LENGTH;
 	i2d_SSL_SESSION(sess, &p);
 
 	shared_context_lock();
@@ -193,9 +194,22 @@ int shctx_new_cb(SSL *ssl, SSL_SESSION *sess) {
 	shsess->data_len = data_len;
 	memcpy(shsess->data, data, data_len);
     
+	/* store creation date */
+	shsess->c_date = SSL_SESSION_get_time(sess);
+
 	shsess_set_active(shsess);
 
 	shared_context_unlock();
+
+	if (shared_session_new_cbk) { /* if user level callback is set */
+
+		/* copy sessionid padded with 0 into the sessionid + data aligned buffer */
+		memcpy(encsess, sess->session_id, sess->session_id_length);
+		if (sess->session_id_length < SSL_MAX_SSL_SESSION_ID_LENGTH)
+			memset(encsess+sess->session_id_length, 0, SSL_MAX_SSL_SESSION_ID_LENGTH-sess->session_id_length); 
+
+		shared_session_new_cbk(encsess, SSL_MAX_SSL_SESSION_ID_LENGTH+data_len, SSL_SESSION_get_time(sess));
+	}
 
 	return 0; /* do not increment session reference count */
 }
@@ -207,6 +221,7 @@ SSL_SESSION *shctx_get_cb(SSL *ssl, unsigned char *key, int key_len, int *do_cop
 	unsigned char data[SHSESS_MAX_DATA_LEN], *p;
 	unsigned char tmpkey[SSL_MAX_SSL_SESSION_ID_LENGTH];
 	unsigned int data_len;
+	long cdate;
 	SSL_SESSION *sess;
 
         /* allow the session to be freed automatically by openssl */
@@ -230,6 +245,9 @@ SSL_SESSION *shctx_get_cb(SSL *ssl, unsigned char *key, int key_len, int *do_cop
 		return NULL;
 	}
 
+	/* backup creation date to reset in session after ASN1 decode */
+	cdate = shsess->c_date;
+
 	/* copy ASN1 session data to decode outside the lock */
 	data_len = shsess->data_len;
 	memcpy(data, shsess->data, shsess->data_len);
@@ -241,6 +259,10 @@ SSL_SESSION *shctx_get_cb(SSL *ssl, unsigned char *key, int key_len, int *do_cop
 	/* decode ASN1 session */
         p = data;
 	sess = d2i_SSL_SESSION(NULL, (const unsigned char **)&p, data_len);
+
+	/* reset creation date */ 
+	if (sess)
+		SSL_SESSION_set_time(sess, cdate);
 
 	return sess;
 }
@@ -269,6 +291,46 @@ void shctx_remove_cb(SSL_CTX *ctx, SSL_SESSION *sess) {
 
 	/* unlock cache */
 	shared_context_unlock();
+}
+
+/* User level function called to add a session to the cache (remote updates) */
+void shctx_sess_add(const unsigned char *encsess, unsigned int len, long cdate) {
+	struct shared_session *shsess;
+
+	/* check buffer is at least padded key long + 1 byte
+		and data_len not too long */
+	if ( (len <= SSL_MAX_SSL_SESSION_ID_LENGTH)
+		 || (len > SHSESS_MAX_DATA_LEN+SSL_MAX_SSL_SESSION_ID_LENGTH) )
+		return;
+
+ 
+	shared_context_lock();
+
+	shsess = shsess_get_next();
+
+	shsess_tree_delete(shsess);
+
+	shsess_set_key(shsess, encsess, SSL_MAX_SSL_SESSION_ID_LENGTH);
+
+	/* it returns the already existing node or current node if none, never returns null */
+	shsess = shsess_tree_insert(shsess);
+
+	/* store into cache and update earlier on session get events */
+	if (cdate)
+		shsess->c_date = (long)cdate;
+
+	/* copy ASN1 session data into cache */
+	shsess->data_len = len-SSL_MAX_SSL_SESSION_ID_LENGTH;
+	memcpy(shsess->data, encsess+SSL_MAX_SSL_SESSION_ID_LENGTH, shsess->data_len);
+
+	shsess_set_active(shsess);
+
+	shared_context_unlock();
+}
+
+/* Function used to set a callback on new session creation */
+void shsess_set_new_cbk(void (*func)(unsigned char *, unsigned int, long)) {
+	shared_session_new_cbk = func;
 }
 
 /* Init shared memory context if not allocated and set SSL context callbacks
