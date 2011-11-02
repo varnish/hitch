@@ -103,6 +103,7 @@ typedef struct stud_options {
 #endif
     int QUIET;
     int SYSLOG;
+    int TCP_KEEPALIVE;
 } stud_options;
 
 static stud_options OPTIONS = {
@@ -124,8 +125,9 @@ static stud_options OPTIONS = {
 #ifdef USE_SHARED_CACHE
     0,            // SHARED_CACHE
 #endif
-    0,             // QUIET
-    0             // SYSLOG    
+    0,            // QUIET
+    0,            // SYSLOG
+    3600          // TCP_KEEPALIVE
 };
 
 
@@ -168,19 +170,6 @@ typedef struct proxystate {
     struct sockaddr_storage remote_ip;  /* Remote ip returned from `accept` */
 } proxystate;
 
-/* set a file descriptor (socket) to non-blocking mode */
-static void setnonblocking(int fd) {
-    int flag = 1;
-
-    assert (ioctl(fd, FIONBIO, &flag) == 0);
-}
-
-
-static void fail(const char* s) {
-    perror(s);
-    exit(1);
-}
-
 #define LOG(...)                                        \
     do {                                                \
       if (!OPTIONS.QUIET) fprintf(stdout, __VA_ARGS__); \
@@ -192,6 +181,35 @@ static void fail(const char* s) {
       fprintf(stderr, __VA_ARGS__); \
       if (OPTIONS.SYSLOG) syslog(LOG_ERR, __VA_ARGS__); \
     } while(0)
+
+
+/* set a file descriptor (socket) to non-blocking mode */
+static void setnonblocking(int fd) {
+    int flag = 1;
+
+    assert (ioctl(fd, FIONBIO, &flag) == 0);
+}
+
+/* set a tcp socket to use TCP Keepalive */
+static void settcpkeepalive(int fd) {
+    int optval = 1;
+    socklen_t optlen = sizeof(optval);
+
+    if(setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen) < 0) {
+        ERR("Error activating SO_KEEPALIVE on client socket: %s", strerror(errno));
+    }
+
+    optval = OPTIONS.TCP_KEEPALIVE;
+    optlen = sizeof(optval);
+    if(setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, &optval, optlen) < 0) {
+        ERR("Error setting TCP_KEEPIDLE on client socket: %s", strerror(errno));
+    }
+}
+
+static void fail(const char* s) {
+    perror(s);
+    exit(1);
+}
 
 #ifndef OPENSSL_NO_DH
 static int init_dh(SSL_CTX *ctx, const char *cert) {
@@ -734,6 +752,10 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
             ERR("{client} accept() failed; too many open files for this system\n");
             break;
 
+        case 'k':
+            OPTIONS.TCP_KEEPALIVE = atoi(optarg);
+            break;
+
         default:
             assert(errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN);
             break;
@@ -755,6 +777,8 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
 #endif
 
     setnonblocking(client);
+    settcpkeepalive(client);
+
     int back = create_back_socket();
 
     if (back == -1) {
@@ -871,6 +895,7 @@ static void usage_fail(const char *prog, const char *msg) {
 "Performance:\n"
 "  -n CORES                 number of worker processes (default is 1)\n"
 "  -B BACKLOG               set listen backlog size (default is 100)\n"
+"  -k SECS                  Change default tcp keepalive on client socket\n"
 #ifdef USE_SHARED_CACHE
 "  -C SHARED_CACHE          set shared cache size in sessions (default no shared cache)\n"
 #endif
@@ -943,7 +968,7 @@ static void parse_cli(int argc, char **argv) {
 
     while (1) {
         int option_index = 0;
-        c = getopt_long(argc, argv, "hf:b:n:c:e:u:r:B:C:qs",
+        c = getopt_long(argc, argv, "hf:b:n:c:e:u:r:B:C:k:qs",
                 long_options, &option_index);
 
         if (c == -1)
