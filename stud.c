@@ -163,7 +163,9 @@ typedef struct proxystate {
     int fd_up;            /* Upstream (client) socket */
     int fd_down;          /* Downstream (backend) socket */
 
-    int want_shutdown;    /* Connection is half-shutdown */
+    int want_shutdown:1;  /* Connection is half-shutdown */
+    int handshaked:1;     /* Initial handshake happened */
+    int renegotiation:1;  /* Renegotation is occuring */
 
     SSL *ssl;             /* OpenSSL SSL state */
 
@@ -240,6 +242,21 @@ static int init_dh(SSL_CTX *ctx, const char *cert) {
 }
 #endif /* OPENSSL_NO_DH */
 
+/* This callback function is executed while OpenSSL processes the SSL
+ * handshake and does SSL record layer stuff.  It's used to trap
+ * client-initiated renegotiations.
+ */
+static void info_callback(const SSL *ssl, int where, int ret) {
+    (void)ret;
+    if (where & SSL_CB_HANDSHAKE_START) {
+        proxystate *ps = (proxystate *)SSL_get_app_data(ssl);
+        if (ps->handshaked) {
+            ps->renegotiation = 1;
+            LOG("{core} SSL renegotiation asked by client\n");
+        }
+    }
+}
+
 /* Init library and load specified certificate.
  * Establishes a SSL_ctx, to act as a template for
  * each connection */
@@ -262,6 +279,7 @@ static SSL_CTX * init_openssl() {
 #endif
 
     SSL_CTX_set_options(ctx, ssloptions);
+    SSL_CTX_set_info_callback(ctx, info_callback);
 
     if (SSL_CTX_use_certificate_chain_file(ctx, OPTIONS.CERT_FILE) <= 0) {
         ERR_print_errors_fp(stderr);
@@ -611,6 +629,12 @@ static void end_handshake(proxystate *ps) {
     ev_io_stop(loop, &ps->ev_r_handshake);
     ev_io_stop(loop, &ps->ev_w_handshake);
 
+    /* Disable renegotiation (CVE-2009-3555) */
+    if (ps->ssl->s3) {
+        ps->ssl->s3->flags |= SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS;
+    }
+    ps->handshaked = 1;
+
     /* if incoming buffer is not full */
     if (!ringbuffer_is_full(&ps->ring_down))
         safe_enable_io(ps, &ps->ev_r_up);
@@ -680,6 +704,13 @@ static void client_read(struct ev_loop *loop, ev_io *w, int revents) {
     }
     char * buf = ringbuffer_write_ptr(&ps->ring_down);
     t = SSL_read(ps->ssl, buf, RING_DATA_LEN);
+
+    /* Fix CVE-2009-3555. Disable reneg if started by client. */
+    if (ps->renegotiation) {
+        shutdown_proxy(ps, SHUTDOWN_UP);
+        return;
+    }
+
     if (t > 0) {
         ringbuffer_write_append(&ps->ring_down, t);
         if (ringbuffer_is_full(&ps->ring_down))
@@ -803,6 +834,8 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     ps->fd_down = back;
     ps->ssl = ssl;
     ps->want_shutdown = 0;
+    ps->handshaked = 0;
+    ps->renegotiation = 0;
     ps->remote_ip = addr;
     ringbuffer_init(&ps->ring_up);
     ringbuffer_init(&ps->ring_down);
@@ -826,6 +859,8 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     ps->ev_r_handshake.data = ps;
     ps->ev_w_handshake.data = ps;
 
+    /* Link back proxystate to SSL state */
+    SSL_set_app_data(ssl, ps);
 }
 
 
