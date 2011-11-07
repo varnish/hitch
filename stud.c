@@ -641,6 +641,9 @@ static SSL_CTX * init_openssl() {
                 exit(1);
             }
 
+            /* Force tls tickets cause keys differs */
+            SSL_CTX_set_options(ctx, SSL_OP_NO_TICKET);
+
             if (*shcupd_peers) {
                 shsess_set_new_cbk(shcupd_session_new);
             }
