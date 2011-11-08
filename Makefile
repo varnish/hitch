@@ -38,7 +38,7 @@ install: $(ALL)
 	install -d $(DESTDIR)$(BINDIR)
 	install stud $(DESTDIR)$(BINDIR)
 	install -d $(DESTDIR)$(MANDIR)/man8
-	install -m 644 doc/stud.8 $(DESTDIR)$(MANDIR)/man8
+	install -m 644 stud.8 $(DESTDIR)$(MANDIR)/man8
 
 clean:
 	rm -f stud $(OBJS)
