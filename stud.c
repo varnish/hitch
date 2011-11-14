@@ -791,10 +791,6 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
             ERR("{client} accept() failed; too many open files for this system\n");
             break;
 
-        case 'k':
-            OPTIONS.TCP_KEEPALIVE_TIME = atoi(optarg);
-            break;
-
         default:
             assert(errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN);
             break;
@@ -1095,7 +1091,11 @@ static void parse_cli(int argc, char **argv) {
         case 's':
             OPTIONS.SYSLOG = 1;
             break;
-            
+
+        case 'k':
+            OPTIONS.TCP_KEEPALIVE_TIME = atoi(optarg);
+            break;
+
         default:
             usage_fail(prog, NULL);
         }
