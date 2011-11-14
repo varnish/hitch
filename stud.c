@@ -66,6 +66,14 @@
 # define AI_ADDRCONFIG 0
 #endif
 
+/* For Mac OS X */
+#ifndef TCP_KEEPIDLE
+# define TCP_KEEPIDLE TCP_KEEPALIVE
+#endif
+#ifndef SOL_TCP
+# define SOL_TCP IPPROTO_TCP
+#endif
+
 /* Globals */
 static struct ev_loop *loop;
 static struct addrinfo *backaddr;
@@ -103,7 +111,7 @@ typedef struct stud_options {
 #endif
     int QUIET;
     int SYSLOG;
-    int TCP_KEEPALIVE;
+    int TCP_KEEPALIVE_TIME;
 } stud_options;
 
 static stud_options OPTIONS = {
@@ -127,7 +135,7 @@ static stud_options OPTIONS = {
 #endif
     0,            // QUIET
     0,            // SYSLOG
-    3600          // TCP_KEEPALIVE
+    3600          // TCP_KEEPALIVE_TIME
 };
 
 
@@ -201,7 +209,7 @@ static void settcpkeepalive(int fd) {
         ERR("Error activating SO_KEEPALIVE on client socket: %s", strerror(errno));
     }
 
-    optval = OPTIONS.TCP_KEEPALIVE;
+    optval = OPTIONS.TCP_KEEPALIVE_TIME;
     optlen = sizeof(optval);
     if(setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, &optval, optlen) < 0) {
         ERR("Error setting TCP_KEEPIDLE on client socket: %s", strerror(errno));
@@ -784,7 +792,7 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
             break;
 
         case 'k':
-            OPTIONS.TCP_KEEPALIVE = atoi(optarg);
+            OPTIONS.TCP_KEEPALIVE_TIME = atoi(optarg);
             break;
 
         default:
