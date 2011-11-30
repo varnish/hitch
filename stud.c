@@ -238,6 +238,14 @@ static int init_dh(SSL_CTX *ctx, const char *cert) {
     LOG("{core} DH initialized with %d bit key\n", 8*DH_size(dh));
     DH_free(dh);
 
+#ifdef NID_X9_62_prime256v1
+    EC_KEY *ecdh = NULL;
+    ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+    SSL_CTX_set_tmp_ecdh(ctx,ecdh);
+    EC_KEY_free(ecdh);
+    LOG("{core} ECDH Initialized with NIST P-256\n");
+#endif
+
     return 0;
 }
 #endif /* OPENSSL_NO_DH */
