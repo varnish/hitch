@@ -135,7 +135,7 @@ Authors
 
 `stud` was originally written by Jamie Turner (@jamwt) and is maintained
 by the Bump (http://bu.mp) server team.  It currently (6/11) provides
-server-side TLS termination for over 40 million Bump users.
+server-side TLS termination for over 65 million Bump users.
 
 Contributors:
 
