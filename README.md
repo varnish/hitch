@@ -40,9 +40,10 @@ Please be aware of the policy regarding releases, code stability, and security:
    changeset--0.1, 0.2, etc.  These tags mark a particular release of
    `stud` that has seen heavy testing and several weeks of production
    stability.  Conservative users are advised to use a tag.
- * `stud` has optional builds that utilize shared memory-based SSL contexts
-   to keep a session cache between many child processes.  The use of these
-   builds can dramatically speed up SSL handshakes on many-core deployments.
+ * `stud` has an optional build that utilizes shared memory-based SSL contexts
+   and UDP peer communication to keep a session cache between many child processes
+   running on many machines.  The use of this build can dramatically speed
+   up SSL handshakes on many-core and/or clustered deployments.
    However, it's important to acknowledge the inevitable theoretical
    security tradeoffs associated with the use of this (substantially more
    complex) binary.  Therefore, the deeply paranoid are advised to use
