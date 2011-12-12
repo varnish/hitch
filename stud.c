@@ -91,6 +91,7 @@ static int listener_socket;
 static int child_num;
 static pid_t *child_pids;
 static SSL_CTX *ssl_ctx;
+
 #ifdef USE_SHARED_CACHE
 static ev_io shcupd_listener;
 static int shcupd_socket;
@@ -103,6 +104,8 @@ typedef struct shcupd_peer_opt {
 } shcupd_peer_opt;
 
 #endif /*USE_SHARED_CACHE*/
+
+long openssl_version;
 
 /* Command line Options */
 typedef enum {
@@ -1697,10 +1700,31 @@ void init_signals() {
         fail("sigaction - sigchld");
 }
 
+void openssl_check_version() {
+    /* detect OpenSSL version in runtime */
+    openssl_version = SSLeay();
+
+    /* check if we're running the same openssl that we were */
+    /* compiled with */
+    if ((openssl_version ^ OPENSSL_VERSION_NUMBER) & ~0xff0L) {
+        ERR(
+	    "WARNING: {core} OpenSSL version mismatch; stud was compiled with %lx, now using %lx.\n",
+	    (unsigned long int) OPENSSL_VERSION_NUMBER,
+	    (unsigned long int) openssl_version
+	);
+	/* now what? exit now? */
+	/* exit(1); */
+    }
+
+    LOG("{core} Using OpenSSL version %lx.\n", (unsigned long int) openssl_version);
+}
+
 /* Process command line args, create the bound socket,
  * spawn child (worker) processes, and respawn if any die */
 int main(int argc, char **argv) {
     parse_cli(argc, argv);
+
+    openssl_check_version();
 
     init_signals();
 
