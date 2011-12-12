@@ -197,7 +197,7 @@ int shctx_new_cb(SSL *ssl, SSL_SESSION *sess) {
 
 	shared_context_unlock();
 
-	return 1; /* leave the session in local cache for reuse */
+	return 0; /* do not increment session reference count */
 }
 
 /* SSL callback used on lookup an existing session cause none found in internal cache */
