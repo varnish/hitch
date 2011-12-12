@@ -32,7 +32,7 @@ ALL += stud
 realall: $(ALL)
 
 stud: $(OBJS)
-	$(CC) $(LDFLAGS) -o $@ $^
+	$(CC) -o $@ $^ $(LDFLAGS)
 
 install: $(ALL)
 	install -d $(DESTDIR)$(BINDIR)
