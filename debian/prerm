@@ -1,0 +1,28 @@
+#!/bin/sh
+
+case "$1" in
+	remove|purge|abort-install|abort-upgrade)
+		# This package is being removed, but its configuration has not yet
+		# been purged.
+
+		# shutdown service
+		service stud stop
+
+		;;
+	
+	disappear)
+		;;
+
+	upgrade)
+		;;
+
+	failed-upgrade)
+		;;
+
+	*) echo "$0: didn't understand being called with \`$1'" 1>&2
+		exit 1;;
+esac
+
+exit 0
+
+# EOF

@@ -1,0 +1,33 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+override_dh_auto_clean:
+	rm -rf ebtree
+	make clean
+
+override_dh_auto_configure:
+	if [ ! -f ebtree-6.0.6.tar.gz ]; then wget http://1wt.eu/tools/ebtree/ebtree-6.0.6.tar.gz; fi
+	if [ ! -d ebtree ]; then tar zxpf ebtree-6.0.6.tar.gz; mv ebtree-6.0.6 ebtree; fi
+
+override_dh_auto_build:
+	make USE_SHARED_CACHE=1 PREFIX=/usr
+
+override_dh_auto_install:
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+	make install DESTDIR=$(CURDIR)/debian/stud PREFIX=/usr
+
+	# create stud instance configuration directory
+	mkdir -p $(CURDIR)/debian/stud/etc/stud
+	chown -R root:root $(CURDIR)/debian/stud/etc/stud
+	chmod 700 $(CURDIR)/debian/stud/etc/stud
+	echo "Run /etc/init.d/stud --sample-config > /etc/stud/something.conf for default instance configuration" >> "$(CURDIR)/debian/stud/etc/stud/README.TXT"
+
+%:
+	dh $@
+
+# EOF

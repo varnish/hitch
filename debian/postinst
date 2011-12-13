@@ -1,0 +1,43 @@
+#!/bin/sh
+
+case $1 in
+	# Configure this package.  If the package must prompt the user for
+	# information, do it here.
+	configure)
+		mkdir -p /var/run/stud
+		;;
+
+	# Back out of an attempt to upgrade this package FROM THIS VERSION
+	# to version $2.  Undo the effects of "prerm upgrade $2".
+	abort-upgrade)
+		;;
+
+	# Back out of an attempt to remove this package, which was due to
+	# a conflict with package $3 (version $4).  Undo the effects of
+	# "prerm remove in-favour $3 $4".
+	abort-remove)
+		;;
+
+	# Back out of an attempt to deconfigure this package, which was
+	# due to package $6 (version $7) which we depend on being removed
+	# to make way for package $3 (version $4).  Undo the effects of
+	# "prerm deconfigure in-favour $3 $4 removing $6 $7".
+	abort-deconfigure)
+		;;
+
+	*)
+		echo "$0: didn't understand being called with \`$1'" 1>&2
+		exit 1;
+		;;
+
+esac
+
+if service stud status >/dev/null 2>&1; then
+	echo 
+	echo "              !!!! WARNING !!!!"
+	echo 
+	echo "stud is running, you should restart it."
+	echo
+fi
+
+# EOF
