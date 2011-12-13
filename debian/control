@@ -1,0 +1,26 @@
+Source: stud
+Section: universe/net
+Priority: optional
+Maintainer: Charlie Root <root@example.com>
+Build-Depends: debhelper (>= 7.0.50~)
+Standards-Version: 3.9.2
+Homepage: https://github.com/bumptech/stud
+
+Package: stud
+Section: universe/net
+Priority: optional
+Architecture: any
+Depends: libc6 (>= 2.4), libev4 (>= 1:4.04), libssl0.9.8 (>= 0.9.8k-1) | libssl1.0.0 (>= 1.0.0e-1)
+# Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: The Scalable TLS Unwrapping Daemon
+ stud is a network proxy that terminates TLS/SSL connections and forwards
+ the unencrypted traffic to some backend. It's designed to handle 10s of
+ thousands of connections efficiently on multicore machines.
+ .
+ It follows a process-per-core model; a parent process spawns N children who
+ each accept() on a common socket to distribute connected clients among them.
+ Within each child, asynchronous socket I/O is conducted across the local
+ connections using libev and OpenSSL's nonblocking API. By default, stud
+ has an overhead of ~200KB per connection--it preallocates some buffer space
+ for data in flight between frontend and backend.
+

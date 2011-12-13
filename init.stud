@@ -1,0 +1,837 @@
+#!/bin/sh
+
+### BEGIN INIT INFO                                                                                                                                                                                                                          
+# Provides:          stud                                                                                                                                                                                                                
+# Required-Start:    $local_fs $remote_fs                                                                                                                                                                                                    
+# Required-Stop:     $local_fs $remote_fs                                                                                                                                                                                                    
+# Should-Start:      $syslog                                                                                                                                                                                                                 
+# Should-Stop:       $syslog                                                                                                                                                                                                                 
+# Default-Start:     2 3 4 5                                                                                                                                                                                                                 
+# Default-Stop:      0 1 6                                                                                                                                                                                                                   
+# Short-Description: Start or stop stud (SSL offloader)                                                                                                                                                              
+### END INIT INFO  
+
+#######################################################
+#                      GLOBALS                        #
+#######################################################
+
+# instance configuration directory
+CONFIG_DIR="/etc/stud"
+
+# Runtime directory data
+RUNTIME_DIR="/var/run/stud"
+
+#######################################################
+
+#######################################################
+
+stud_single_instance_config_reset() {
+#######################################################
+#            stud instance configuration              #
+#######################################################
+
+# stud listening address
+FRONTEND_ADDRESS="*,8443"
+
+# upstream service address
+BACKEND_ADDRESS="127.0.0.1,80"
+
+# x509 certificate file
+CERT_FILE=""
+
+# TLS only service? Don't set this to 1 if you're
+# offloading HTTPS.
+TLS_ONLY="0"
+
+# cipher suite (run openssl ciphers for full list)
+CIPHER_SUITE="HIGH"
+
+# OpenSSL engine
+ENGINE=""
+
+# Number of worker processes
+WORKERS="1"
+
+# Listen backlog
+BACKLOG=""
+
+# Chroot directory
+CHROOT_DIR=""
+
+# drop privileges and run as specified
+# user if set
+SETUID_USER=""
+
+# use shared cache with specified number of sessions
+# WARNING: stud must be compiled with USE_SHARED_CACHE=1
+SHARED_CACHE_SESSIONS="0"
+
+# Accept cache updates on specified address
+#
+# syntax: HOST,PORT
+#
+# WARNING: stud must be compiled with USE_SHARED_CACHE=1
+#          SHARED_CACHE_SESSIONS must be >= 1
+CACHE_UPDATE_ACCEPT=""
+
+# Send cache updates to specified list space separated peers
+#
+# syntax: HOST1,PORT HOST2,PORT
+#
+# WARNING: stud must be compiled with USE_SHARED_CACHE=1
+#          and CACHE_UPDATE_ACCEPT must be defined
+CACHE_UPDATE_SEND=""
+
+# Force network interface and ttl to receive and send multicast
+# cache updates
+#
+# syntax: IFACE[,TTL]
+#
+# WARNING: stud must be compiled with USE_SHARED_CACHE=1
+#          and CACHE_UPDATE_ACCEPT must be defined
+CACHE_UPDATE_IFACE=""
+
+# default tcp keepalive on client socket in seconds
+CLIENT_TCP_KEEPALIVE_SEC=""
+
+# log to syslog?
+SYSLOG="1"
+
+# Enable write-ip?
+WRITE_IP="0"
+
+# Enable SENDPROXY protocol; see
+# http://haproxy.1wt.eu/download/1.5/doc/proxy-protocol.txt
+# for additional info
+WRITE_PROXY="0"
+
+# Alternative OpenSSL library dir
+# Use this if you'd like to run stud with different
+# version of OpenSSL library
+OPENSSL_LIB_DIR=""
+
+# Semicolon separated list of process affinities; requires
+# taskset(8) utility.
+#
+# SYNTAX:
+#   "<process_number>:<affinity>;<process_number2>:<affinity2>;..."
+#
+# <process_number>:      stud worker process number, starting with 1
+# <affinity>:            process affinity, see taskset(8) for details
+#
+# EXAMPLES:
+#
+#   "1:0"                => bind first process to CPU0
+#
+#   "1:0;2:3-4;3:5;4:7"  => bind first worker process to CPU0,
+#                        second worker process to CPU3 and CPU4,
+#                        third worker process to CPU5 and fourth
+#                        worker process to CPU7
+PROCESS_AFFINITY=""
+
+# Process priority (integer between -19 to 19)
+# lower value means higher priority
+#
+PROCESS_PRIORITY=""
+
+# ulimit -n value before starting single stud instance
+#
+# Comment out or set to 0 to disable ulimit -n
+# setup.
+#
+ULIMIT_N=""
+
+# Additional stud command line options
+#
+# NOTE: set this only if you really know what your're
+#       doing
+# 
+# ADDITIONAL_STUD_OPT=""
+
+# EOF
+}
+
+PATH="${PATH}:."
+INSTANCE_NAME=""
+STUD=`which stud 2>/dev/null`
+
+die() {
+  msg_log "FATAL: $@"
+  echo "FATAL: $@" 1>&2
+  exit 1
+}
+
+msg_log() {
+  ident="stud"
+  test ! -z "${INSTANCE_NAME}" && ident="${ident}/${INSTANCE_NAME}"
+  logger -i -t "${ident}" "$@" >/dev/null 2>&1
+}
+
+msg_err() {
+  msg_log "ERROR: $@"
+}
+
+
+_real_single_instance_start() {
+  # check stud binary
+  if [ -z "${STUD}" ] || [ ! -f "${STUD}" ] || [ ! -x "${STUD}" ]; then
+    die "Invalid stud binary: '${STUD}'"
+  fi
+
+  # generate stud command line options
+  opts="-f ${FRONTEND_ADDRESS}"
+  opts="${opts} -b ${BACKEND_ADDRESS}"
+  
+  if [ "${TLS_ONLY}" = "1" ]; then
+    opts="${opts} --tls"
+  else
+    opts="${opts} --ssl"
+  fi
+
+  test ! -z "${CIPHER_SUITE}" && opts="${opts} -c ${CIPHER_SUITE}"
+  test ! -z "${ENGINE}" && opts="${opts} -e ${ENGINE}"
+
+  if [ ! -z "${WORKERS}" ] && [ ${WORKERS} -gt 0 ]; then
+    opts="${opts} -n ${WORKERS}"
+  fi
+
+  if [ ! -z "${BACKLOG}" ] && [ ${BACKLOG} -gt 0 ]; then
+    opts="${opts} -B ${BACKLOG}"
+  fi
+
+  if [ ! -z "${CLIENT_TCP_KEEPALIVE_SEC}" ] && [ ${CLIENT_TCP_KEEPALIVE_SEC} -gt 0 ]; then
+    opts="${opts} -k ${CLIENT_TCP_KEEPALIVE_SEC}"
+  fi
+
+  # shared cache sessions...
+  if [ ! -z "${SHARED_CACHE_SESSIONS}" ] && [ ${SHARED_CACHE_SESSIONS} -gt 0 ]; then
+    opts="${opts} -C ${SHARED_CACHE_SESSIONS}"
+
+    # shared cache stuff
+    if [ ! -z "${CACHE_UPDATE_ACCEPT}" ]; then
+      opts="${opts} -U ${CACHE_UPDATE_ACCEPT}"
+
+      c_u=0
+      for h in ${CACHE_UPDATE_SEND}; do
+        test ! -z "${h}" || continue
+        opts="${opts} -P ${h}"
+        c_u=$((c_u + 1))
+      done
+      if [ ${c_u} -lt 1 ]; then
+        die "Cache updates are enabled but CACHE_UPDATE_SEND option seems to be empty."
+      fi
+
+      if [ ! -z "${CACHE_UPDATE_IFACE}" ]; then
+        opts="${opts} -M ${CACHE_UPDATE_IFACE}"
+      fi
+    fi
+    
+  fi
+
+  # chroot?
+  test ! -z "${CHROOT_DIR}" && opts="${opts} -r ${CHROOT_DIR}"
+  test ! -z "${SETUID_USER}" && opts="${opts} -u ${SETUID_USER}"
+
+  opts="${opts} -q"
+  test "${SYSLOG}" = "1" && opts="${opts} -s"
+
+  test "${WRITE_IP}" = "1" && opts="${opts} --write-ip"
+  test "${WRITE_PROXY}" = "1" && opts="${opts} --write-proxy"
+
+  if [ ! -z "${CERT_FILE}" ] && [ -f "${CERT_FILE}" ] && [ -r "${CERT_FILE}" ]; then
+    opts="${opts} ${CERT_FILE}"
+  else
+    die "Invalid or unreadable certificate file '${CERT_FILE}'."
+  fi
+
+  # additional command line options?!
+  if [ ! -z "${ADDITIONAL_STUD_OPT}" ]; then
+    opts="${opts} ${ADDITIONAL_STUD_OPT}"
+  fi
+
+  # priority?!
+  prefix=""
+  if [ ! -z "${PROCESS_PRIORITY}" ]; then
+    prefix="nice -n ${PROCESS_PRIORITY}"
+  fi
+
+  # set ulimits!
+  ulimit_set || die "Unable to set stud runtime limits."
+
+  # disable linker stuff
+  unset LD_LIBRARY_PATH
+
+  # set new lib path if requested
+  if [ ! -z "${OPENSSL_LIB_DIR}" -a -d "${OPENSSL_LIB_DIR}" ]; then
+    LD_LIBRARY_PATH="${OPENSSL_LIB_DIR}"
+    export LD_LIBRARY_PATH
+  fi
+
+  # start stud!
+  msg_log "Starting instance '${INSTANCE_NAME}': ${STUD} ${opts}"
+  ${prefix} ${STUD} ${opts} >/dev/null 2>&1 </dev/null &
+
+  # remove lib path
+  unset LD_LIBRARY_PATH
+
+  # check invocation
+  stud_pid="$!"
+  if [ -z "${stud_pid}" ]; then
+     die "Empty stud pid. This is extremely weird."
+  fi
+
+  # wait a little bit, check if pid is still alive
+  sleep 0.2 >/dev/null 2>&1
+  if ! kill -0 "${stud_pid}" >/dev/null 2>&1; then
+    die "Stud started successfully as pid ${stud_pid} but died shortly after startup.";
+  fi
+
+  # write pid file!
+  pid_file_write "${INSTANCE_NAME}" "${stud_pid}" || msg_warn "${Error}"
+
+  # set affinity!
+  stud_affinity_set "${stud_pid}" || die "${Error}"
+}
+
+stud_single_instance_start() {
+  name="${1}"
+  if [ -z "${name}" ]; then
+    Error="Unable to stop undefined stud instance."
+    return 1
+  fi
+
+  # check if it is running
+  if stud_single_instance_status "${name}"; then
+    Error="Instance ${name} is already running as pid ${Error}."
+    return 1
+  fi
+
+  # do the real stuff...
+  Error=""
+  out=`_real_single_instance_start 2>&1`
+  rv=$?
+  if [ "${rv}" != "0" ]; then
+    Error="${out}"
+    rv=1
+  fi
+
+  # this is it! :)
+  return $rv
+}
+
+stud_single_instance_stop() {
+  name="${1}"
+  if [ -z "${name}" ]; then
+    Error="Unable to stop undefined stud instance."
+    return 1
+  fi
+
+  # check if it is running
+  stud_single_instance_status "${name}" || return 1
+
+  # time to stop instance
+  pid="${Error}"
+  msg_log "Stopping stud instance '${name}', pid ${pid}."
+
+  ok=0
+  if ! kill "${pid}" >/dev/null 2>&1; then
+    Error="Unable to stop instance: unable to kill pid ${pid}."
+    return 1
+  fi
+
+  # wait for termination
+  i=0
+  while [ ${i} -lt 9 ]; do
+    i=$((i + 1))
+    # are you dead yet?
+    if ! kill -0 "${pid}" >/dev/null 2>&1; then
+      ok=1
+      break
+    fi
+    sleep 0.1 >/dev/null 2>&1
+  done
+
+  # not ok?! try to with headshot...
+  if [ "${ok}" != "1" ]; then
+    msg_log "Gentle stop of instance ${name} failed, trying to stop it with SIGKILL."
+    if ! kill -9 "${pid}"; then
+      Error="Unable to stop instance ${name}: kill(1) failed."
+      return 1
+    fi
+  fi
+
+  return 0
+}
+
+stud_single_instance_restart() {
+  name="${1}"
+  if [ -z "${name}" ]; then
+    Error="Unable to stop undefined stud instance."
+    return 1
+  fi
+
+  # load configuration...
+  
+  
+  # maybe we need to stop it first...
+  if stud_single_instance_status "${name}"; then
+    stud_single_instance_stop "${name}" || return 1
+  fi
+
+  # start it back...
+  Error=""
+  stud_single_instance_start "${name}"
+}
+
+stud_single_instance_status() {
+  Error=""
+  if [ -z "${1}" ]; then
+    Error="Invalid instance name."
+    return 1
+  fi
+
+  # get pid file...
+  pid=`pid_file_read "${1}"`
+
+  # check it...
+  if [ -z "${pid}" ] || ! kill -0 "${pid}" >/dev/null 2>&1; then
+    Error="Instance '${1}' is stopped."
+    return 1
+  fi
+
+  # set pid to Error
+  Error="${pid}"
+  return 0
+}
+
+# reads pid file of specific instance
+pid_file_read() {
+  test -z "${1}" && return 1
+  file="${RUNTIME_DIR}/${1}.pid"
+  test -f "${file}" -a -r "${file}" || return 1
+  head -n 1 "${file}"
+}
+
+# writes pid file for specific instance
+pid_file_write() {
+  test -z "${1}" && return 1
+  test -z "${2}" && return 1
+
+  # check runtime directory
+  if [ ! -e "${RUNTIME_DIR}" ] || [ ! -d "${RUNTIME_DIR}" ] || [ ! -w "${RUNTIME_DIR}" ]; then
+    # try to create directory
+    mkdir -p "${RUNTIME_DIR}" || die "Unable to create missing runtime directory '${RUNTIME_DIR}'"
+  fi
+
+  file="${RUNTIME_DIR}/${1}.pid"
+  echo "${2}" > "${file}"
+}
+
+# lists running instances
+running_instance_list() {
+  list=""
+  for file in ${RUNTIME_DIR}/*.pid; do
+    test -f "${file}" || continue
+
+    fileb=`basename "${file}"`
+    name=`echo "${fileb}" | cut -d. -f1`
+    if [ -z "${name}" ]; then
+      msg_log "Removing bogus pid file '${file}'."
+      rm -f "${file}" >/dev/null 2>&1
+      continue
+    fi
+    pid=`pid_file_read "${name}"`
+    if [ -z "${pid}" ]; then
+      msg_log "Removing bogus pid file '${file}': instance '${name}' doesn't contain pid."
+      rm -f "${file}" >/dev/null 2>&1
+      continue
+    fi
+
+    # is this pid alive?
+    if ! kill -0 "${pid}" >/dev/null 2>&1			; then
+      msg_log "Removing bogus pid file '${file}': instance '${name}' [pid ${pid}] is stopped."
+      rm -f "${file}" >/dev/null 2>&1
+      continue
+    fi
+
+    list="${list} ${name}"
+  done
+  echo ${list}
+}
+
+stud_instances_start() {
+  list="$@"
+  if [ -z "${list}" ]; then
+    list=`stud_config_instances_list`
+  fi
+  if [ -z "${list}" ]; then
+    die "No stud instances configured in directory '${CONFIG_DIR}'."
+  fi
+
+  echo "Starting stud instances:"
+  num_ok=0
+  num_failed=0
+  for instance in ${list}; do
+    echo -n "  ${instance}: "
+    # load configuration
+    if ! stud_single_instance_config_load "${instance}"; then
+      echo "failed: ${Error}"
+      return 1
+    # start instance
+    elif stud_single_instance_start "${instance}"; then
+      echo "done."
+      msg_log "Instance ${name} successfully started."
+      num_ok=$((num_ok + 1))
+    else
+      echo "failed: ${Error}"
+      msg_err "Error starting instance ${name}: ${Error}"
+      num_failed=$((num_failed + 1))
+    fi
+  done
+
+  if [ "${num_failed}" != "0" ]; then
+    return 1
+  else
+    return 0
+  fi
+}
+
+stud_instances_stop() {
+  list="$@"
+  if [ -z "${list}" ]; then
+    list=`running_instance_list`
+  fi
+  if [ -z "${list}" ]; then
+    die "No stud instances are running."
+  fi
+
+  echo "Stopping stud instances:"
+  num_ok=0
+  num_failed=0
+  for instance in ${list}; do
+    echo -n "  ${instance}: "
+    if stud_single_instance_stop "${instance}"; then
+      echo "done."
+      num_ok=$((num_ok + 1))
+      msg_log "Instance ${instance} successfully stopped."
+    else
+      echo "failed: ${Error}"
+      msg_err "Error stopping instance ${instance}: ${Error}"
+      num_failed=$((num_failed + 1))
+    fi
+  done
+
+  if [ "${num_failed}" != "0" ]; then
+    return 1
+  else
+    return 0
+  fi
+}
+
+stud_instances_restart() {
+  list="$@"
+  if [ -z "${list}" ]; then
+    list=`(running_instance_list ; stud_config_instances_list) | tr ' ' '\n' | sort -u | xargs echo`
+  fi
+
+  echo "Restarting stud instances: "
+  num_ok=0
+  num_failed=0
+  for instance in ${list}; do
+    echo -n "  ${instance}: ";
+
+    # load configuration
+    if ! stud_single_instance_config_load "${instance}"; then
+      echo "failed: ${Error}"
+      return 1
+    # restart instance
+    elif stud_single_instance_restart "${instance}"; then
+      echo "done."
+      num_ok=$((num_ok + 1))
+      msg_log "Instance ${instance} successfully restarted."
+    else
+      echo "failed: ${Error}"
+      msg_err "Error restarting instance ${instance}: ${Error}"
+      num_failed=$((num_failed + 1))
+    fi
+  done
+    
+  if [ "${num_failed}" != "0" ]; then
+    return 1
+  else
+    return 0
+  fi
+}
+
+stud_instances_status() {
+  list_config=`stud_config_instances_list`
+  list_running=`running_instance_list`
+
+  list_all=`echo ${list_config} ${list_running} | tr ' ' '\n' | sort -u | xargs echo`
+
+  i=0;
+
+  echo "Stud instance status: "
+
+  if [ -z "${list_all}" ]; then
+    die "No instances are configured and/or running."
+  fi
+
+  for instance in ${list_all}; do
+    echo -n "  ${instance}: "
+    if stud_single_instance_status "${instance}"; then
+      echo "running as pid $Error"
+      i=$((i + 1))
+    else
+      echo "stopped"
+    fi
+  done
+
+  if [ ${i} -gt 0 ]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+stud_config_instances_list() {
+  list=""
+  for file in ${CONFIG_DIR}/*.conf; do
+    test -f "${file}" -a -r "${file}" || continue
+    fileb=`basename "${file}"`
+    name=`echo "${fileb}" | cut -d. -f1`
+    test ! -z "${name}" || continue
+    list="${list} ${name}"
+  done
+
+  echo ${list}
+}
+
+stud_single_instance_config_print() {
+  head -n 151 "$0" | tail -n 123
+}
+
+stud_single_instance_config_load() {
+  file="${CONFIG_DIR}/${1}.conf"
+  INSTANCE_NAME=""
+
+  # reset configuration
+  stud_single_instance_config_reset
+  Error=''
+
+  if [ -f "${file}" -a -r "${file}" ]; then
+    . "${file}" >/dev/null || Error="Unable to load instance configuration file '${file}'."
+  else
+    Error="Invalid or unreadable instance configuration file '${file}'."
+    return 1
+  fi
+
+  # set instance name...
+  INSTANCE_NAME="${1}"
+
+  return 0
+}
+
+stud_instance_worker_pids() {
+  test -z "${1}" && return 1
+  ps -ef | grep  " ${1}  " | grep -v ' 1  ' | grep -v ' grep ' | awk '{print $2}' | xargs echo
+}
+
+# prints worker pid for n-th worker
+# arguments:
+#       $1:     list of worker pids (string)
+#       $2:     worker number
+stud_instance_worker_pid_by_num() {
+  i=0
+  local IFS=" "
+  for e in ${1}; do
+    i=$((i + 1))
+    if [ "${i}" = "${2}" ]; then
+      echo "$e"
+      return 0
+    fi
+  done
+  return 1
+}
+
+stud_affinity_set() {
+  # nothing to set?
+  test -z "$PROCESS_AFFINITY" && return 0
+
+  Error=""
+
+#   "1:0;2:3-4;3:5;4:7"  => bind first haproxy process to CPU0,
+#                        second haproxy process to CPU3 and CPU4,
+#                        third haproxy process to CPU5 and fourth
+#                        process to CPU7
+
+
+  worker_pids=`stud_instance_worker_pids "${1}"`
+
+  local IFS=";"
+  item=""
+  for item in $PROCESS_AFFINITY; do
+    num=`echo "${item}" | cut -f1 -d:`
+    affinity=`echo "${item}" | cut -f2 -d:`
+
+    # validate process number
+    test -z "$num" && continue
+    test ${num} -ge 1 2>&1 || continue
+
+    # validate affinity
+    test -z "${affinity}" && continue
+    # WORKS:        OpenSUSE
+    # DOESNT WORK:  Debian/Ubuntu!!!
+    #echo "${affinity}" | grep -qPi '[^a-f0-9\-\,x]' && continue
+
+    # is this raw affinity mask?
+    raw_affinity=0
+    echo "${affinity}" | grep -qE '^0x' && raw_affinity=1
+
+    # get pid for process id $num
+    pid=`stud_instance_worker_pid_by_num "${worker_pids}" "$num"`
+    test -z "$pid" && continue
+
+    #echo "item: $item; process num: $num; pid: $pid;  affinity: $affinity; raw: $raw_affinity"
+
+    opt="-p"
+    test "${raw_affinity}" = "0" && opt="${opt} -c"
+    opt="${opt} ${affinity}"
+    opt="${opt} ${pid}"
+    # echo "WILL RUN: 'taskset $opt'"
+    msg_log "Setting stud worker number ${num} (pid ${pid}) affinity using command: taskset ${opt}"
+    eval taskset ${opt} >/dev/null 2>&1 || msg_log "Error setting process affinity."
+  done
+}
+
+ulimit_n_set() {
+  if [ -z "$ULIMIT_N" ] || [ "$ULIMIT_N" = "0" ]; then
+    return 0
+  fi
+
+  # try to set maximum possible limit...
+  i="$ULIMIT_N"
+  num=0
+  while [ $i -gt 0 ]; do
+    num=$((num + 1))
+    if ulimit -n "$i" > /dev/null 2>&1; then
+      percentage=$((i*100 / ${ULIMIT_N}))
+      if [ $percentage -lt 75 ]; then
+        Error="Filedescriptor limit set to only $i (${percentage}% of desired value of $ULIMIT_N); check your system settings."
+        return 1
+      fi
+      msg_log "Filedescriptor limit successfully set to $i (${percentage}% of desired value of $ULIMIT_N) after ${num} iteration(s)."
+      return 0
+      break
+    else
+      i=$((i - 100))
+    fi
+  done
+
+  Error="Filedescriptor limit of $ULIMIT_N could not be set."
+  msg_log "$Error"
+  return 1
+}
+
+ulimit_set() {
+  # set fd limit
+  ulimit_n_set || return 1
+
+  # set core file limit
+  ulimit -c unlimited >/dev/null 2>&1
+
+  return 0
+}
+
+printhelp() {
+  cat <<EOF
+Usage: ${MYNAME} {start|stop|restart|status|sample_instance_config} [name, name2, ...]
+
+This is stud SSL offloader multi-instance init script.
+
+OPTIONS:
+  -C  --config-dir        Instance configuration directory (Default: "${CONFIG_DIR}")
+
+                          This directory is searched for files matching *.conf
+                          glob pattern; each file represents single stud instance
+                          configuration file.
+
+  -R  --runtime-dir       Runtime (pid file) directory (Default: "${RUNTIME_DIR}")
+
+      --sample-config     Prints out default single instance configuration
+
+  -V  --version           Prints script version
+  -h  --help              This help message
+EOF
+}
+
+# parse command line...
+TEMP=`getopt -o C:R:Vh --long config-dir:,runtime-dir:,sample-config,version,help -n "$MYNAME" -- "$@"`
+test "$?" != "0" && die "Invalid command line arguments. Run $MYNAME --help for instructions."
+eval set -- "$TEMP"
+while true; do
+  case $1 in
+    -C|--config-dir)
+      CONFIG_DIR="${2}"
+      shift 2
+      ;;
+    -R|--runtime-dir)
+      RUNTIME_DIR="${2}"
+      shift 2
+      ;;
+    --sample-config)
+      stud_single_instance_config_print
+      exit 0
+      ;;
+    -V|--version)
+      echo "$MYNAME $VERSION"
+      exit 0
+      ;;
+    -h|--help)
+      printhelp
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      die "Invalid command line arguments. Run $MYNAME --help for instructions."
+      ;;
+  esac
+done
+
+# weed out real action and do something
+case $1 in
+  start)
+    shift
+    stud_instances_start "$@"
+    ;;
+
+  stop)
+    shift
+    stud_instances_stop "$@"
+    ;;
+
+  force-reload|restart)
+    shift
+    stud_instances_restart "$@"
+    ;;
+
+  status)
+    stud_instances_status
+    exit $?
+    ;;
+
+  sample_instance_config|instance_config)
+    stud_single_instance_config_print
+    exit 0
+    ;;
+
+  *)
+    printhelp
+    exit 1
+  ;;
+esac
+
+# EOF
