@@ -106,6 +106,7 @@ typedef struct shcupd_peer_opt {
 #endif /*USE_SHARED_CACHE*/
 
 long openssl_version;
+int create_workers;
 
 /* Command line Options */
 typedef enum {
@@ -140,6 +141,7 @@ typedef struct stud_options {
     int QUIET;
     int SYSLOG;
     int TCP_KEEPALIVE_TIME;
+    int DAEMONIZE;
 } stud_options;
 
 static stud_options OPTIONS = {
@@ -168,7 +170,8 @@ static stud_options OPTIONS = {
 #endif
     0,            // QUIET
     0,            // SYSLOG
-    3600          // TCP_KEEPALIVE_TIME
+    3600,         // TCP_KEEPALIVE_TIME
+    0             // DAEMONIZE
 };
 
 
@@ -225,6 +228,7 @@ typedef struct proxystate {
       if (OPTIONS.SYSLOG) syslog(LOG_ERR, __VA_ARGS__); \
     } while(0)
 
+#define NULL_DEV "/dev/null"
 
 /* set a file descriptor (socket) to non-blocking mode */
 static void setnonblocking(int fd) {
@@ -1223,6 +1227,10 @@ static void check_ppid(struct ev_loop *loop, ev_timer *w, int revents) {
  * on the bound socket, etc */
 static void handle_connections() {
     LOG("{core} Process %d online\n", child_num);
+
+    /* child cannot create new children... */
+    create_workers = 0;
+
 #if defined(CPU_ZERO) && defined(CPU_SET)
     cpu_set_t cpus;
 
@@ -1291,6 +1299,7 @@ static void usage_fail(const char *prog, const char *msg) {
 "  -s                       send log message to syslog in addition to stderr/stdout\n"
 "\n"
 "Special:\n"
+"  --daemon                 fork into background and become a daemon\n"
 "  --write-ip               write 1 octet with the IP family followed by the IP\n"
 "                           address in 4 (IPv4) or 16 (IPv6) octets little-endian\n"
 "                           to backend before the actual data\n"
@@ -1424,6 +1433,7 @@ static void parse_cli(int argc, char **argv) {
         {"ssl", 0, &ssl, 1},
         {"write-ip", 0, &OPTIONS.WRITE_IP_OCTET, 1},
         {"write-proxy", 0, &OPTIONS.WRITE_PROXY_LINE, 1},
+        {"daemon", 0, &OPTIONS.DAEMONIZE, 1},
         {0, 0, 0, 0}
     };
 
@@ -1552,6 +1562,9 @@ static void parse_cli(int argc, char **argv) {
         usage_fail(prog, "exactly one argument is required: path to PEM file with cert/key");
 
     OPTIONS.CERT_FILE = argv[0];
+
+    /* parent process can create new children */
+    create_workers = 1;
 }
 
 
@@ -1618,10 +1631,13 @@ void init_globals() {
  * Each child's index is stored in child_num and its pid is stored in child_pids[child_num]
  * so the parent can manage it later. */
 void start_children(int start_index, int count) {
+    /* don't do anything if we're not allowed to create new children */
+    if (!create_workers) return;
+
     for (child_num = start_index; child_num < start_index + count; child_num++) {
         int pid = fork();
         if (pid == -1) {
-            ERR("{core} fork() failed! Goodbye cruel world!\n");
+            ERR("{core} fork() failed: %s; Goodbye cruel world!\n", strerror(errno));
             exit(1);
         }
         else if (pid == 0) { /* child */
@@ -1679,6 +1695,29 @@ static void do_wait(int __attribute__ ((unused)) signo) {
     }
 }
 
+static void sigh_terminate (int __attribute__ ((unused)) signo) {
+    /* don't create any more children */
+    create_workers = 0;
+
+    /* are we the master? */
+    if (getpid() == master_pid) {
+        LOG("{core} Received signal %d, shutting down.\n", signo);
+
+        /* kill all children */
+        int i;
+        for (i = 0; i < OPTIONS.NCORES; i++) {
+            /* LOG("Stopping worker pid %d.\n", child_pids[i]); */
+            if (child_pids[i] > 1 && kill(child_pids[i], SIGTERM) != 0) {
+                ERR("{core} Unable to send SIGTERM to worker pid %d: %s\n", child_pids[i], strerror(errno));
+            }
+        }
+        /* LOG("Shutdown complete.\n"); */
+    }
+
+    /* this is it, we're done... */
+    exit(0);
+}
+
 void init_signals() {
     struct sigaction act;
 
@@ -1698,6 +1737,70 @@ void init_signals() {
     /* We do care when child processes change status */
     if (sigaction(SIGCHLD, &act, NULL) < 0)
         fail("sigaction - sigchld");
+
+    /* catch INT and TERM signals */
+    act.sa_flags = 0;
+    act.sa_handler = sigh_terminate;
+    if (sigaction(SIGINT, &act, NULL) < 0) {
+        ERR("Unable to register SIGINT signal handler: %s\n", strerror(errno));
+        exit(1);
+    }
+    if (sigaction(SIGTERM, &act, NULL) < 0) {
+        ERR("Unable to register SIGTERM signal handler: %s\n", strerror(errno));
+        exit(1);
+    }
+}
+
+void daemonize () {
+    /* go to root directory */
+    if (chdir("/") != 0) {
+        ERR("Unable change directory to /: %s\n", strerror(errno));
+        exit(1);
+    }
+
+    /* let's make some children, baby :) */
+    pid_t pid = fork();
+    if (pid < 0) {
+        ERR("Unable to daemonize: fork failed: %s\n", strerror(errno));
+        exit(1);
+    }
+
+    /* am i the parent? */
+    if (pid != 0) {
+        printf("{core} Daemonized as pid %d.\n", pid);
+        exit(0);
+    }
+
+    /* close standard streams */
+    fclose(stdin);
+    fclose(stdout);
+    fclose(stderr);
+
+    /* reopen standard streams to null device */
+    stdin = fopen(NULL_DEV, "r");
+    if (stdin == NULL) {
+        ERR("Unable to reopen stdin to %s: %s\n", NULL_DEV, strerror(errno));
+        exit(1);
+    }
+    stdout = fopen(NULL_DEV, "w");
+    if (stdout == NULL) {
+        ERR("Unable to reopen stdout to %s: %s\n", NULL_DEV, strerror(errno));
+        exit(1);
+    }
+    stderr = fopen(NULL_DEV, "w");
+    if (stderr == NULL) {
+        ERR("Unable to reopen stderr to %s: %s\n", NULL_DEV, strerror(errno));
+        exit(1);
+    }
+
+    /* this is child, the new master */
+    pid_t s = setsid();
+    if (s < 0) {
+        ERR("Unable to create new session, setsid(2) failed: %s :: %d\n", strerror(errno), s);
+        exit(1);
+    }
+
+    LOG("Successfully daemonized as pid %d.\n", getpid());
 }
 
 void openssl_check_version() {
@@ -1743,13 +1846,23 @@ int main(int argc, char **argv) {
     /* load certificate, pass to handle_connections */
     ssl_ctx = init_openssl();
 
-    master_pid = getpid();
-
     if (OPTIONS.CHROOT && OPTIONS.CHROOT[0])
         change_root();
 
     if (OPTIONS.UID || OPTIONS.GID)
         drop_privileges();
+
+    /* should we daemonize ?*/
+    if (OPTIONS.DAEMONIZE) {
+        /* disable logging to stderr */
+        OPTIONS.QUIET = 1;
+        OPTIONS.SYSLOG = 1;
+
+        /* become a daemon */
+        daemonize();
+    }
+
+    master_pid = getpid();
 
     start_children(0, OPTIONS.NCORES);
 

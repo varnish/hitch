@@ -255,6 +255,9 @@ _real_single_instance_start() {
     prefix="nice -n ${PROCESS_PRIORITY}"
   fi
 
+  # we want to start stud in a daemon mode...
+  opts="${opts} --daemon"
+
   # set ulimits!
   ulimit_set || die "Unable to set stud runtime limits."
 
@@ -269,13 +272,13 @@ _real_single_instance_start() {
 
   # start stud!
   msg_log "Starting instance '${INSTANCE_NAME}': ${STUD} ${opts}"
-  ${prefix} ${STUD} ${opts} >/dev/null 2>&1 </dev/null &
+  out=`${prefix} ${STUD} ${opts} 2>&1`
 
   # remove lib path
   unset LD_LIBRARY_PATH
 
   # check invocation
-  stud_pid="$!"
+  stud_pid=`echo "${out}" | tail -n 1 | cut -d " " -f5 | tr -d '.'`
   if [ -z "${stud_pid}" ]; then
      die "Empty stud pid. This is extremely weird."
   fi
@@ -369,9 +372,6 @@ stud_single_instance_restart() {
     Error="Unable to stop undefined stud instance."
     return 1
   fi
-
-  # load configuration...
-  
   
   # maybe we need to stop it first...
   if stud_single_instance_status "${name}"; then
