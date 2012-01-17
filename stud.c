@@ -142,6 +142,7 @@ typedef struct stud_options {
     int SYSLOG;
     int TCP_KEEPALIVE_TIME;
     int DAEMONIZE;
+    int PREFER_SERVER_CIPHERS;
 } stud_options;
 
 static stud_options OPTIONS = {
@@ -171,7 +172,8 @@ static stud_options OPTIONS = {
     0,            // QUIET
     0,            // SYSLOG
     3600,         // TCP_KEEPALIVE_TIME
-    0             // DAEMONIZE
+    0,            // DAEMONIZE
+    0             // PREFER_SERVER_CIPHERS
 };
 
 
@@ -651,6 +653,9 @@ static SSL_CTX * init_openssl() {
     if (OPTIONS.CIPHER_SUITE)
         if (SSL_CTX_set_cipher_list(ctx, OPTIONS.CIPHER_SUITE) != 1)
             ERR_print_errors_fp(stderr);
+
+    if (OPTIONS.PREFER_SERVER_CIPHERS)
+        SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
 
 #ifdef USE_SHARED_CACHE
     if (OPTIONS.SHARED_CACHE) {
@@ -1272,6 +1277,7 @@ static void usage_fail(const char *prog, const char *msg) {
 "  --ssl                    SSLv3 (implies no TLSv1)\n"
 "  -c CIPHER_SUITE          set allowed ciphers (default is OpenSSL defaults)\n"
 "  -e ENGINE                set OpenSSL engine\n"
+"  -O                       prefer server cipher order\n"
 "\n"
 "Socket:\n"
 "  -b HOST,PORT             backend [connect] (default is \"127.0.0.1,8000\")\n"
@@ -1439,7 +1445,7 @@ static void parse_cli(int argc, char **argv) {
 
     while (1) {
         int option_index = 0;
-        c = getopt_long(argc, argv, "hf:b:n:c:e:u:r:B:C:k:qsU:P:M:",
+        c = getopt_long(argc, argv, "hf:b:n:c:e:Ou:r:B:C:k:qsU:P:M:",
                 long_options, &option_index);
 
         if (c == -1)
@@ -1474,6 +1480,10 @@ static void parse_cli(int argc, char **argv) {
 
         case 'e':
             OPTIONS.ENGINE = optarg;
+            break;
+
+        case 'O':
+            OPTIONS.PREFER_SERVER_CIPHERS = 1;
             break;
 
         case 'u':
