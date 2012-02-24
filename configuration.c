@@ -72,6 +72,7 @@ static char error_buf[CONFIG_BUF_SIZE];
 static char tmp_buf[150];
 
 // for testing configuration only
+#include <openssl/ssl.h>
 SSL_CTX * init_openssl();
 
 static void config_error_set (char *fmt, ...) {
