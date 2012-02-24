@@ -47,6 +47,7 @@
 #include <pwd.h>
 #include <limits.h>
 #include <syslog.h>
+#include <stdarg.h>
 
 #include <ctype.h>
 #include <sched.h>
@@ -60,6 +61,7 @@
 
 #include "ringbuffer.h"
 #include "shctx.h"
+#include "configuration.h"
 
 #ifndef MSG_NOSIGNAL
 # define MSG_NOSIGNAL 0
@@ -74,12 +76,6 @@
 #endif
 #ifndef SOL_TCP
 # define SOL_TCP IPPROTO_TCP
-#endif
-
-#ifdef USE_SHARED_CACHE
-#ifndef MAX_SHCUPD_PEERS
-# define MAX_SHCUPD_PEERS 15
-#endif
 #endif
 
 /* Globals */
@@ -98,85 +94,16 @@ static int shcupd_socket;
 struct addrinfo *shcupd_peers[MAX_SHCUPD_PEERS+1];
 static unsigned char shared_secret[SHA_DIGEST_LENGTH];
 
-typedef struct shcupd_peer_opt {
-     const char *ip;
-     const char *port;
-} shcupd_peer_opt;
+//typedef struct shcupd_peer_opt {
+//     const char *ip;
+//     const char *port;
+//} shcupd_peer_opt;
 
 #endif /*USE_SHARED_CACHE*/
 
 long openssl_version;
 int create_workers;
-
-/* Command line Options */
-typedef enum {
-    ENC_TLS,
-    ENC_SSL
-} ENC_TYPE;
-
-typedef struct stud_options {
-    ENC_TYPE ETYPE;
-    int WRITE_IP_OCTET;
-    int WRITE_PROXY_LINE;
-    const char* CHROOT;
-    uid_t UID;
-    gid_t GID;
-    const char *FRONT_IP;
-    const char *FRONT_PORT;
-    const char *BACK_IP;
-    const char *BACK_PORT;
-    long NCORES;
-    const char *CERT_FILE;
-    const char *CIPHER_SUITE;
-    const char *ENGINE;
-    int BACKLOG;
-#ifdef USE_SHARED_CACHE
-    int SHARED_CACHE;
-    const char *SHCUPD_IP;
-    const char *SHCUPD_PORT;
-    shcupd_peer_opt SHCUPD_PEERS[MAX_SHCUPD_PEERS+1];
-    const char *SHCUPD_MCASTIF;
-    const char *SHCUPD_MCASTTTL;
-#endif
-    int QUIET;
-    int SYSLOG;
-    int TCP_KEEPALIVE_TIME;
-    int DAEMONIZE;
-    int PREFER_SERVER_CIPHERS;
-} stud_options;
-
-static stud_options OPTIONS = {
-    ENC_TLS,      // ETYPE
-    0,            // WRITE_IP_OCTET
-    0,            // WRITE_PROXY_LINE
-    NULL,         // CHROOT
-    0,            // UID
-    0,            // GID
-    NULL,         // FRONT_IP
-    "8443",       // FRONT_PORT
-    "127.0.0.1",  // BACK_IP
-    "8000",       // BACK_PORT
-    1,            // NCORES
-    NULL,         // CERT_FILE
-    NULL,         // CIPHER_SUITE
-    NULL,         // ENGINE
-    100,          // BACKLOG
-#ifdef USE_SHARED_CACHE
-    0,            // SHARED_CACHE
-    NULL,         // SHCUPD_IP
-    NULL,         // SHCUPD_PORT
-    { { NULL, NULL } }, // SHCUPD_PEERS
-    NULL,         // SHCUPD_MCASTIF
-    NULL,         // SHCUPD_MCASTTTL
-#endif
-    0,            // QUIET
-    0,            // SYSLOG
-    3600,         // TCP_KEEPALIVE_TIME
-    0,            // DAEMONIZE
-    0             // PREFER_SERVER_CIPHERS
-};
-
-
+stud_config *CONFIG;
 
 static char tcp_proxy_line[128] = "";
 
@@ -220,14 +147,14 @@ typedef struct proxystate {
 
 #define LOG(...)                                        \
     do {                                                \
-      if (!OPTIONS.QUIET) fprintf(stdout, __VA_ARGS__); \
-      if (OPTIONS.SYSLOG) syslog(LOG_INFO, __VA_ARGS__);                    \
+      if (!CONFIG->QUIET) fprintf(stdout, __VA_ARGS__); \
+      if (CONFIG->SYSLOG) syslog(LOG_INFO, __VA_ARGS__);                    \
     } while(0)
 
 #define ERR(...)                    \
     do {                            \
       fprintf(stderr, __VA_ARGS__); \
-      if (OPTIONS.SYSLOG) syslog(LOG_ERR, __VA_ARGS__); \
+      if (CONFIG->SYSLOG) syslog(LOG_ERR, __VA_ARGS__); \
     } while(0)
 
 #define NULL_DEV "/dev/null"
@@ -248,7 +175,7 @@ static void settcpkeepalive(int fd) {
         ERR("Error activating SO_KEEPALIVE on client socket: %s", strerror(errno));
     }
 
-    optval = OPTIONS.TCP_KEEPALIVE_TIME;
+    optval = CONFIG->TCP_KEEPALIVE_TIME;
     optlen = sizeof(optval);
     if(setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, &optval, optlen) < 0) {
         ERR("Error setting TCP_KEEPIDLE on client socket: %s", strerror(errno));
@@ -258,6 +185,15 @@ static void settcpkeepalive(int fd) {
 static void fail(const char* s) {
     perror(s);
     exit(1);
+}
+
+void die (char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  vfprintf(stderr, fmt, args);
+  va_end(args);
+
+  exit(1);
 }
 
 #ifndef OPENSSL_NO_DH
@@ -409,7 +345,7 @@ static int create_shcupd_socket() {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_DGRAM;
     hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
-    const int gai_err = getaddrinfo(OPTIONS.SHCUPD_IP, OPTIONS.SHCUPD_PORT,
+    const int gai_err = getaddrinfo(CONFIG->SHCUPD_IP, CONFIG->SHCUPD_PORT,
                                     &hints, &ai);
     if (gai_err != 0) {
         ERR("{getaddrinfo}: [%s]\n", gai_strerror(gai_err));
@@ -444,28 +380,28 @@ static int create_shcupd_socket() {
         memset(&mreqn, 0, sizeof(mreqn));
         mreqn.imr_multiaddr.s_addr = ((struct sockaddr_in *)ai->ai_addr)->sin_addr.s_addr;
 
-        if (OPTIONS.SHCUPD_MCASTIF) {
-            if (isalpha(*OPTIONS.SHCUPD_MCASTIF)) { /* appears to be an iface name */
+        if (CONFIG->SHCUPD_MCASTIF) {
+            if (isalpha(*CONFIG->SHCUPD_MCASTIF)) { /* appears to be an iface name */
                 struct ifreq ifr;
 
                 memset(&ifr, 0, sizeof(ifr));
-                if (strlen(OPTIONS.SHCUPD_MCASTIF) > IFNAMSIZ) {
-                    ERR("Error iface name is too long [%s]\n",OPTIONS.SHCUPD_MCASTIF);
+                if (strlen(CONFIG->SHCUPD_MCASTIF) > IFNAMSIZ) {
+                    ERR("Error iface name is too long [%s]\n",CONFIG->SHCUPD_MCASTIF);
                     exit(1);
                 }
 
-                memcpy(ifr.ifr_name, OPTIONS.SHCUPD_MCASTIF, strlen(OPTIONS.SHCUPD_MCASTIF));
+                memcpy(ifr.ifr_name, CONFIG->SHCUPD_MCASTIF, strlen(CONFIG->SHCUPD_MCASTIF));
                 if (ioctl(s, SIOCGIFINDEX, &ifr)) {
                     fail("{ioctl: SIOCGIFINDEX}");
                 }
 
                 mreqn.imr_ifindex = ifr.ifr_ifindex;
             }
-            else if (strchr(OPTIONS.SHCUPD_MCASTIF,'.')) { /* appears to be an ipv4 address */
-                mreqn.imr_address.s_addr = inet_addr(OPTIONS.SHCUPD_MCASTIF);
+            else if (strchr(CONFIG->SHCUPD_MCASTIF,'.')) { /* appears to be an ipv4 address */
+                mreqn.imr_address.s_addr = inet_addr(CONFIG->SHCUPD_MCASTIF);
             }
             else { /* appears to be an iface index */
-                mreqn.imr_ifindex = atoi(OPTIONS.SHCUPD_MCASTIF);
+                mreqn.imr_ifindex = atoi(CONFIG->SHCUPD_MCASTIF);
             }
         }
 
@@ -484,15 +420,15 @@ static int create_shcupd_socket() {
         }
 
         /* optional set sockopts for sending to multicast msg */
-        if (OPTIONS.SHCUPD_MCASTIF &&
+        if (CONFIG->SHCUPD_MCASTIF &&
             setsockopt(s, IPPROTO_IP, IP_MULTICAST_IF, &mreqn, sizeof(mreqn)) < 0) {
             fail("{setsockopt: IP_MULTICAST_IF}");
         }
 
-        if (OPTIONS.SHCUPD_MCASTTTL) {
+        if (CONFIG->SHCUPD_MCASTTTL) {
              unsigned char ttl;
 
-             ttl = (unsigned char)atoi(OPTIONS.SHCUPD_MCASTTTL);
+             ttl = (unsigned char)atoi(CONFIG->SHCUPD_MCASTTTL);
              if (setsockopt(s, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) < 0) {
                  fail("{setsockopt: IP_MULTICAST_TTL}");
              }
@@ -507,17 +443,17 @@ static int create_shcupd_socket() {
         memcpy(&mreq.ipv6mr_multiaddr, &((struct sockaddr_in6 *)ai->ai_addr)->sin6_addr,
                                        sizeof(mreq.ipv6mr_multiaddr));
 
-        if (OPTIONS.SHCUPD_MCASTIF) {
-            if (isalpha(*OPTIONS.SHCUPD_MCASTIF)) { /* appears to be an iface name */
+        if (CONFIG->SHCUPD_MCASTIF) {
+            if (isalpha(*CONFIG->SHCUPD_MCASTIF)) { /* appears to be an iface name */
                 struct ifreq ifr;
 
                 memset(&ifr, 0, sizeof(ifr));
-                if (strlen(OPTIONS.SHCUPD_MCASTIF) > IFNAMSIZ) {
-                    ERR("Error iface name is too long [%s]\n",OPTIONS.SHCUPD_MCASTIF);
+                if (strlen(CONFIG->SHCUPD_MCASTIF) > IFNAMSIZ) {
+                    ERR("Error iface name is too long [%s]\n",CONFIG->SHCUPD_MCASTIF);
                     exit(1);
                 }
 
-                memcpy(ifr.ifr_name, OPTIONS.SHCUPD_MCASTIF, strlen(OPTIONS.SHCUPD_MCASTIF));
+                memcpy(ifr.ifr_name, CONFIG->SHCUPD_MCASTIF, strlen(CONFIG->SHCUPD_MCASTIF));
                 if (ioctl(s, SIOCGIFINDEX, &ifr)) {
                     fail("{ioctl: SIOCGIFINDEX}");
                 }
@@ -525,7 +461,7 @@ static int create_shcupd_socket() {
                 mreq.ipv6mr_interface = ifr.ifr_ifindex;
             }
             else { /* option appears to be an iface index */
-                mreq.ipv6mr_interface = atoi(OPTIONS.SHCUPD_MCASTIF);
+                mreq.ipv6mr_interface = atoi(CONFIG->SHCUPD_MCASTIF);
             }
         }
 
@@ -549,10 +485,10 @@ static int create_shcupd_socket() {
             fail("{setsockopt: IPV6_MULTICAST_IF}");
         }
 
-        if (OPTIONS.SHCUPD_MCASTTTL) {
+        if (CONFIG->SHCUPD_MCASTTTL) {
             int hops;
 
-            hops = atoi(OPTIONS.SHCUPD_MCASTTTL);
+            hops = atoi(CONFIG->SHCUPD_MCASTTTL);
             if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &hops, sizeof(hops)) < 0) {
                 fail("{setsockopt: IPV6_MULTICAST_HOPS}");
             }
@@ -591,7 +527,7 @@ RSA *load_rsa_privatekey(SSL_CTX *ctx, const char *file) {
 /* Init library and load specified certificate.
  * Establishes a SSL_ctx, to act as a template for
  * each connection */
-static SSL_CTX * init_openssl() {
+SSL_CTX * init_openssl() {
     SSL_library_init();
     SSL_load_error_strings();
     SSL_CTX *ctx = NULL;
@@ -600,12 +536,12 @@ static SSL_CTX * init_openssl() {
     long ssloptions = SSL_OP_NO_SSLv2 | SSL_OP_ALL | 
             SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION;
 
-    if (OPTIONS.ETYPE == ENC_TLS)
+    if (CONFIG->ETYPE == ENC_TLS)
         ctx = SSL_CTX_new(TLSv1_server_method());
-    else if (OPTIONS.ETYPE == ENC_SSL)
+    else if (CONFIG->ETYPE == ENC_SSL)
         ctx = SSL_CTX_new(SSLv23_server_method());
     else
-        assert(OPTIONS.ETYPE == ENC_TLS || OPTIONS.ETYPE == ENC_SSL);
+        assert(CONFIG->ETYPE == ENC_TLS || CONFIG->ETYPE == ENC_SSL);
 
 #ifdef SSL_OP_NO_COMPRESSION
     ssloptions |= SSL_OP_NO_COMPRESSION;
@@ -614,12 +550,12 @@ static SSL_CTX * init_openssl() {
     SSL_CTX_set_options(ctx, ssloptions);
     SSL_CTX_set_info_callback(ctx, info_callback);
 
-    if (SSL_CTX_use_certificate_chain_file(ctx, OPTIONS.CERT_FILE) <= 0) {
+    if (SSL_CTX_use_certificate_chain_file(ctx, CONFIG->CERT_FILE) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(1);
     }
 
-    rsa = load_rsa_privatekey(ctx, OPTIONS.CERT_FILE);
+    rsa = load_rsa_privatekey(ctx, CONFIG->CERT_FILE);
     if(!rsa) {
        ERR("Error loading rsa private key\n");
        exit(1);
@@ -631,16 +567,16 @@ static SSL_CTX * init_openssl() {
     }
 
 #ifndef OPENSSL_NO_DH
-    init_dh(ctx, OPTIONS.CERT_FILE);
+    init_dh(ctx, CONFIG->CERT_FILE);
 #endif /* OPENSSL_NO_DH */
 
-    if (OPTIONS.ENGINE) {
+    if (CONFIG->ENGINE) {
         ENGINE *e = NULL;
         ENGINE_load_builtin_engines();
-        if (!strcmp(OPTIONS.ENGINE, "auto"))
+        if (!strcmp(CONFIG->ENGINE, "auto"))
             ENGINE_register_all_complete();
         else {
-            if ((e = ENGINE_by_id(OPTIONS.ENGINE)) == NULL ||
+            if ((e = ENGINE_by_id(CONFIG->ENGINE)) == NULL ||
                 !ENGINE_init(e) ||
                 !ENGINE_set_default(e, ENGINE_METHOD_ALL)) {
                 ERR_print_errors_fp(stderr);
@@ -652,20 +588,20 @@ static SSL_CTX * init_openssl() {
         }
     }
 
-    if (OPTIONS.CIPHER_SUITE)
-        if (SSL_CTX_set_cipher_list(ctx, OPTIONS.CIPHER_SUITE) != 1)
+    if (CONFIG->CIPHER_SUITE)
+        if (SSL_CTX_set_cipher_list(ctx, CONFIG->CIPHER_SUITE) != 1)
             ERR_print_errors_fp(stderr);
 
-    if (OPTIONS.PREFER_SERVER_CIPHERS)
+    if (CONFIG->PREFER_SERVER_CIPHERS)
         SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
 
 #ifdef USE_SHARED_CACHE
-    if (OPTIONS.SHARED_CACHE) {
-        if (shared_context_init(ctx, OPTIONS.SHARED_CACHE) < 0) {
+    if (CONFIG->SHARED_CACHE) {
+        if (shared_context_init(ctx, CONFIG->SHARED_CACHE) < 0) {
             ERR("Unable to alloc memory for shared cache.\n");
             exit(1);
         }
-	if (OPTIONS.SHCUPD_PORT) {
+	if (CONFIG->SHCUPD_PORT) {
             if (compute_secret(rsa, shared_secret) < 0) {
                 ERR("Unable to compute shared secret.\n");
                 exit(1);
@@ -721,7 +657,7 @@ static int create_main_socket() {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
-    const int gai_err = getaddrinfo(OPTIONS.FRONT_IP, OPTIONS.FRONT_PORT,
+    const int gai_err = getaddrinfo(CONFIG->FRONT_IP, CONFIG->FRONT_PORT,
                                     &hints, &ai);
     if (gai_err != 0) {
         ERR("{getaddrinfo}: [%s]\n", gai_strerror(gai_err));
@@ -752,7 +688,7 @@ static int create_main_socket() {
     prepare_proxy_line(ai->ai_addr);
 
     freeaddrinfo(ai);
-    listen(s, OPTIONS.BACKLOG);
+    listen(s, CONFIG->BACKLOG);
 
     return s;
 }
@@ -917,7 +853,7 @@ static void handle_connect(struct ev_loop *loop, ev_io *w, int revents) {
         ev_io_init(&ps->ev_w_down, back_write, ps->fd_down, EV_WRITE);
         start_handshake(ps, SSL_ERROR_WANT_READ); /* for client-first handshake */
         ev_io_start(loop, &ps->ev_r_down);
-        if (OPTIONS.WRITE_PROXY_LINE) {
+        if (CONFIG->WRITE_PROXY_LINE) {
             char *ring_pnt = ringbuffer_write_ptr(&ps->ring_down);
             assert(ps->remote_ip.ss_family == AF_INET ||
 		   ps->remote_ip.ss_family == AF_INET6);
@@ -943,7 +879,7 @@ static void handle_connect(struct ev_loop *loop, ev_io *w, int revents) {
             ringbuffer_write_append(&ps->ring_down, written);
             ev_io_start(loop, &ps->ev_w_down);
         }
-        else if (OPTIONS.WRITE_IP_OCTET) {
+        else if (CONFIG->WRITE_IP_OCTET) {
             char *ring_pnt = ringbuffer_write_ptr(&ps->ring_down);
             assert(ps->remote_ip.ss_family == AF_INET ||
                    ps->remote_ip.ss_family == AF_INET6);
@@ -1266,331 +1202,17 @@ static void handle_connections() {
     exit(1);
 }
 
-
-/* Print usage w/error message and exit failure */
-static void usage_fail(const char *prog, const char *msg) {
-    if (msg)
-        fprintf(stderr, "%s: %s\n", prog, msg);
-    fprintf(stderr, "usage: %s [OPTION] PEM\n", prog);
-
-    fprintf(stderr,
-"Encryption Methods:\n"
-"  --tls                    TLSv1 (default)\n"
-"  --ssl                    SSLv3 (implies no TLSv1)\n"
-"  -c CIPHER_SUITE          set allowed ciphers (default is OpenSSL defaults)\n"
-"  -e ENGINE                set OpenSSL engine\n"
-"  -O                       prefer server cipher order\n"
-"\n"
-"Socket:\n"
-"  -b HOST,PORT             backend [connect] (default is \"127.0.0.1,8000\")\n"
-"  -f HOST,PORT             frontend [bind] (default is \"*,8443\")\n"
-#ifdef USE_SHARED_CACHE
-"  -U HOST,PORT             accept cache updates on udp (default disabled, needs shared cache enabled)\n"
-"  -P HOST[,PORT]           send cache updates to peer (multiple option, needs updates enabled)\n"
-"  -M IFACE[,TTL]           force iface and ttl to receive and send multicast updates\n"
-#endif
-"\n"
-"Performance:\n"
-"  -n CORES                 number of worker processes (default is 1)\n"
-"  -B BACKLOG               set listen backlog size (default is 100)\n"
-"  -k SECS                  Change default tcp keepalive on client socket\n"
-#ifdef USE_SHARED_CACHE
-"  -C SHARED_CACHE          set shared cache size in sessions (default no shared cache)\n"
-#endif
-"\n"
-"Security:\n"
-"  -r PATH                  chroot\n"
-"  -u USERNAME              set gid/uid after binding the socket\n"
-"\n"
-"Logging:\n"
-"  -q                       be quiet; emit only error messages\n"
-"  -s                       send log message to syslog in addition to stderr/stdout\n"
-"\n"
-"Special:\n"
-"  --daemon                 fork into background and become a daemon\n"
-"  --write-ip               write 1 octet with the IP family followed by the IP\n"
-"                           address in 4 (IPv4) or 16 (IPv6) octets little-endian\n"
-"                           to backend before the actual data\n"
-"  --write-proxy            write HaProxy's PROXY (IPv4 or IPv6) protocol line\n" 
-"                           before actual data\n"
-);
-    exit(1);
-}
-
-
-static void parse_host_and_port(const char *prog, const char *name, char *inp, int wildcard_okay, const char **ip, const char **port) {
-    char buf[150];
-    char *sp;
-
-    if (strlen(inp) >= sizeof buf) {
-        snprintf(buf, sizeof buf, "invalid option for %s HOST,PORT\n", name);
-        usage_fail(prog, buf);
-    }
-
-    sp = strchr(inp, ',');
-    if (!sp) {
-        snprintf(buf, sizeof buf, "invalid option for %s HOST,PORT\n", name);
-        usage_fail(prog, buf);
-    }
-
-    if (!strncmp(inp, "*", sp - inp)) {
-        if (!wildcard_okay) {
-            snprintf(buf, sizeof buf, "wildcard host specification invalid for %s\n", name);
-            usage_fail(prog, buf);
-        }
-        *ip = NULL;
-    }
-    else {
-        *sp = 0;
-        *ip = inp;
-    }
-    *port = sp + 1;
-}
-
-#ifdef USE_SHARED_CACHE
-/* Parse mcast and ttl options */
-static void parse_mcast_iface_and_ttl(const char *prog, const char *name, char *inp, const char **iface, const char **ttl) {
-    char buf[150];
-    char *sp;
-
-    if (strlen(inp) >= sizeof buf) {
-        snprintf(buf, sizeof buf, "invalid option for %s IFACE[,TTL]\n", name);
-        usage_fail(prog, buf);
-    }
-
-    sp = strchr(inp, ',');
-    if (!sp) {
-        if (!strcmp(inp, "*"))
-            *iface = NULL;
-        else
-            *iface = inp;
-        *ttl = NULL;
-        return;
-    }
-    else if (!strncmp(inp, "*", sp - inp)) {
-        *iface = NULL;
-    }
-    else {
-        *sp = 0;
-        *iface = inp;
-    }
-    *ttl = sp + 1;
-}
-
-static void parse_peer(const char *prog, const char *name, char *inp, const char **ip, const char **port) {
-    char buf[150];
-    char *sp;
-
-    if (strlen(inp) >= sizeof buf) {
-        snprintf(buf, sizeof buf, "invalid option for %s HOST[,PORT]\n", name);
-        usage_fail(prog, buf);
-    }
-
-    sp = strchr(inp, ',');
-    if (!sp) {
-        if (!strcmp(inp, "*")) {
-            snprintf(buf, sizeof buf, "wildcard host specification invalid for %s\n", name);
-            usage_fail(prog, buf);
-        }
-        else
-            *ip = inp;
-        *port = NULL;
-        return;
-    }
-    else if (!strncmp(inp, "*", sp - inp)) {
-        snprintf(buf, sizeof buf, "wildcard host specification invalid for %s\n", name);
-        usage_fail(prog, buf);
-    }
-    else {
-        *sp = 0;
-        *ip = inp;
-    }
-    *port = sp + 1;
-}
-
-/* Add shcupd peer to options */
-static void parse_peers(const char *prog, const char *name, char *inp) {
-    int i;
-
-    for (i = 0 ; i < MAX_SHCUPD_PEERS; i++) {
-         if (!OPTIONS.SHCUPD_PEERS[i].ip) {
-             parse_peer(prog, name, inp, &(OPTIONS.SHCUPD_PEERS[i].ip), &(OPTIONS.SHCUPD_PEERS[i].port));
-             memset(&(OPTIONS.SHCUPD_PEERS[i+1]), 0, sizeof(shcupd_peer_opt));
-             break;
-         }
-    }
-    if (i == MAX_SHCUPD_PEERS ) {
-        ERR("Maximum %s peers reach (%d)\n", name, MAX_SHCUPD_PEERS);
-        exit(1);
-    }
-}
-
-#endif /* USE_SHARED_CACHE */
-
-/* Handle command line arguments modifying behavior */
-static void parse_cli(int argc, char **argv) {
-    const char *prog = argv[0];
-
-    static int tls = 0, ssl = 0;
-    int c;
-    struct passwd* passwd;
-
-    static struct option long_options[] =
-    {
-        {"tls", 0, &tls, 1},
-        {"ssl", 0, &ssl, 1},
-        {"write-ip", 0, &OPTIONS.WRITE_IP_OCTET, 1},
-        {"write-proxy", 0, &OPTIONS.WRITE_PROXY_LINE, 1},
-        {"daemon", 0, &OPTIONS.DAEMONIZE, 1},
-        {0, 0, 0, 0}
-    };
-
-    while (1) {
-        int option_index = 0;
-        c = getopt_long(argc, argv, "hf:b:n:c:e:Ou:r:B:C:k:qsU:P:M:",
-                long_options, &option_index);
-
-        if (c == -1)
-            break;
-
-        switch (c) {
-
-        case 0:
-            break;
-
-        case 'n':
-            errno = 0;
-            OPTIONS.NCORES = strtol(optarg, NULL, 10);
-            if ((errno == ERANGE &&
-                (OPTIONS.NCORES == LONG_MAX || OPTIONS.NCORES == LONG_MIN)) ||
-                OPTIONS.NCORES < 1 || OPTIONS.NCORES > 128) {
-                usage_fail(prog, "invalid option for -n CORES; please provide an integer between 1 and 128\n");
-            }
-            break;
-
-        case 'b':
-            parse_host_and_port(prog, "-b", optarg, 0, &(OPTIONS.BACK_IP), &(OPTIONS.BACK_PORT));
-            break;
-
-        case 'f':
-            parse_host_and_port(prog, "-f", optarg, 1, &(OPTIONS.FRONT_IP), &(OPTIONS.FRONT_PORT));
-            break;
-            
-        case 'c':
-            OPTIONS.CIPHER_SUITE = optarg;
-            break;
-
-        case 'e':
-            OPTIONS.ENGINE = optarg;
-            break;
-
-        case 'O':
-            OPTIONS.PREFER_SERVER_CIPHERS = 1;
-            break;
-
-        case 'u':
-            passwd = getpwnam(optarg);
-            if (!passwd) {
-                if (errno)
-                    fail("getpwnam failed");
-                else
-                    ERR("user not found: %s\n", optarg);
-                exit(1);
-            }
-            OPTIONS.UID = passwd->pw_uid;
-            OPTIONS.GID = passwd->pw_gid;
-            break;
-
-        case 'r':
-            if (optarg && optarg[0] == '/')
-                OPTIONS.CHROOT = optarg;
-            else {
-                ERR("chroot must be absolute path: \"%s\"\n", optarg);
-                exit(1);
-            }
-            break;
-
-        case 'B':
-            OPTIONS.BACKLOG = atoi(optarg);
-            if ( OPTIONS.BACKLOG <= 0 ) {
-                ERR("listen backlog can not be set to %d\n", OPTIONS.BACKLOG);
-                exit(1);
-            }
-            break;
-
-#ifdef USE_SHARED_CACHE
-        case 'C':
-            OPTIONS.SHARED_CACHE = atoi(optarg);
-            if ( OPTIONS.SHARED_CACHE < 0 ) {
-                ERR("shared cache size can not be set to %d\n", OPTIONS.SHARED_CACHE);
-                exit(1);
-            }
-            break;
-
-        case 'U':
-            parse_host_and_port(prog, "-U", optarg, 1, &(OPTIONS.SHCUPD_IP), &(OPTIONS.SHCUPD_PORT));
-            break;
-
-        case 'P':
-            parse_peers(prog, "-P", optarg);
-            break;
-
-        case 'M':
-            parse_mcast_iface_and_ttl(prog, "-M", optarg, &(OPTIONS.SHCUPD_MCASTIF), &(OPTIONS.SHCUPD_MCASTTTL));
-            break;
-#endif
-
-        case 'q':
-            OPTIONS.QUIET = 1;
-            break;
-        
-        case 's':
-            OPTIONS.SYSLOG = 1;
-            break;
-
-        case 'k':
-            OPTIONS.TCP_KEEPALIVE_TIME = atoi(optarg);
-            break;
-
-        default:
-            usage_fail(prog, NULL);
-        }
-    }
-
-    /* Post-processing */
-    if (tls && ssl)
-        usage_fail(prog, "Cannot specify both --tls and --ssl");
-
-    if (ssl)
-        OPTIONS.ETYPE = ENC_SSL; // implied.. else, TLS
-
-    if (OPTIONS.WRITE_IP_OCTET && OPTIONS.WRITE_PROXY_LINE)
-        usage_fail(prog, "Cannot specify both --write-ip and --write-proxy; pick one!");
-
-    argc -= optind;
-    argv += optind;
-
-    if (argc != 1)
-        usage_fail(prog, "exactly one argument is required: path to PEM file with cert/key");
-
-    OPTIONS.CERT_FILE = argv[0];
-
-    /* parent process can create new children */
-    create_workers = 1;
-}
-
-
 void change_root() {
-    if (chroot(OPTIONS.CHROOT) == -1)
+    if (chroot(CONFIG->CHROOT) == -1)
         fail("chroot");
     if (chdir("/"))
         fail("chdir");
 }
 
 void drop_privileges() {
-    if (setgid(OPTIONS.GID))
+    if (setgid(CONFIG->GID))
         fail("setgid failed");
-    if (setuid(OPTIONS.UID))
+    if (setuid(CONFIG->UID))
         fail("setuid failed");
 }
 
@@ -1602,7 +1224,7 @@ void init_globals() {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = 0;
-    const int gai_err = getaddrinfo(OPTIONS.BACK_IP, OPTIONS.BACK_PORT,
+    const int gai_err = getaddrinfo(CONFIG->BACK_IP, CONFIG->BACK_PORT,
                                     &hints, &backaddr);
     if (gai_err != 0) {
         ERR("{getaddrinfo}: [%s]", gai_strerror(gai_err));
@@ -1610,9 +1232,9 @@ void init_globals() {
     }
 
 #ifdef USE_SHARED_CACHE
-    if (OPTIONS.SHARED_CACHE) {
+    if (CONFIG->SHARED_CACHE) {
         /* cache update peers addresses */
-        shcupd_peer_opt *spo = OPTIONS.SHCUPD_PEERS;
+        shcupd_peer_opt *spo = CONFIG->SHCUPD_PEERS;
         struct addrinfo **pai = shcupd_peers;
 
         while (spo->ip) {
@@ -1621,7 +1243,7 @@ void init_globals() {
             hints.ai_socktype = SOCK_DGRAM;
             hints.ai_flags = 0;
             const int gai_err = getaddrinfo(spo->ip,
-                                spo->port ? spo->port : OPTIONS.SHCUPD_PORT, &hints, pai);
+                                spo->port ? spo->port : CONFIG->SHCUPD_PORT, &hints, pai);
             if (gai_err != 0) {
                 ERR("{getaddrinfo}: [%s]", gai_strerror(gai_err));
                 exit(1);
@@ -1632,10 +1254,10 @@ void init_globals() {
     }
 #endif
     /* child_pids */
-    if ((child_pids = calloc(OPTIONS.NCORES, sizeof(pid_t))) == NULL)
+    if ((child_pids = calloc(CONFIG->NCORES, sizeof(pid_t))) == NULL)
         fail("calloc");
 
-    if (OPTIONS.SYSLOG)
+    if (CONFIG->SYSLOG)
         openlog("stud", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_DAEMON);
 }
 
@@ -1667,7 +1289,7 @@ void replace_child_with_pid(pid_t pid) {
     int i;
 
     /* find old child's slot and put a new child there */ 
-    for (i = 0; i < OPTIONS.NCORES; i++) {
+    for (i = 0; i < CONFIG->NCORES; i++) {
         if (child_pids[i] == pid) {
             start_children(i, 1);
             return;
@@ -1686,7 +1308,7 @@ static void do_wait(int __attribute__ ((unused)) signo) {
     if (pid == -1) {
         if (errno == ECHILD) {
             ERR("{core} All children have exited! Restarting...\n");
-            start_children(0, OPTIONS.NCORES);
+            start_children(0, CONFIG->NCORES);
         }
         else if (errno == EINTR) {
             ERR("{core} Interrupted wait\n");
@@ -1717,7 +1339,7 @@ static void sigh_terminate (int __attribute__ ((unused)) signo) {
 
         /* kill all children */
         int i;
-        for (i = 0; i < OPTIONS.NCORES; i++) {
+        for (i = 0; i < CONFIG->NCORES; i++) {
             /* LOG("Stopping worker pid %d.\n", child_pids[i]); */
             if (child_pids[i] > 1 && kill(child_pids[i], SIGTERM) != 0) {
                 ERR("{core} Unable to send SIGTERM to worker pid %d: %s\n", child_pids[i], strerror(errno));
@@ -1837,7 +1459,13 @@ void openssl_check_version() {
 /* Process command line args, create the bound socket,
  * spawn child (worker) processes, and respawn if any die */
 int main(int argc, char **argv) {
-    parse_cli(argc, argv);
+    // initialize configuration
+    CONFIG = config_new();
+    
+    // parse command line
+    config_parse_cli(argc, argv, CONFIG);
+    
+    create_workers = 1;
 
     openssl_check_version();
 
@@ -1848,7 +1476,7 @@ int main(int argc, char **argv) {
     listener_socket = create_main_socket();
 
 #ifdef USE_SHARED_CACHE
-    if (OPTIONS.SHCUPD_PORT) {
+    if (CONFIG->SHCUPD_PORT) {
         /* create socket to send(children) and
                receive(parent) cache updates */
     	shcupd_socket = create_shcupd_socket();
@@ -1858,17 +1486,17 @@ int main(int argc, char **argv) {
     /* load certificate, pass to handle_connections */
     ssl_ctx = init_openssl();
 
-    if (OPTIONS.CHROOT && OPTIONS.CHROOT[0])
+    if (CONFIG->CHROOT && CONFIG->CHROOT[0])
         change_root();
 
-    if (OPTIONS.UID || OPTIONS.GID)
+    if (CONFIG->UID || CONFIG->GID)
         drop_privileges();
 
     /* should we daemonize ?*/
-    if (OPTIONS.DAEMONIZE) {
+    if (CONFIG->DAEMONIZE) {
         /* disable logging to stderr */
-        OPTIONS.QUIET = 1;
-        OPTIONS.SYSLOG = 1;
+        CONFIG->QUIET = 1;
+        CONFIG->SYSLOG = 1;
 
         /* become a daemon */
         daemonize();
@@ -1876,10 +1504,10 @@ int main(int argc, char **argv) {
 
     master_pid = getpid();
 
-    start_children(0, OPTIONS.NCORES);
+    start_children(0, CONFIG->NCORES);
 
 #ifdef USE_SHARED_CACHE
-    if (OPTIONS.SHCUPD_PORT) {
+    if (CONFIG->SHCUPD_PORT) {
         /* start event loop to receive cache updates */
 
         loop = ev_default_loop(EVFLAG_AUTO);
@@ -1896,6 +1524,6 @@ int main(int argc, char **argv) {
          * Parent will be woken up if a signal arrives */
         pause();
     }
-
+    
     exit(0); /* just a formality; we never get here */
 }
