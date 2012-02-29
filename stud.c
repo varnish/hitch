@@ -72,7 +72,9 @@
 
 /* For Mac OS X */
 #ifndef TCP_KEEPIDLE
-# define TCP_KEEPIDLE TCP_KEEPALIVE
+# ifdef TCP_KEEPALIVE
+#  define TCP_KEEPIDLE TCP_KEEPALIVE
+# endif
 #endif
 #ifndef SOL_TCP
 # define SOL_TCP IPPROTO_TCP
@@ -177,9 +179,11 @@ static void settcpkeepalive(int fd) {
 
     optval = CONFIG->TCP_KEEPALIVE_TIME;
     optlen = sizeof(optval);
+#ifdef TCP_KEEPIDLE
     if(setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, &optval, optlen) < 0) {
         ERR("Error setting TCP_KEEPIDLE on client socket: %s", strerror(errno));
     }
+#endif
 }
 
 static void fail(const char* s) {
