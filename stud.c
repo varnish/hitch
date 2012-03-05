@@ -89,6 +89,7 @@ static int listener_socket;
 static int child_num;
 static pid_t *child_pids;
 static SSL_CTX *ssl_ctx;
+static SSL_SESSION *client_session;
 
 #ifdef USE_SHARED_CACHE
 static ev_io shcupd_listener;
@@ -544,9 +545,9 @@ SSL_CTX * init_openssl() {
             SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION;
 
     if (CONFIG->ETYPE == ENC_TLS)
-        ctx = SSL_CTX_new(TLSv1_server_method());
+        ctx = SSL_CTX_new((CONFIG->PMODE == SSL_CLIENT) ? TLSv1_client_method() : TLSv1_server_method());
     else if (CONFIG->ETYPE == ENC_SSL)
-        ctx = SSL_CTX_new(SSLv23_server_method());
+        ctx = SSL_CTX_new((CONFIG->PMODE == SSL_CLIENT) ? SSLv23_client_method() : SSLv23_server_method());
     else
         assert(CONFIG->ETYPE == ENC_TLS || CONFIG->ETYPE == ENC_SSL);
 
@@ -556,26 +557,6 @@ SSL_CTX * init_openssl() {
 
     SSL_CTX_set_options(ctx, ssloptions);
     SSL_CTX_set_info_callback(ctx, info_callback);
-
-    if (SSL_CTX_use_certificate_chain_file(ctx, CONFIG->CERT_FILE) <= 0) {
-        ERR_print_errors_fp(stderr);
-        exit(1);
-    }
-
-    rsa = load_rsa_privatekey(ctx, CONFIG->CERT_FILE);
-    if(!rsa) {
-       ERR("Error loading rsa private key\n");
-       exit(1);
-    }
-
-    if (SSL_CTX_use_RSAPrivateKey(ctx,rsa) <= 0) {
-        ERR_print_errors_fp(stderr);
-        exit(1);
-    }
-
-#ifndef OPENSSL_NO_DH
-    init_dh(ctx, CONFIG->CERT_FILE);
-#endif /* OPENSSL_NO_DH */
 
     if (CONFIG->ENGINE) {
         ENGINE *e = NULL;
@@ -601,6 +582,31 @@ SSL_CTX * init_openssl() {
 
     if (CONFIG->PREFER_SERVER_CIPHERS)
         SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
+
+
+    if (CONFIG->PMODE == SSL_CLIENT)
+        return ctx;
+
+    /* SSL_SERVER Mode stuff */
+    if (SSL_CTX_use_certificate_chain_file(ctx, CONFIG->CERT_FILE) <= 0) {
+        ERR_print_errors_fp(stderr);
+        exit(1);
+    }
+
+    rsa = load_rsa_privatekey(ctx, CONFIG->CERT_FILE);
+    if(!rsa) {
+       ERR("Error loading rsa private key\n");
+       exit(1);
+    }
+
+    if (SSL_CTX_use_RSAPrivateKey(ctx,rsa) <= 0) {
+        ERR_print_errors_fp(stderr);
+        exit(1);
+    }
+
+#ifndef OPENSSL_NO_DH
+    init_dh(ctx, CONFIG->CERT_FILE);
+#endif /* OPENSSL_NO_DH */
 
 #ifdef USE_SHARED_CACHE
     if (CONFIG->SHARED_CACHE) {
@@ -963,6 +969,14 @@ static void end_handshake(proxystate *ps) {
 	/* start connect now */
         start_connect(ps);
     }
+    else {
+        /* stud used in client mode, keep client session ) */
+        if (!SSL_session_reused(ps->ssl)) {
+            if (client_session)
+                SSL_SESSION_free(client_session);
+            client_session = SSL_get1_session(ps->ssl);
+        }
+    }
 
     /* if incoming buffer is not full */
     if (!ringbuffer_is_full(&ps->ring_ssl2clear))
@@ -1208,6 +1222,105 @@ static void check_ppid(struct ev_loop *loop, ev_timer *w, int revents) {
 
 }
 
+static void handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents) {
+    (void) revents;
+    (void) loop;
+    struct sockaddr_storage addr;
+    socklen_t sl = sizeof(addr);
+    int client = accept(w->fd, (struct sockaddr *) &addr, &sl);
+    if (client == -1) {
+        switch (errno) {
+        case EMFILE:
+            ERR("{client} accept() failed; too many open files for this process\n");
+            break;
+
+        case ENFILE:
+            ERR("{client} accept() failed; too many open files for this system\n");
+            break;
+
+        default:
+            assert(errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN);
+            break;
+        }
+        return;
+    }
+
+    int flag = 1;
+    int ret = setsockopt(client, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag) );
+    if (ret == -1) {
+      perror("Couldn't setsockopt on client (TCP_NODELAY)\n");
+    }
+#ifdef TCP_CWND
+    int cwnd = 10;
+    ret = setsockopt(client, IPPROTO_TCP, TCP_CWND, &cwnd, sizeof(cwnd));
+    if (ret == -1) {
+      perror("Couldn't setsockopt on client (TCP_CWND)\n");
+    }
+#endif
+
+    setnonblocking(client);
+    settcpkeepalive(client);
+
+    int back = create_back_socket();
+
+    if (back == -1) {
+        close(client);
+        perror("{backend-socket}");
+        return;
+    }
+
+    SSL_CTX * ctx = (SSL_CTX *)w->data;
+    SSL *ssl = SSL_new(ctx);
+    long mode = SSL_MODE_ENABLE_PARTIAL_WRITE;
+#ifdef SSL_MODE_RELEASE_BUFFERS
+    mode |= SSL_MODE_RELEASE_BUFFERS;
+#endif
+    SSL_set_mode(ssl, mode);
+    SSL_set_connect_state(ssl);
+    SSL_set_fd(ssl, back);
+    if (client_session)
+        SSL_set_session(ssl, client_session);
+
+    proxystate *ps = (proxystate *)malloc(sizeof(proxystate));
+
+    ps->fd_up = client;
+    ps->fd_down = back;
+    ps->ssl = ssl;
+    ps->want_shutdown = 0;
+    ps->clear_connected = 1;
+    ps->handshaked = 0;
+    ps->renegotiation = 0;
+    ps->remote_ip = addr;
+    ringbuffer_init(&ps->ring_clear2ssl);
+    ringbuffer_init(&ps->ring_ssl2clear);
+
+    /* set up events */
+    ev_io_init(&ps->ev_r_clear, clear_read, client, EV_READ);
+    ev_io_init(&ps->ev_w_clear, clear_write, client, EV_WRITE);
+
+    ev_io_init(&ps->ev_w_connect, handle_connect, back, EV_WRITE);
+
+    ev_io_init(&ps->ev_r_handshake, client_handshake, back, EV_READ);
+    ev_io_init(&ps->ev_w_handshake, client_handshake, back, EV_WRITE);
+
+
+    ev_io_init(&ps->ev_w_ssl, ssl_write, back, EV_WRITE);
+    ev_io_init(&ps->ev_r_ssl, ssl_read, back, EV_READ);
+
+    ps->ev_r_ssl.data = ps;
+    ps->ev_w_ssl.data = ps;
+    ps->ev_r_clear.data = ps;
+    ps->ev_w_clear.data = ps;
+    ps->ev_w_connect.data = ps;
+    ps->ev_r_handshake.data = ps;
+    ps->ev_w_handshake.data = ps;
+
+    /* Link back proxystate to SSL state */
+    SSL_set_app_data(ssl, ps);
+
+    ev_io_start(loop, &ps->ev_r_clear);
+    start_connect(ps); /* start connect */
+}
 
 /* Set up the child (worker) process including libev event loop, read event
  * on the bound socket, etc */
@@ -1236,7 +1349,7 @@ static void handle_connections() {
     ev_timer_init(&timer_ppid_check, check_ppid, 1.0, 1.0);
     ev_timer_start(loop, &timer_ppid_check);
 
-    ev_io_init(&listener, handle_accept, listener_socket, EV_READ);
+    ev_io_init(&listener, (CONFIG->PMODE == SSL_CLIENT) ? handle_clear_accept : handle_accept, listener_socket, EV_READ);
     listener.data = ssl_ctx;
     ev_io_start(loop, &listener);
 

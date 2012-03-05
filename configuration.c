@@ -108,6 +108,7 @@ stud_config * config_new (void) {
   // set default values
 
   r->ETYPE              = ENC_TLS;
+  r->PMODE              = SSL_SERVER;
   r->WRITE_IP_OCTET     = 0;
   r->WRITE_PROXY_LINE   = 0;
   r->CHROOT             = NULL;
@@ -769,6 +770,7 @@ void config_print_usage_fd (char *prog, stud_config *cfg, FILE *out) {
   fprintf(out, "\n");
   fprintf(out, "SOCKET:\n");
   fprintf(out, "\n");
+  fprintf(out, "  --client                    Enable client proxy mode\n");
   fprintf(out, "  -b  --backend=HOST,PORT     Backend [connect] (default is \"%s\")\n", config_disp_hostport(cfg->BACK_IP, cfg->BACK_PORT));
   fprintf(out, "  -f  --frontend=HOST,PORT    Frontend [bind] (default is \"%s\")\n", config_disp_hostport(cfg->FRONT_IP, cfg->FRONT_PORT));
 
@@ -1002,6 +1004,7 @@ void config_print_usage (char *prog, stud_config *cfg) {
 
 void config_parse_cli(int argc, char **argv, stud_config *cfg) {
   static int tls = 0, ssl = 0;
+  static int client = 0;
   int c;
   int test_only = 0;
   char *prog;
@@ -1014,6 +1017,7 @@ void config_parse_cli(int argc, char **argv, stud_config *cfg) {
     
     { "tls", 0, &tls, 1},
     { "ssl", 0, &ssl, 1},    
+    { "client", 0, &client, 1},    
     { CFG_CIPHERS, 1, NULL, 'c' },
     { CFG_PREFER_SERVER_CIPHERS, 0, NULL, 'O' },
     { CFG_BACKEND, 1, NULL, 'b' },
@@ -1147,6 +1151,10 @@ void config_parse_cli(int argc, char **argv, stud_config *cfg) {
       cfg->ETYPE = ENC_TLS;
   }
 
+  if (client) {
+      cfg->PMODE = SSL_CLIENT;
+  }
+
   if (cfg->WRITE_IP_OCTET && cfg->WRITE_PROXY_LINE)
     config_die("Options --write-ip and --write-proxy are mutually exclusive.");
 
@@ -1165,7 +1173,7 @@ void config_parse_cli(int argc, char **argv, stud_config *cfg) {
   argv += optind;
   if (argv != NULL && argv[0] != NULL)
     config_param_validate(CFG_PEM_FILE, argv[0], cfg, NULL, 0);
-  else if (cfg->CERT_FILE == NULL || strlen(cfg->CERT_FILE) < 1)
+  else if ((cfg->PMODE == SSL_SERVER) && (cfg->CERT_FILE == NULL || strlen(cfg->CERT_FILE) < 1))
     config_die("No x509 certificate PEM file specified!");
   
   // was this only a test?
