@@ -107,6 +107,9 @@ Send messages to syslog in addition to
 .Em stderr
 and
 .Em stdout .
+.It Fl -syslog-facility Ar facility
+Syslog facility to use. Default is
+.Ar daemon .
 .It Fl -write-ip
 Write 1 octet with the IP family followed by the IP address in 4
 (IPv4) or 16 (IPv6) octets little-endian to backend before the actual

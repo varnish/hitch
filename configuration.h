@@ -53,6 +53,7 @@ struct __stud_config {
 #endif
     int QUIET;
     int SYSLOG;
+    int SYSLOG_FACILITY;
     int TCP_KEEPALIVE_TIME;
     int DAEMONIZE;
     int PREFER_SERVER_CIPHERS;
