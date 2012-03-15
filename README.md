@@ -162,25 +162,12 @@ Authors
 
 `stud` was originally written by Jamie Turner (@jamwt) and is maintained
 by the Bump (http://bu.mp) server team.  It currently (12/11) provides
-server-side TLS termination for over 65 million Bump users.
+server-side TLS termination for over 85 million Bump users.
 
-Contributors:
+Special thanks to Colin Percival (@cperciva) for an early security
+audit and code review.
 
-    * Colin Percival @cperciva      -- early security audit and code review
-    * Frank DENIS @jedisct1         -- port to BSD, IPv6 support, various fixes
-    * Denis Bilenko                 -- HAProxy PROXY protocol support, chroot/setuid
-    * Joe Damato                    -- Diffie-Hellman parameter loading
-    * Benjamin Pineau               -- Chained cert loading, various fixes,
-                                       performance tweaks
-    * Carl Perry/Dreamhost          -- IPv6 PROXY support
-    * Emeric Brun/Exceliance        -- Session resumption and shared-memory
-                                       session cache
-    * Vladimir Dronnikov            -- Logging cleanup
-    * James Golick/BitLove Inc.     -- SIGPIPE fixes and child-reaping
-    * Joe Williams                  -- Syslog support
-    * Jason Cook                    -- SSL option tweaks (performance)
-    * Artur Bergman                 -- Socket tweaks (performance)
-Usage: stud [OPTIONS] PEM
+Finally, thank you to all the stud contributors, who have taken the
+program from a good start to a solid project:
 
-This is stud, The Scalable TLS Unwrapping Daemon.
-
+https://github.com/bumptech/stud/contributors
