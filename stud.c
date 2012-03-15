@@ -684,10 +684,12 @@ static int create_main_socket() {
         fail("{bind-socket}");
     }
 
+#ifndef NO_DEFER_ACCEPT
 #if TCP_DEFER_ACCEPT
     int timeout = 1; 
     setsockopt(s, IPPROTO_TCP, TCP_DEFER_ACCEPT, &timeout, sizeof(int) );
 #endif /* TCP_DEFER_ACCEPT */
+#endif
 
     prepare_proxy_line(ai->ai_addr);
 
@@ -792,7 +794,8 @@ static void back_read(struct ev_loop *loop, ev_io *w, int revents) {
         ringbuffer_write_append(&ps->ring_up, t);
         if (ringbuffer_is_full(&ps->ring_up))
             ev_io_stop(loop, &ps->ev_r_down);
-        safe_enable_io(ps, &ps->ev_w_up);
+        if (ps->handshaked)
+            safe_enable_io(ps, &ps->ev_w_up);
     }
     else if (t == 0) {
         LOG("{backend} Connection closed\n");
@@ -820,7 +823,8 @@ static void back_write(struct ev_loop *loop, ev_io *w, int revents) {
     if (t > 0) {
         if (t == sz) {
             ringbuffer_read_pop(&ps->ring_down);
-            safe_enable_io(ps, &ps->ev_r_up);
+            if (ps->handshaked)
+                safe_enable_io(ps, &ps->ev_r_up);
             if (ringbuffer_is_empty(&ps->ring_down)) {
                 if (ps->want_shutdown) {
                     shutdown_proxy(ps, SHUTDOWN_HARD);
@@ -914,6 +918,9 @@ static void handle_connect(struct ev_loop *loop, ev_io *w, int revents) {
 static void start_handshake(proxystate *ps, int err) {
     ev_io_stop(loop, &ps->ev_r_up);
     ev_io_stop(loop, &ps->ev_w_up);
+
+    ps->handshaked = 0;
+
     if (err == SSL_ERROR_WANT_READ)
         ev_io_start(loop, &ps->ev_r_handshake);
     else if (err == SSL_ERROR_WANT_WRITE)
