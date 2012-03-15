@@ -1269,7 +1269,7 @@ void init_globals() {
         fail("calloc");
 
     if (CONFIG->SYSLOG)
-        openlog("stud", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_DAEMON);
+        openlog("stud", LOG_CONS | LOG_PID | LOG_NDELAY, CONFIG->SYSLOG_FACILITY);
 }
 
 /* Forks COUNT children starting with START_INDEX.

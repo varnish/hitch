@@ -118,6 +118,7 @@ Detail about the entire set of options can be found by invoking `stud -h`:
     LOGGING:
       -q  --quiet                Be quiet; emit only error messages
       -s  --syslog               Send log message to syslog in addition to stderr/stdout
+      --syslog-facility=FACILITY Syslog facility to use (Default: "daemon")
 
     OTHER OPTIONS:
           --daemon               Fork into background and become a daemon (Default: off)

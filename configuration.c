@@ -17,6 +17,7 @@
 #include <pwd.h>
 #include <grp.h>
 #include <sys/stat.h>
+#include <syslog.h>
 
 #include "configuration.h"
 #include "version.h"
@@ -39,6 +40,8 @@
 #define CFG_GROUP "group"
 #define CFG_QUIET "quiet"
 #define CFG_SYSLOG "syslog"
+#define CFG_SYSLOG_FACILITY "syslog-facility"
+#define CFG_PARAM_SYSLOG_FACILITY 11015
 #define CFG_DAEMON "daemon"
 #define CFG_WRITE_IP "write-ip"
 #define CFG_WRITE_PROXY "write-proxy"
@@ -137,6 +140,7 @@ stud_config * config_new (void) {
 
   r->QUIET              = 0;
   r->SYSLOG             = 0;
+  r->SYSLOG_FACILITY    = LOG_DAEMON;
   r->TCP_KEEPALIVE_TIME = 3600;
   r->DAEMONIZE          = 0;
   r->PREFER_SERVER_CIPHERS = 0;
@@ -620,6 +624,47 @@ void config_param_validate (char *k, char *v, stud_config *cfg, char *file, int 
   else if (strcmp(k, CFG_SYSLOG) == 0) {
     r = config_param_val_bool(v, &cfg->SYSLOG);
   }
+  else if (strcmp(k, CFG_SYSLOG_FACILITY) == 0) {
+    r = 1;
+    if (!strcmp(v, "auth") || !strcmp(v, "authpriv"))
+      cfg->SYSLOG_FACILITY = LOG_AUTHPRIV;
+    else if (!strcmp(v, "cron"))
+      cfg->SYSLOG_FACILITY = LOG_CRON;
+    else if (!strcmp(v, "daemon"))
+      cfg->SYSLOG_FACILITY = LOG_DAEMON;
+    else if (!strcmp(v, "ftp"))
+      cfg->SYSLOG_FACILITY = LOG_FTP;
+    else if (!strcmp(v, "local0"))
+      cfg->SYSLOG_FACILITY = LOG_LOCAL0;
+    else if (!strcmp(v, "local1"))
+      cfg->SYSLOG_FACILITY = LOG_LOCAL1;
+    else if (!strcmp(v, "local2"))
+      cfg->SYSLOG_FACILITY = LOG_LOCAL2;
+    else if (!strcmp(v, "local3"))
+      cfg->SYSLOG_FACILITY = LOG_LOCAL3;
+    else if (!strcmp(v, "local4"))
+      cfg->SYSLOG_FACILITY = LOG_LOCAL4;
+    else if (!strcmp(v, "local5"))
+      cfg->SYSLOG_FACILITY = LOG_LOCAL5;
+    else if (!strcmp(v, "local6"))
+      cfg->SYSLOG_FACILITY = LOG_LOCAL6;
+    else if (!strcmp(v, "local7"))
+      cfg->SYSLOG_FACILITY = LOG_LOCAL7;
+    else if (!strcmp(v, "lpr"))
+      cfg->SYSLOG_FACILITY = LOG_LPR;
+    else if (!strcmp(v, "mail"))
+      cfg->SYSLOG_FACILITY = LOG_MAIL;
+    else if (!strcmp(v, "news"))
+      cfg->SYSLOG_FACILITY = LOG_NEWS;
+    else if (!strcmp(v, "user"))
+      cfg->SYSLOG_FACILITY = LOG_USER;
+    else if (!strcmp(v, "uucp"))
+      cfg->SYSLOG_FACILITY = LOG_UUCP;
+    else {
+      config_error_set("Invalid facility '%s'.", v);
+      r = 0;
+    }
+  }
   else if (strcmp(k, CFG_DAEMON) == 0) {
     r = config_param_val_bool(v, &cfg->DAEMONIZE);
   }
@@ -748,6 +793,48 @@ char * config_disp_hostport (char *host, char *port) {
   return tmp_buf;
 }
 
+const char * config_disp_log_facility (int facility) {
+  switch (facility)
+  {
+    case LOG_AUTHPRIV:
+      return "authpriv";
+    case LOG_CRON:
+      return "cron";
+    case LOG_DAEMON:
+      return "daemon";
+    case LOG_FTP:
+      return "ftp";
+    case LOG_LOCAL0:
+      return "local0";
+    case LOG_LOCAL1:
+      return "local1";
+    case LOG_LOCAL2:
+      return "local2";
+    case LOG_LOCAL3:
+      return "local3";
+    case LOG_LOCAL4:
+      return "local4";
+    case LOG_LOCAL5:
+      return "local5";
+    case LOG_LOCAL6:
+      return "local6";
+    case LOG_LOCAL7:
+      return "local7";
+    case LOG_LPR:
+      return "lpr";
+    case LOG_MAIL:
+      return "mail";
+    case LOG_NEWS:
+      return "news";
+    case LOG_USER:
+      return "user";
+    case LOG_UUCP:
+      return "uucp";
+    default:
+      return "UNKNOWN";
+  }
+}
+
 void config_print_usage_fd (char *prog, stud_config *cfg, FILE *out) {
   if (out == NULL) out = stderr;
   fprintf(out, "Usage: %s [OPTIONS] PEM\n\n", basename(prog));
@@ -806,6 +893,7 @@ void config_print_usage_fd (char *prog, stud_config *cfg, FILE *out) {
   fprintf(out, "LOGGING:\n");
   fprintf(out, "  -q  --quiet                Be quiet; emit only error messages\n");
   fprintf(out, "  -s  --syslog               Send log message to syslog in addition to stderr/stdout\n");
+  fprintf(out, "  --syslog-facility=FACILITY Syslog facility to use (Default: \"%s\")\n", config_disp_log_facility(cfg->SYSLOG_FACILITY));
   fprintf(out, "\n");
   fprintf(out, "OTHER OPTIONS:\n");
   fprintf(out, "      --daemon               Fork into background and become a daemon (Default: %s)\n", config_disp_bool(cfg->DAEMONIZE));
@@ -968,6 +1056,12 @@ void config_print_default (FILE *fd, stud_config *cfg) {
   fprintf(fd, FMT_STR, CFG_SYSLOG, config_disp_bool(cfg->SYSLOG));
   fprintf(fd, "\n");
 
+  fprintf(fd, "# Syslog facility to use\n");
+  fprintf(fd, "#\n");
+  fprintf(fd, "# type: string\n");
+  fprintf(fd, FMT_QSTR, CFG_SYSLOG_FACILITY, config_disp_log_facility(cfg->SYSLOG_FACILITY));
+  fprintf(fd, "\n");
+
   fprintf(fd, "# Run as daemon\n");
   fprintf(fd, "#\n");
   fprintf(fd, "# type: boolean\n");
@@ -1032,6 +1126,7 @@ void config_parse_cli(int argc, char **argv, stud_config *cfg) {
     { CFG_GROUP, 1, NULL, 'g' },
     { CFG_QUIET, 0, NULL, 'q' },
     { CFG_SYSLOG, 0, NULL, 's' },
+    { CFG_SYSLOG_FACILITY, 1, NULL, CFG_PARAM_SYSLOG_FACILITY },
     { CFG_DAEMON, 0, &cfg->DAEMONIZE, 1 },
     { CFG_WRITE_IP, 0, &cfg->WRITE_IP_OCTET, 1 },
     { CFG_WRITE_PROXY, 0, &cfg->WRITE_PROXY_LINE, 1 },
@@ -1066,6 +1161,9 @@ void config_parse_cli(int argc, char **argv, stud_config *cfg) {
         exit(0);
         break;
 #endif
+      case CFG_PARAM_SYSLOG_FACILITY:
+        config_param_validate(CFG_SYSLOG_FACILITY, optarg, cfg, NULL, 0);
+        break;
       case 'c':
         config_param_validate(CFG_CIPHERS, optarg, cfg, NULL, 0);
         break;
