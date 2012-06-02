@@ -26,9 +26,15 @@ typedef enum {
     ENC_SSL
 } ENC_TYPE;
 
+typedef enum {
+    SSL_SERVER,
+    SSL_CLIENT
+} PROXY_MODE;
+
 /* configuration structure */
 struct __stud_config {
     ENC_TYPE ETYPE;
+    PROXY_MODE PMODE;
     int WRITE_IP_OCTET;
     int WRITE_PROXY_LINE;
     char *CHROOT;
