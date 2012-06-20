@@ -57,6 +57,7 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/engine.h>
+#include <openssl/bio.h>
 #include <ev.h>
 
 #include "ringbuffer.h"
@@ -131,6 +132,8 @@ typedef struct proxystate {
 
     ev_io ev_r_clear;                   /* Clear stream write event */
     ev_io ev_w_clear;                   /* Clear stream read event */
+
+    ev_io ev_proxy;                     /* proxy read event */
 
     int fd_up;                          /* Upstream (client) socket */
     int fd_down;                        /* Downstream (backend) socket */
@@ -738,6 +741,7 @@ static void shutdown_proxy(proxystate *ps, SHUTDOWN_REQUESTOR req) {
         ev_io_stop(loop, &ps->ev_w_connect);
         ev_io_stop(loop, &ps->ev_w_clear);
         ev_io_stop(loop, &ps->ev_r_clear);
+        ev_io_stop(loop, &ps->ev_proxy);
 
         close(ps->fd_up);
         close(ps->fd_down);
@@ -982,6 +986,47 @@ static void end_handshake(proxystate *ps) {
         ev_io_start(loop, &ps->ev_w_ssl);
 }
 
+static void client_proxy_proxy(struct ev_loop *loop, ev_io *w, int revents) {
+    (void) revents;
+    int t;
+    char *proxy = tcp_proxy_line, *end = tcp_proxy_line + sizeof(tcp_proxy_line);
+    proxystate *ps = (proxystate *)w->data;
+    BIO *b = SSL_get_rbio(ps->ssl);
+
+    // Copy characters one-by-one until we hit a \n or an error
+    while (proxy != end && (t = BIO_read(b, proxy, 1)) == 1) {
+        if (*proxy++ == '\n') break;
+    }
+
+    if (proxy == end) {
+        LOG("{client} Unexpectedly long PROXY line. Perhaps a malformed request?");
+        shutdown_proxy(ps, SHUTDOWN_SSL);
+    }
+    else if (t == 1) {
+        if (ringbuffer_is_full(&ps->ring_ssl2clear)) {
+            LOG("{client} Error writing PROXY line");
+            shutdown_proxy(ps, SHUTDOWN_SSL);
+            return;
+        }
+
+        char *ring = ringbuffer_write_ptr(&ps->ring_ssl2clear);
+        memcpy(ring, tcp_proxy_line, proxy - tcp_proxy_line);
+        ringbuffer_write_append(&ps->ring_ssl2clear, proxy - tcp_proxy_line);
+
+        // Finished reading the PROXY header
+        if (*(proxy - 1) == '\n') {
+            ev_io_stop(loop, &ps->ev_proxy);
+
+            // Start the real handshake
+            start_handshake(ps, SSL_ERROR_WANT_READ);
+        }
+    }
+    else if (!BIO_should_retry(b)) {
+        LOG("{client} Unexpected error reading PROXY line");
+        shutdown_proxy(ps, SHUTDOWN_SSL);
+    }
+}
+
 /* The libev I/O handler during the OpenSSL handshake phase.  Basically, just
  * let OpenSSL do what it likes with the socket and obey its requests for reads
  * or writes */
@@ -1184,6 +1229,8 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     ev_io_init(&ps->ev_r_handshake, client_handshake, client, EV_READ);
     ev_io_init(&ps->ev_w_handshake, client_handshake, client, EV_WRITE);
 
+    ev_io_init(&ps->ev_proxy, client_proxy_proxy, client, EV_READ);
+
     ev_io_init(&ps->ev_w_connect, handle_connect, back, EV_WRITE);
 
     ev_io_init(&ps->ev_w_clear, clear_write, back, EV_WRITE);
@@ -1193,6 +1240,7 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     ps->ev_w_ssl.data = ps;
     ps->ev_r_clear.data = ps;
     ps->ev_w_clear.data = ps;
+    ps->ev_proxy.data = ps;
     ps->ev_w_connect.data = ps;
     ps->ev_r_handshake.data = ps;
     ps->ev_w_handshake.data = ps;
@@ -1200,7 +1248,12 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     /* Link back proxystate to SSL state */
     SSL_set_app_data(ssl, ps);
 
-    start_handshake(ps, SSL_ERROR_WANT_READ); /* for client-first handshake */
+    if (CONFIG->PROXY_PROXY_LINE) {
+        ev_io_start(loop, &ps->ev_proxy);
+    }
+    else {
+        start_handshake(ps, SSL_ERROR_WANT_READ); /* for client-first handshake */
+    }
 }
 
 
