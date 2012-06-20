@@ -58,7 +58,7 @@
   #define FMT_STR "%s = %s\n"
   #define FMT_QSTR "%s = \"%s\"\n"
   #define FMT_ISTR "%s = %d\n"
-  
+
   #define CONFIG_MAX_LINES 10000
   #define CONFIG_BUF_SIZE 1024
   #define CFG_PARAM_CFGFILE 10000
@@ -107,7 +107,7 @@ stud_config * config_new (void) {
     config_error_set("Unable to allocate memory for configuration structure: %s", strerror(errno));
     return NULL;
   }
-  
+
   // set default values
 
   r->ETYPE              = ENC_TLS;
@@ -131,10 +131,10 @@ stud_config * config_new (void) {
   r->SHARED_CACHE       = 0;
   r->SHCUPD_IP          = NULL;
   r->SHCUPD_PORT        = NULL;
-  
+
   for (int i = 0 ; i < MAX_SHCUPD_PEERS; i++)
     memset(&r->SHCUPD_PEERS[i], 0, sizeof(shcupd_peer_opt));
-  
+
   r->SHCUPD_MCASTIF     = NULL;
   r->SHCUPD_MCASTTTL    = NULL;
 #endif
@@ -171,7 +171,7 @@ void config_destroy (stud_config *cfg) {
     if (cfg->SHCUPD_PEERS[i].ip != NULL)
       free(cfg->SHCUPD_PEERS[i].ip);
     if (cfg->SHCUPD_PEERS[i].port != NULL)
-      free(cfg->SHCUPD_PEERS[i].port);    
+      free(cfg->SHCUPD_PEERS[i].port);
   }
 
   if (cfg->SHCUPD_MCASTIF != NULL) free(cfg->SHCUPD_MCASTIF);
@@ -244,28 +244,28 @@ char * config_get_value (char *str) {
 char * str_rtrim(char *str) {
   char *ptr;
   int   len;
- 
+
   len = strlen(str);
   ptr = str + len - 1;
   while (ptr >= str && (isspace((int)*ptr ) || (char) *ptr == '"' || (char) *ptr == '\'')) --ptr;
- 
+
   ptr[1] = '\0';
- 
+
   return str;
 }
- 
+
 char * str_ltrim(char *str) {
   char *ptr;
   int  len;
- 
+
   for (ptr = str; (*ptr && (isspace((int)*ptr) || (char) *ptr == '"' || (char) *ptr == '\'')); ++ptr);
- 
+
   len = strlen(ptr);
   memmove(str, ptr, len + 1);
- 
+
   return str;
 }
- 
+
 char * str_trim(char *str) {
   char *ptr;
   ptr = str_rtrim(str);
@@ -300,7 +300,7 @@ int config_param_val_bool (char *val, int *res) {
     strcasecmp(val, "1") == 0) {
     *res = 1;
   }
-  
+
   return 1;
 }
 
@@ -318,10 +318,10 @@ int config_param_host_port_wildcard (char *str, char **addr, char **port, int wi
   // address/port buffers
   char port_buf[PORT_LEN];
   char addr_buf[ADDR_LEN];
-  
+
   memset(port_buf, '\0', sizeof(port_buf));
   memset(addr_buf, '\0', sizeof(addr_buf));
-  
+
   // NEW FORMAT: [address]:port
   if (*str == '[') {
     char *ptr = str + 1;
@@ -330,10 +330,10 @@ int config_param_host_port_wildcard (char *str, char **addr, char **port, int wi
       config_error_set("Invalid address '%s'.", str);
       return 0;
     }
-    
+
     // address
     memcpy(addr_buf, ptr, (x - ptr));
-    
+
     // port
     x += 2;
     memcpy(port_buf, x, sizeof(port_buf) - 1);
@@ -351,16 +351,16 @@ int config_param_host_port_wildcard (char *str, char **addr, char **port, int wi
     // port
     memcpy(port_buf, (++x), sizeof(port_buf));
   }
-  
+
   // printf("PARSED ADDR '%s', PORT '%s'\n", addr_buf, port_buf);
-  
+
   // check port
   int p = atoi(port_buf);
   if (p < 1 || p > 65536) {
     config_error_set("Invalid port number '%s'", port_buf);
     return 0;
   }
-  
+
   // write
   if (strcmp(addr_buf, "*") == 0) {
     if (wildcard_okay)
@@ -375,9 +375,9 @@ int config_param_host_port_wildcard (char *str, char **addr, char **port, int wi
   }
   // if (**port != NULL) free(*port);
   *port = strdup(port_buf);
-  
+
   // printf("ADDR FINAL: '%s', '%s'\n", *addr, *port);
-  
+
   return 1;
 }
 
@@ -394,12 +394,12 @@ int config_param_val_int_pos (char *str, int *dst) {
   int num = 0;
   if (str != NULL)
     num = atoi(str);
-  
+
   if (num < 1) {
     config_error_set("Not a positive number.");
     return 0;
   }
-  
+
   *dst = num;
   return 1;
 }
@@ -413,12 +413,12 @@ int config_param_val_intl_pos (char *str, long int *dst) {
   long int num = 0;
   if (str != NULL)
     num = atol(str);
-  
+
   if (num < 1) {
     config_error_set("Not a positive number.");
     return 0;
   }
-  
+
   *dst = num;
   return 1;
 }
@@ -451,7 +451,7 @@ int config_param_shcupd_mcastif (char *str, char **iface, char **ttl) {
         *iface = str;
     }
     *ttl = sp + 1;
-    
+
     return 1;
 }
 
@@ -460,7 +460,7 @@ int config_param_shcupd_peer (char *str, stud_config *cfg) {
     config_error_set("Configuration pointer is NULL.");
     return 0;
   }
-  
+
   // parse result
   int r = 1;
 
@@ -480,7 +480,7 @@ int config_param_shcupd_peer (char *str, stud_config *cfg) {
     );
     return 0;
   }
-  
+
   // create place for new peer
   char *addr = malloc(ADDR_LEN);
   if (addr == NULL) {
@@ -502,13 +502,13 @@ int config_param_shcupd_peer (char *str, stud_config *cfg) {
     goto outta_parse_peer;
   }
   memset(port, '\0', PORT_LEN);
-  
+
   // try to parse address
   if (! config_param_host_port(str, &addr, &port)) {
     r = 0;
     goto outta_parse_peer;
   }
-  
+
   outta_parse_peer:
 
   if (! r) {
@@ -518,7 +518,7 @@ int config_param_shcupd_peer (char *str, stud_config *cfg) {
     cfg->SHCUPD_PEERS[offset].ip = addr;
     cfg->SHCUPD_PEERS[offset].port = port;
   }
-  
+
   return r;
 }
 
@@ -527,7 +527,7 @@ int config_param_shcupd_peer (char *str, stud_config *cfg) {
 void config_param_validate (char *k, char *v, stud_config *cfg, char *file, int line) {
   int r = 1;
   struct stat st;
-      
+
   if (strcmp(k, "tls") == 0) {
     //cfg->ENC_TLS = 1;
   }
@@ -603,7 +603,7 @@ void config_param_validate (char *k, char *v, stud_config *cfg, char *file, int 
         r = 0;
       } else {
         cfg->UID = passwd->pw_uid;
-        cfg->GID = passwd->pw_gid;    
+        cfg->GID = passwd->pw_gid;
       }
     }
   }
@@ -615,7 +615,7 @@ void config_param_validate (char *k, char *v, stud_config *cfg, char *file, int 
         config_error_set("Invalid group '%s'.", v);
         r = 0;
       } else {
-        cfg->GID = grp->gr_gid;    
+        cfg->GID = grp->gr_gid;
       }
     }
   }
@@ -683,7 +683,7 @@ void config_param_validate (char *k, char *v, stud_config *cfg, char *file, int 
       }
       else if (! S_ISREG(st.st_mode)) {
         config_error_set("Invalid x509 certificate PEM file '%s': Not a file.", v);
-        r = 0;        
+        r = 0;
       } else
         config_assign_str(&cfg->CERT_FILE, v);
     }
@@ -695,10 +695,10 @@ void config_param_validate (char *k, char *v, stud_config *cfg, char *file, int 
       k, file, line
     );
   }
-  
+
   if (! r) {
     if (file != NULL)
-      config_die("Error in configuration file '%s', line %d: %s\n", file, line, config_error_get()); 
+      config_die("Error in configuration file '%s', line %d: %s\n", file, line, config_error_get());
     else
       config_die("Invalid parameter '%s': %s", k, config_error_get());
   }
@@ -708,7 +708,7 @@ void config_param_validate (char *k, char *v, stud_config *cfg, char *file, int 
 int config_file_parse (char *file, stud_config *cfg) {
   if (cfg == NULL)
     config_die("Undefined stud options; THIS IS A BUG!\n");
-  
+
   char line[CONFIG_BUF_SIZE];
   FILE *fd = NULL;
 
@@ -727,25 +727,25 @@ int config_file_parse (char *file, stud_config *cfg) {
     memset(line, '\0', sizeof(line));
     if (fgets(line, (sizeof(line) - 1), fd) == NULL) break;
     i++;
-    
+
     // get configuration key
     char *key, *val;
     key = config_get_param(line);
     if (key == NULL) continue;
-    
+
     // get configuration key value...
     val = config_get_value(line);
     if (val == NULL) continue;
     str_trim(val);
-    
+
     // printf("File '%s', line %d, key: '%s', value: '%s'\n", file, i, key, val);
-    
+
     // validate configuration key => value
     config_param_validate(key, val, cfg, file, i);
   }
 
   fclose(fd);
-  
+
   return 1;
 }
 #endif /* NO_CONFIG_FILE */
@@ -775,7 +775,7 @@ char * config_disp_gid (gid_t gid) {
   if (gr) {
     memcpy(tmp_buf, gr->gr_name, strlen(gr->gr_name));
   }
-  return tmp_buf;  
+  return tmp_buf;
 }
 
 char * config_disp_hostport (char *host, char *port) {
@@ -942,7 +942,7 @@ void config_print_default (FILE *fd, stud_config *cfg) {
   fprintf(fd, "# type: string\n");
   fprintf(fd, FMT_QSTR, CFG_PEM_FILE, config_disp_str(cfg->CERT_FILE));
   fprintf(fd, "\n");
-  
+
   fprintf(fd, "# SSL protocol.\n");
   fprintf(fd, "#\n");
   fprintf(fd, "# tls = on\n");
@@ -992,14 +992,14 @@ void config_print_default (FILE *fd, stud_config *cfg) {
   fprintf(fd, "# type: integer\n");
   fprintf(fd, FMT_ISTR, CFG_SHARED_CACHE, cfg->SHARED_CACHE);
   fprintf(fd, "\n");
-  
+
   fprintf(fd, "# Accept shared SSL cache updates on specified listener.\n");
   fprintf(fd, "#\n");
   fprintf(fd, "# type: string\n");
   fprintf(fd, "# syntax: [HOST]:PORT\n");
   fprintf(fd, FMT_QSTR, CFG_SHARED_CACHE_LISTEN, config_disp_hostport(cfg->SHCUPD_IP, cfg->SHCUPD_PORT));
   fprintf(fd, "\n");
-  
+
   fprintf(fd, "# Shared cache peer address.\n");
   fprintf(fd, "# Multiple stud processes on multiple hosts (host limit: %d)\n", MAX_SHCUPD_PEERS);
   fprintf(fd, "# can share SSL session cache by sending updates to peers.\n");
@@ -1108,10 +1108,10 @@ void config_parse_cli(int argc, char **argv, stud_config *cfg) {
     { CFG_CONFIG, 1, NULL, CFG_PARAM_CFGFILE },
     { CFG_CONFIG_DEFAULT, 0, NULL, CFG_PARAM_DEFCFG },
 #endif
-    
+
     { "tls", 0, &tls, 1},
-    { "ssl", 0, &ssl, 1},    
-    { "client", 0, &client, 1},    
+    { "ssl", 0, &ssl, 1},
+    { "client", 0, &client, 1},
     { CFG_CIPHERS, 1, NULL, 'c' },
     { CFG_PREFER_SERVER_CIPHERS, 0, NULL, 'O' },
     { CFG_BACKEND, 1, NULL, 'b' },
@@ -1134,7 +1134,7 @@ void config_parse_cli(int argc, char **argv, stud_config *cfg) {
     { CFG_DAEMON, 0, &cfg->DAEMONIZE, 1 },
     { CFG_WRITE_IP, 0, &cfg->WRITE_IP_OCTET, 1 },
     { CFG_WRITE_PROXY, 0, &cfg->WRITE_PROXY_LINE, 1 },
- 
+
     { "test", 0, NULL, 't' },
     { "version", 0, NULL, 'V' },
     { "help", 0, NULL, 'h' },
@@ -1197,7 +1197,7 @@ void config_parse_cli(int argc, char **argv, stud_config *cfg) {
         config_param_validate(CFG_SHARED_CACHE_LISTEN, optarg, cfg, NULL, 0);
         break;
       case 'P':
-        config_param_validate(CFG_SHARED_CACHE_PEER, optarg, cfg, NULL, 0); 
+        config_param_validate(CFG_SHARED_CACHE_PEER, optarg, cfg, NULL, 0);
         break;
       case 'M':
         config_param_validate(CFG_SHARED_CACHE_MCASTIF, optarg, cfg, NULL, 0);
@@ -1237,7 +1237,7 @@ void config_parse_cli(int argc, char **argv, stud_config *cfg) {
         config_die("Invalid command line parameters. Run %s --help for instructions.", basename(argv[0]));
     }
   }
-  
+
   prog = argv[0];
 
   if (tls && ssl)
@@ -1265,7 +1265,7 @@ void config_parse_cli(int argc, char **argv, stud_config *cfg) {
   if (cfg->SHCUPD_IP != NULL && ! cfg->SHARED_CACHE)
     config_die("Shared cache update listener is defined, but shared cache is disabled.");
 #endif
-  
+
   // argv leftovers, do we have pem file as an argument?
   argc -= optind;
   argv += optind;
@@ -1273,7 +1273,7 @@ void config_parse_cli(int argc, char **argv, stud_config *cfg) {
     config_param_validate(CFG_PEM_FILE, argv[0], cfg, NULL, 0);
   else if ((cfg->PMODE == SSL_SERVER) && (cfg->CERT_FILE == NULL || strlen(cfg->CERT_FILE) < 1))
     config_die("No x509 certificate PEM file specified!");
-  
+
   // was this only a test?
   if (test_only) {
     fprintf(stderr, "Trying to initialize SSL context with certificate '%s'\n", cfg->CERT_FILE);
