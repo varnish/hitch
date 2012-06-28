@@ -124,7 +124,7 @@ stud_config * config_new (void) {
   r->BACK_IP            = strdup("127.0.0.1");
   r->BACK_PORT          = strdup("8000");
   r->NCORES             = 1;
-  r->CERT_FILE          = NULL;
+  r->CERT_FILES         = NULL;
   r->CIPHER_SUITE       = NULL;
   r->ENGINE             = NULL;
   r->BACKLOG            = 100;
@@ -161,7 +161,14 @@ void config_destroy (stud_config *cfg) {
   if (cfg->FRONT_PORT != NULL) free(cfg->FRONT_PORT);
   if (cfg->BACK_IP != NULL) free(cfg->BACK_IP);
   if (cfg->BACK_PORT != NULL) free(cfg->BACK_PORT);
-  if (cfg->CERT_FILE != NULL) free(cfg->CERT_FILE);
+  if (cfg->CERT_FILES != NULL) {
+    struct cert_files *curr = cfg->CERT_FILES, *next;
+    while (cfg->CERT_FILES != NULL) {
+      next = curr->NEXT;
+      free(curr);
+      curr = next;
+    }
+  }
   if (cfg->CIPHER_SUITE != NULL) free(cfg->CIPHER_SUITE);
   if (cfg->ENGINE != NULL) free(cfg->ENGINE);
 
@@ -689,8 +696,12 @@ void config_param_validate (char *k, char *v, stud_config *cfg, char *file, int 
       else if (! S_ISREG(st.st_mode)) {
         config_error_set("Invalid x509 certificate PEM file '%s': Not a file.", v);
         r = 0;
-      } else
-        config_assign_str(&cfg->CERT_FILE, v);
+      } else {
+        struct cert_files *cert = calloc(1, sizeof(*cert));
+        config_assign_str(&cert->CERT_FILE, v);
+        cert->NEXT = cfg->CERT_FILES;
+        cfg->CERT_FILES = cert;
+      }
     }
   }
   else {
@@ -946,9 +957,11 @@ void config_print_default (FILE *fd, stud_config *cfg) {
   fprintf(fd, "\n");
 
   fprintf(fd, "# SSL x509 certificate file. REQUIRED.\n");
+  fprintf(fd, "# List multiple certs to use SNI. Certs are used in the order they\n");
+  fprintf(fd, "# are listed; the last cert listed will be used if none of the others match\n");
   fprintf(fd, "#\n");
   fprintf(fd, "# type: string\n");
-  fprintf(fd, FMT_QSTR, CFG_PEM_FILE, config_disp_str(cfg->CERT_FILE));
+  fprintf(fd, FMT_QSTR, CFG_PEM_FILE, "");
   fprintf(fd, "\n");
 
   fprintf(fd, "# SSL protocol.\n");
@@ -1115,7 +1128,7 @@ void config_print_usage (char *prog, stud_config *cfg) {
 void config_parse_cli(int argc, char **argv, stud_config *cfg) {
   static int tls = 0, ssl = 0;
   static int client = 0;
-  int c;
+  int c, i;
   int test_only = 0;
   char *prog;
 
@@ -1289,19 +1302,22 @@ void config_parse_cli(int argc, char **argv, stud_config *cfg) {
     config_die("Shared cache update listener is defined, but shared cache is disabled.");
 #endif
 
-  // argv leftovers, do we have pem file as an argument?
+  // Any arguments left are presumed to be PEM files
   argc -= optind;
   argv += optind;
-  if (argv != NULL && argv[0] != NULL)
-    config_param_validate(CFG_PEM_FILE, argv[0], cfg, NULL, 0);
-  else if ((cfg->PMODE == SSL_SERVER) && (cfg->CERT_FILE == NULL || strlen(cfg->CERT_FILE) < 1))
+  for (i = 0; i < argc; i++) {
+    config_param_validate(CFG_PEM_FILE, argv[i], cfg, NULL, 0);
+  }
+  if (cfg->PMODE == SSL_SERVER && cfg->CERT_FILES == NULL) {
     config_die("No x509 certificate PEM file specified!");
+  }
 
   // was this only a test?
   if (test_only) {
-    fprintf(stderr, "Trying to initialize SSL context with certificate '%s'\n", cfg->CERT_FILE);
-    if (! init_openssl())
+    fprintf(stderr, "Trying to initialize SSL contexts with your certificates");
+    if (!init_openssl()) {
       config_die("Error initializing OpenSSL.");
+    }
     printf("%s configuration looks ok.\n", basename(prog));
     exit(0);
   }

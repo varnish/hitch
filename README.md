@@ -83,7 +83,11 @@ Usage
 -----
 
 The only required argument is a path to a PEM file that contains the certificate
-(or a chain of certificates) and private key.
+(or a chain of certificates) and private key. If multiple certificates are
+given, `stud` will attempt to perform SNI (Server Name Indication) on new
+connections, by comparing the indicated name with the names on each of the
+certificates, in order. The first certificate that matches will be used. If none
+of the certificates matches, the last certificate will be used as the default.
 
 Detail about the entire set of options can be found by invoking `stud -h`:
 
