@@ -176,7 +176,7 @@ typedef struct proxystate {
 #define LOG(...)                                            \
     do {                                                    \
       if (!CONFIG->QUIET) fprintf(stdout, __VA_ARGS__);     \
-      if (CONFIG->SYSLOG) syslog(LOG_INFO, __VA_ARGS__);    \
+      if (!CONFIG->QUIET && CONFIG->SYSLOG) syslog(LOG_INFO, __VA_ARGS__);                    \
     } while(0)
 
 #define ERR(...)                                            \
@@ -200,20 +200,20 @@ static void settcpkeepalive(int fd) {
     socklen_t optlen = sizeof(optval);
 
     if(setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen) < 0) {
-        ERR("Error activating SO_KEEPALIVE on client socket: %s", strerror(errno));
+        ERR("Error activating SO_KEEPALIVE on client socket: %s\n", strerror(errno));
     }
 
     optval = CONFIG->TCP_KEEPALIVE_TIME;
     optlen = sizeof(optval);
 #ifdef TCP_KEEPIDLE
     if(setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, &optval, optlen) < 0) {
-        ERR("Error setting TCP_KEEPIDLE on client socket: %s", strerror(errno));
+        ERR("Error setting TCP_KEEPIDLE on client socket: %s\n", strerror(errno));
     }
 #endif
 }
 
 static void fail(const char* s) {
-    perror(s);
+    ERR("%s: %s\n", s, strerror(errno));
     exit(1);
 }
 
@@ -859,7 +859,7 @@ static int create_back_socket() {
     int flag = 1;
     int ret = setsockopt(s, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag));
     if (ret == -1) {
-      perror("Couldn't setsockopt to backend (TCP_NODELAY)\n");
+      ERR("Couldn't setsockopt to backend (TCP_NODELAY): %s\n", strerror(errno));
     }
     setnonblocking(s);
 
@@ -915,7 +915,7 @@ static void handle_socket_errno(proxystate *ps, int backend) {
     else if (errno == EPIPE)
         ERR("{%s} Broken pipe to backend (EPIPE)\n", backend ? "backend" : "client");
     else
-        perror("{backend} [errno]");
+        ERR("{%s} Socket error: %s\n", backend ? "backend" : "client", strerror(errno));
     shutdown_proxy(ps, SHUTDOWN_CLEAR);
 }
 /* Start connect to backend */
@@ -926,7 +926,7 @@ static void start_connect(proxystate *ps) {
         ev_io_start(loop, &ps->ev_w_connect);
         return ;
     }
-    perror("{backend-connect}");
+    ERR("{backend-connect}: %s\n", strerror(errno));
     shutdown_proxy(ps, SHUTDOWN_HARD);
 }
 
@@ -1031,7 +1031,7 @@ static void handle_connect(struct ev_loop *loop, ev_io *w, int revents) {
         /* do nothing, we'll get phoned home again... */
     }
     else {
-        perror("{backend-connect}");
+        ERR("{backend-connect}: %s\n", strerror(errno));
         shutdown_proxy(ps, SHUTDOWN_HARD);
     }
 }
@@ -1206,12 +1206,12 @@ static void client_handshake(struct ev_loop *loop, ev_io *w, int revents) {
 /* Handle a socket error condition passed to us from OpenSSL */
 static void handle_fatal_ssl_error(proxystate *ps, int err, int backend) {
     if (err == SSL_ERROR_ZERO_RETURN)
-        ERR("{%s} Connection closed (in data)\n", backend ? "backend" : "client");
+        LOG("{%s} Connection closed (in data)\n", backend ? "backend" : "client");
     else if (err == SSL_ERROR_SYSCALL)
         if (errno == 0)
-            ERR("{%s} Connection closed (in data)\n", backend ? "backend" : "client");
+            LOG("{%s} Connection closed (in data)\n", backend ? "backend" : "client");
         else
-            perror(backend ? "{backend} [errno] " : "{client} [errno] ");
+            ERR("{%s} SSL socket error: %s\n", backend ? "backend" : "client", strerror(errno));
     else
         ERR("{%s} Unexpected SSL_read error: %d\n", backend ? "backend" : "client" , err);
     shutdown_proxy(ps, SHUTDOWN_SSL);
@@ -1321,13 +1321,13 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     int flag = 1;
     int ret = setsockopt(client, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag) );
     if (ret == -1) {
-      perror("Couldn't setsockopt on client (TCP_NODELAY)\n");
+      ERR("Couldn't setsockopt on client (TCP_NODELAY): %s\n", strerror(errno));
     }
 #ifdef TCP_CWND
     int cwnd = 10;
     ret = setsockopt(client, IPPROTO_TCP, TCP_CWND, &cwnd, sizeof(cwnd));
     if (ret == -1) {
-      perror("Couldn't setsockopt on client (TCP_CWND)\n");
+      ERR("Couldn't setsockopt on client (TCP_CWND): %s\n", strerror(errno));
     }
 #endif
 
@@ -1338,7 +1338,7 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
 
     if (back == -1) {
         close(client);
-        perror("{backend-socket}");
+        ERR("{backend-socket}: %s\n", strerror(errno));
         return;
     }
 
@@ -1438,13 +1438,13 @@ static void handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents) {
     int flag = 1;
     int ret = setsockopt(client, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag) );
     if (ret == -1) {
-      perror("Couldn't setsockopt on client (TCP_NODELAY)\n");
+      ERR("Couldn't setsockopt on client (TCP_NODELAY): %s\n", strerror(errno));
     }
 #ifdef TCP_CWND
     int cwnd = 10;
     ret = setsockopt(client, IPPROTO_TCP, TCP_CWND, &cwnd, sizeof(cwnd));
     if (ret == -1) {
-      perror("Couldn't setsockopt on client (TCP_CWND)\n");
+      ERR("Couldn't setsockopt on client (TCP_CWND): %s\n", strerror(errno));
     }
 #endif
 
@@ -1455,7 +1455,7 @@ static void handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents) {
 
     if (back == -1) {
         close(client);
-        perror("{backend-socket}");
+        ERR("{backend-socket}: %s\n", strerror(errno));
         return;
     }
 
