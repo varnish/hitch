@@ -909,7 +909,7 @@ static void handle_socket_errno(proxystate *ps, int backend) {
         return;
 
     if (errno == ECONNRESET)
-        ERR("{%s} Connection reset by peer\n", backend ? "backend" : "client");
+        LOG("{%s} Connection reset by peer\n", backend ? "backend" : "client");
     else if (errno == ETIMEDOUT)
         ERR("{%s} Connection to backend timed out\n", backend ? "backend" : "client");
     else if (errno == EPIPE)
@@ -1213,7 +1213,7 @@ static void handle_fatal_ssl_error(proxystate *ps, int err, int backend) {
         else
             ERR("{%s} SSL socket error: %s\n", backend ? "backend" : "client", strerror(errno));
     else
-        ERR("{%s} Unexpected SSL_read error: %d\n", backend ? "backend" : "client" , err);
+        LOG("{%s} Unexpected SSL_read error: %d\n", backend ? "backend" : "client" , err);
     shutdown_proxy(ps, SHUTDOWN_SSL);
 }
 
