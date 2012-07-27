@@ -185,14 +185,23 @@ typedef struct proxystate {
       if (CONFIG->SYSLOG) syslog(LOG_ERR, __VA_ARGS__);     \
     } while(0)
 
+#define SOCKERR(msg) \
+    if (errno == ECONNRESET) \
+	LOG(msg ":%s\n", strerror(errno)); \
+    else \
+	ERR(msg ":%s\n", strerror(errno))
+
 #define NULL_DEV "/dev/null"
 
-/* Set a file descriptor (socket) to non-blocking mode */
+/* set a file descriptor (socket) to non-blocking mode */
 static void setnonblocking(int fd) {
     int flag = 1;
 
-    assert(ioctl(fd, FIONBIO, &flag) == 0);
+    if (ioctl(fd, FIONBIO, &flag) < 0) {
+	SOCKERR("Error setting FIONBIO");
+    }
 }
+
 
 /* set a tcp socket to use TCP Keepalive */
 static void settcpkeepalive(int fd) {
@@ -200,14 +209,14 @@ static void settcpkeepalive(int fd) {
     socklen_t optlen = sizeof(optval);
 
     if(setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen) < 0) {
-        ERR("Error activating SO_KEEPALIVE on client socket: %s\n", strerror(errno));
+        SOCKERR("Error activating SO_KEEPALIVE on client socket");
     }
 
     optval = CONFIG->TCP_KEEPALIVE_TIME;
     optlen = sizeof(optval);
 #ifdef TCP_KEEPIDLE
     if(setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, &optval, optlen) < 0) {
-        ERR("Error setting TCP_KEEPIDLE on client socket: %s\n", strerror(errno));
+        SOCKERR("Error setting TCP_KEEPIDLE on client socket");
     }
 #endif
 }
@@ -908,14 +917,11 @@ static void handle_socket_errno(proxystate *ps, int backend) {
     if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
         return;
 
-    if (errno == ECONNRESET)
-        LOG("{%s} Connection reset by peer\n", backend ? "backend" : "client");
-    else if (errno == ETIMEDOUT)
-        ERR("{%s} Connection to backend timed out\n", backend ? "backend" : "client");
-    else if (errno == EPIPE)
-        ERR("{%s} Broken pipe to backend (EPIPE)\n", backend ? "backend" : "client");
-    else
-        ERR("{%s} Socket error: %s\n", backend ? "backend" : "client", strerror(errno));
+    if (backend) {
+	ERR("{backend} Socket error: %s\n", strerror(errno));
+    } else {
+        LOG("{client} Socket error: %s\n", strerror(errno));
+    }
     shutdown_proxy(ps, SHUTDOWN_CLEAR);
 }
 /* Start connect to backend */
@@ -1203,17 +1209,28 @@ static void client_handshake(struct ev_loop *loop, ev_io *w, int revents) {
     }
 }
 
-/* Handle a socket error condition passed to us from OpenSSL */
+#define SSLERR(which,log) \
+switch (err) { \
+case SSL_ERROR_ZERO_RETURN: \
+    log("{" which "} Connection closed (in data)\n"); \
+    break; \
+case SSL_ERROR_SYSCALL: \
+    if (errno == 0) \
+	log("{" which "} Connection closed (in data)\n"); \
+    else \
+	log("{" which "} SSL socket error: %s\n", strerror(errno)); \
+    break; \
+default: \
+    log("{" which "} Unexpected SSL_read error: %d\n", err); \
+}
+
+    /* Handle a socket error condition passed to us from OpenSSL */
 static void handle_fatal_ssl_error(proxystate *ps, int err, int backend) {
-    if (err == SSL_ERROR_ZERO_RETURN)
-        LOG("{%s} Connection closed (in data)\n", backend ? "backend" : "client");
-    else if (err == SSL_ERROR_SYSCALL)
-        if (errno == 0)
-            LOG("{%s} Connection closed (in data)\n", backend ? "backend" : "client");
-        else
-            ERR("{%s} SSL socket error: %s\n", backend ? "backend" : "client", strerror(errno));
-    else
-        LOG("{%s} Unexpected SSL_read error: %d\n", backend ? "backend" : "client" , err);
+    if (backend) {
+	SSLERR("backend", ERR);
+    } else {
+	SSLERR("client", LOG);
+    }
     shutdown_proxy(ps, SHUTDOWN_SSL);
 }
 
@@ -1312,7 +1329,10 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
             break;
 
         default:
-            assert(errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN);
+            if (errno != EINTR && errno != EWOULDBLOCK && errno != EAGAIN) {
+        	SOCKERR("{client} accept() failed");
+        	exit(1);
+            }
             break;
         }
         return;
@@ -1321,13 +1341,13 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     int flag = 1;
     int ret = setsockopt(client, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag) );
     if (ret == -1) {
-      ERR("Couldn't setsockopt on client (TCP_NODELAY): %s\n", strerror(errno));
+      SOCKERR("Couldn't setsockopt on client (TCP_NODELAY)");
     }
 #ifdef TCP_CWND
     int cwnd = 10;
     ret = setsockopt(client, IPPROTO_TCP, TCP_CWND, &cwnd, sizeof(cwnd));
     if (ret == -1) {
-      ERR("Couldn't setsockopt on client (TCP_CWND): %s\n", strerror(errno));
+      SOCKERR("Couldn't setsockopt on client (TCP_CWND)");
     }
 #endif
 
@@ -1429,7 +1449,10 @@ static void handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents) {
             break;
 
         default:
-            assert(errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN);
+            if (errno != EINTR && errno != EWOULDBLOCK && errno != EAGAIN) {
+        	SOCKERR("{client} accept() failed");
+        	exit(1);
+            }
             break;
         }
         return;
