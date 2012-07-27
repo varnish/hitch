@@ -187,9 +187,9 @@ typedef struct proxystate {
 
 #define SOCKERR(msg) \
     if (errno == ECONNRESET) \
-	LOG(msg ":%s\n", strerror(errno)); \
+	LOG(msg ": %s\n", strerror(errno)); \
     else \
-	ERR(msg ":%s\n", strerror(errno))
+	ERR(msg ": %s\n", strerror(errno))
 
 #define NULL_DEV "/dev/null"
 
@@ -1329,11 +1329,9 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
             break;
 
         default:
-            if (errno != EINTR && errno != EWOULDBLOCK && errno != EAGAIN) {
+            if (errno != EINTR && errno != EWOULDBLOCK && errno != EAGAIN && errno != ENOTTY && errno != ECONNABORTED) {
         	SOCKERR("{client} accept() failed");
-        	exit(1);
             }
-            break;
         }
         return;
     }
