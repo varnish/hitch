@@ -47,6 +47,8 @@
 #define CFG_WRITE_PROXY "write-proxy"
 #define CFG_PEM_FILE "pem-file"
 #define CFG_PROXY_PROXY "proxy-proxy"
+#define CFG_BACKEND_CONNECT_TIMEOUT "backend-connect-timeout"
+#define CFG_SSL_HANDSHAKE_TIMEOUT "ssl-handshake-timeout"
 
 #ifdef USE_SHARED_CACHE
   #define CFG_SHARED_CACHE "shared-cache"
@@ -147,6 +149,9 @@ stud_config * config_new (void) {
   r->TCP_KEEPALIVE_TIME = 3600;
   r->DAEMONIZE          = 0;
   r->PREFER_SERVER_CIPHERS = 0;
+
+  r->BACKEND_CONNECT_TIMEOUT = 30;
+  r->SSL_HANDSHAKE_TIMEOUT = 30;
 
   return r;
 }
@@ -703,6 +708,12 @@ void config_param_validate (char *k, char *v, stud_config *cfg, char *file, int 
         cfg->CERT_FILES = cert;
       }
     }
+  }
+  else if (strcmp(k, CFG_BACKEND_CONNECT_TIMEOUT) == 0) {
+      r = config_param_val_int_pos(v, &cfg->BACKEND_CONNECT_TIMEOUT);
+  }
+  else if (strcmp(k, CFG_SSL_HANDSHAKE_TIMEOUT) == 0) {
+      r = config_param_val_int_pos(v, &cfg->SSL_HANDSHAKE_TIMEOUT);
   }
   else {
     fprintf(

@@ -152,12 +152,13 @@ typedef struct proxystate {
 
     ev_io ev_r_handshake;               /* Secure stream handshake write event */
     ev_io ev_w_handshake;               /* Secure stream handshake read event */
+    ev_timer ev_t_handshake; /* handshake timer */
 
     ev_io ev_w_connect;                 /* Backend connect event */
+    ev_timer ev_t_connect; /* backend connect timer */
 
     ev_io ev_r_clear;                   /* Clear stream write event */
     ev_io ev_w_clear;                   /* Clear stream read event */
-
     ev_io ev_proxy;                     /* proxy read event */
 
     int fd_up;                          /* Upstream (client) socket */
@@ -171,6 +172,7 @@ typedef struct proxystate {
     SSL *ssl;                           /* OpenSSL SSL state */
 
     struct sockaddr_storage remote_ip;  /* Remote ip returned from `accept` */
+    int connect_port;	/* local port for connection */
 } proxystate;
 
 #define LOG(...)                                            \
@@ -190,6 +192,32 @@ typedef struct proxystate {
 	LOG(msg ": %s\n", strerror(errno)); \
     else \
 	ERR(msg ": %s\n", strerror(errno))
+
+static void
+logproxy (const proxystate* ps, const char* fmt, ...)
+{
+    char buf[1024];
+    char abuf[INET_ADDRSTRLEN+1];
+    va_list ap;
+
+    va_start(ap, fmt);
+    snprintf(buf, sizeof(buf), "[%d] %p %s:%d :%d %d:%d %s",
+	     getpid(), ps,
+	     inet_ntop(AF_INET, &((struct sockaddr_in*)&ps->remote_ip)->sin_addr, abuf, sizeof(abuf)),
+	     ntohs(((struct sockaddr_in*)&ps->remote_ip)->sin_port),
+	     ps->connect_port,
+	     ps->fd_up, ps->fd_down,
+	     fmt);
+    vfprintf(stdout, buf, ap);
+    va_end(ap);
+}
+
+#define LOGPROXY(...) \
+    if (!CONFIG->QUIET)	logproxy( __VA_ARGS__ )
+
+#define ERRPROXY(...) \
+    logproxy( __VA_ARGS__ )
+
 
 #define NULL_DEV "/dev/null"
 
@@ -885,12 +913,15 @@ static void safe_enable_io(proxystate *ps, ev_io *w) {
 /* Only enable a libev ev_io event if the proxied connection still
  * has both up and down connected */
 static void shutdown_proxy(proxystate *ps, SHUTDOWN_REQUESTOR req) {
+    LOGPROXY(ps, "proxy shutdown req=%d\n", req);
     if (ps->want_shutdown || req == SHUTDOWN_HARD) {
         ev_io_stop(loop, &ps->ev_w_ssl);
         ev_io_stop(loop, &ps->ev_r_ssl);
         ev_io_stop(loop, &ps->ev_w_handshake);
         ev_io_stop(loop, &ps->ev_r_handshake);
+        ev_timer_stop(loop, &ps->ev_t_handshake);
         ev_io_stop(loop, &ps->ev_w_connect);
+        ev_timer_stop(loop, &ps->ev_t_connect);
         ev_io_stop(loop, &ps->ev_w_clear);
         ev_io_stop(loop, &ps->ev_r_clear);
         ev_io_stop(loop, &ps->ev_proxy);
@@ -930,6 +961,7 @@ static void start_connect(proxystate *ps) {
     t = connect(ps->fd_down, backaddr->ai_addr, backaddr->ai_addrlen);
     if (t == 0 || errno == EINPROGRESS || errno == EINTR) {
         ev_io_start(loop, &ps->ev_w_connect);
+        ev_timer_start(loop, &ps->ev_t_connect);
         return ;
     }
     ERR("{backend-connect}: %s\n", strerror(errno));
@@ -959,7 +991,7 @@ static void clear_read(struct ev_loop *loop, ev_io *w, int revents) {
             safe_enable_io(ps, &ps->ev_w_ssl);
     }
     else if (t == 0) {
-        LOG("{%s} Connection closed\n", fd == ps->fd_down ? "backend" : "client");
+        LOGPROXY(ps,"Connection closed by %s\n", fd == ps->fd_down ? "backend" : "client");
         shutdown_proxy(ps, SHUTDOWN_CLEAR);
     }
     else {
@@ -1015,8 +1047,17 @@ static void handle_connect(struct ev_loop *loop, ev_io *w, int revents) {
     t = connect(ps->fd_down, backaddr->ai_addr, backaddr->ai_addrlen);
     if (!t || errno == EISCONN || !errno) {
         ev_io_stop(loop, &ps->ev_w_connect);
+        ev_timer_stop(loop, &ps->ev_t_connect);
 
         if (!ps->clear_connected) {
+            struct sockaddr_storage addr;
+            socklen_t sl;
+
+            sl = sizeof(addr);
+            getsockname(ps->fd_down, (struct sockaddr*)&addr, &sl);
+            ps->connect_port = ntohs(((struct sockaddr_in*)&addr)->sin_port);
+            LOGPROXY(ps, "backend connected\n");
+
             ps->clear_connected = 1;
 
             /* if incoming buffer is not full */
@@ -1042,6 +1083,15 @@ static void handle_connect(struct ev_loop *loop, ev_io *w, int revents) {
     }
 }
 
+static void connect_timeout(EV_P_ ev_timer *w, int revents)
+{
+    (void) loop;
+    (void) revents;
+    proxystate *ps = (proxystate *)w->data;
+    ERRPROXY(ps,"backend connect timeout\n");
+    //shutdown_proxy(ps, SHUTDOWN_HARD);
+}
+
 /* Upon receiving a signal from OpenSSL that a handshake is required, re-wire
  * the read/write events to hook up to the handshake handlers */
 static void start_handshake(proxystate *ps, int err) {
@@ -1050,10 +1100,12 @@ static void start_handshake(proxystate *ps, int err) {
 
     ps->handshaked = 0;
 
+    LOGPROXY(ps,"ssl handshake start\n");
     if (err == SSL_ERROR_WANT_READ)
         ev_io_start(loop, &ps->ev_r_handshake);
     else if (err == SSL_ERROR_WANT_WRITE)
         ev_io_start(loop, &ps->ev_w_handshake);
+    ev_timer_start(loop, &ps->ev_t_handshake);
 }
 
 /* After OpenSSL is done with a handshake, re-wire standard read/write handlers
@@ -1063,7 +1115,9 @@ static void end_handshake(proxystate *ps) {
     size_t written = 0;
     ev_io_stop(loop, &ps->ev_r_handshake);
     ev_io_stop(loop, &ps->ev_w_handshake);
+    ev_timer_stop(loop, &ps->ev_t_handshake);
 
+    LOGPROXY(ps,"ssl end handshake\n");
     /* Disable renegotiation (CVE-2009-3555) */
     if (ps->ssl->s3) {
         ps->ssl->s3->flags |= SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS;
@@ -1184,12 +1238,14 @@ static void client_handshake(struct ev_loop *loop, ev_io *w, int revents) {
     int t;
     proxystate *ps = (proxystate *)w->data;
 
+    LOGPROXY(ps,"ssl client handshake revents=%x\n",revents);
     t = SSL_do_handshake(ps->ssl);
     if (t == 1) {
         end_handshake(ps);
     }
     else {
         int err = SSL_get_error(ps->ssl, t);
+        LOGPROXY(ps,"ssl client handshake err=%d\n",err);
         if (err == SSL_ERROR_WANT_READ) {
             ev_io_stop(loop, &ps->ev_w_handshake);
             ev_io_start(loop, &ps->ev_r_handshake);
@@ -1209,27 +1265,37 @@ static void client_handshake(struct ev_loop *loop, ev_io *w, int revents) {
     }
 }
 
-#define SSLERR(which,log) \
+static void handshake_timeout(EV_P_ ev_timer *w, int revents)
+{
+    (void) loop;
+    (void) revents;
+    proxystate *ps = (proxystate *)w->data;
+    LOGPROXY(ps,"SSL handshake timeout\n");
+    shutdown_proxy(ps, SHUTDOWN_HARD);
+}
+
+#define SSLERR(ps,which,log) \
 switch (err) { \
 case SSL_ERROR_ZERO_RETURN: \
-    log("{" which "} Connection closed (in data)\n"); \
+log(ps,"Connection closed by " which "\n"); \
     break; \
 case SSL_ERROR_SYSCALL: \
-    if (errno == 0) \
-	log("{" which "} Connection closed (in data)\n"); \
-    else \
-	log("{" which "} SSL socket error: %s\n", strerror(errno)); \
+    if (errno == 0) {\
+        log(ps,"Connection closed by " which "\n"); \
+    } else {\
+	log(ps,"SSL socket error (" which "): %s\n",strerror(errno)); \
+    }\
     break; \
 default: \
-    log("{" which "} Unexpected SSL_read error: %d\n", err); \
+    log(ps,"{" which "} Unexpected SSL_read error (" which "): %d\n",err); \
 }
 
     /* Handle a socket error condition passed to us from OpenSSL */
 static void handle_fatal_ssl_error(proxystate *ps, int err, int backend) {
     if (backend) {
-	SSLERR("backend", ERR);
+	SSLERR(ps, "backend", ERRPROXY);
     } else {
-	SSLERR("client", LOG);
+	SSLERR(ps, "client", LOGPROXY);
     }
     shutdown_proxy(ps, SHUTDOWN_SSL);
 }
@@ -1380,6 +1446,7 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     ps->handshaked = 0;
     ps->renegotiation = 0;
     ps->remote_ip = addr;
+    ps->connect_port = 0;
     ringbuffer_init(&ps->ring_clear2ssl);
     ringbuffer_init(&ps->ring_ssl2clear);
 
@@ -1389,10 +1456,12 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
 
     ev_io_init(&ps->ev_r_handshake, client_handshake, client, EV_READ);
     ev_io_init(&ps->ev_w_handshake, client_handshake, client, EV_WRITE);
+    ev_timer_init(&ps->ev_t_handshake, handshake_timeout, CONFIG->SSL_HANDSHAKE_TIMEOUT, 0.);
 
     ev_io_init(&ps->ev_proxy, client_proxy_proxy, client, EV_READ);
 
     ev_io_init(&ps->ev_w_connect, handle_connect, back, EV_WRITE);
+    ev_timer_init(&ps->ev_t_connect, connect_timeout, CONFIG->BACKEND_CONNECT_TIMEOUT, 0.);
 
     ev_io_init(&ps->ev_w_clear, clear_write, back, EV_WRITE);
     ev_io_init(&ps->ev_r_clear, clear_read, back, EV_READ);
@@ -1403,12 +1472,15 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     ps->ev_w_clear.data = ps;
     ps->ev_proxy.data = ps;
     ps->ev_w_connect.data = ps;
+    ps->ev_t_connect.data = ps;
     ps->ev_r_handshake.data = ps;
     ps->ev_w_handshake.data = ps;
+    ps->ev_t_handshake.data = ps;
 
     /* Link back proxystate to SSL state */
     SSL_set_app_data(ssl, ps);
 
+    LOGPROXY(ps, "proxy connect\n");
     if (CONFIG->PROXY_PROXY_LINE) {
         ev_io_start(loop, &ps->ev_proxy);
     }
@@ -1510,10 +1582,11 @@ static void handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents) {
     ev_io_init(&ps->ev_w_clear, clear_write, client, EV_WRITE);
 
     ev_io_init(&ps->ev_w_connect, handle_connect, back, EV_WRITE);
+    ev_timer_init(&ps->ev_t_connect, connect_timeout, CONFIG->BACKEND_CONNECT_TIMEOUT, 0.);
 
     ev_io_init(&ps->ev_r_handshake, client_handshake, back, EV_READ);
     ev_io_init(&ps->ev_w_handshake, client_handshake, back, EV_WRITE);
-
+    ev_timer_init(&ps->ev_t_handshake, handshake_timeout, CONFIG->SSL_HANDSHAKE_TIMEOUT, 0.);
 
     ev_io_init(&ps->ev_w_ssl, ssl_write, back, EV_WRITE);
     ev_io_init(&ps->ev_r_ssl, ssl_read, back, EV_READ);
@@ -1525,6 +1598,7 @@ static void handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents) {
     ps->ev_w_connect.data = ps;
     ps->ev_r_handshake.data = ps;
     ps->ev_w_handshake.data = ps;
+    ps->ev_t_handshake.data = ps;
 
     /* Link back proxystate to SSL state */
     SSL_set_app_data(ssl, ps);

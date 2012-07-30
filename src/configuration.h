@@ -69,6 +69,8 @@ struct __stud_config {
     int TCP_KEEPALIVE_TIME;
     int DAEMONIZE;
     int PREFER_SERVER_CIPHERS;
+    int BACKEND_CONNECT_TIMEOUT;
+    int SSL_HANDSHAKE_TIMEOUT;
 };
 
 typedef struct __stud_config stud_config;
