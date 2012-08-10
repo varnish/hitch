@@ -53,10 +53,13 @@
 #include <sched.h>
 #include <signal.h>
 
-#include <openssl/x509.h>
 #include <openssl/ssl.h>
+#include <openssl/x509.h>
+#include <openssl/x509v3.h>
+#include <openssl/x509.h>
 #include <openssl/err.h>
 #include <openssl/engine.h>
+#include <openssl/asn1.h>
 #include <ev.h>
 
 #include "ringbuffer.h"
@@ -80,6 +83,13 @@
 # define SOL_TCP IPPROTO_TCP
 #endif
 
+/* Do we have SNI support? */
+#ifndef OPENSSL_NO_TLSEXT
+#ifndef SSL_CTRL_SET_TLSEXT_HOSTNAME
+#define OPENSSL_NO_TLSEXT
+#endif
+#endif
+
 /* Globals */
 static struct ev_loop *loop;
 static struct addrinfo *backaddr;
@@ -88,7 +98,7 @@ static ev_io listener;
 static int listener_socket;
 static int child_num;
 static pid_t *child_pids;
-static SSL_CTX *ssl_ctx;
+static SSL_CTX *default_ctx;
 static SSL_SESSION *client_session;
 
 #ifdef USE_SHARED_CACHE
@@ -96,12 +106,6 @@ static ev_io shcupd_listener;
 static int shcupd_socket;
 struct addrinfo *shcupd_peers[MAX_SHCUPD_PEERS+1];
 static unsigned char shared_secret[SHA_DIGEST_LENGTH];
-
-//typedef struct shcupd_peer_opt {
-//     const char *ip;
-//     const char *port;
-//} shcupd_peer_opt;
-
 #endif /*USE_SHARED_CACHE*/
 
 long openssl_version;
@@ -118,58 +122,76 @@ typedef enum _SHUTDOWN_REQUESTOR {
     SHUTDOWN_SSL
 } SHUTDOWN_REQUESTOR;
 
+#ifndef OPENSSL_NO_TLSEXT
+/*
+ * SSL context linked list. Someday it might be nice to have a more clever data
+ * structure here, but assuming the number of SNI certs is small it probably
+ * doesn't matter.
+ */
+typedef struct ctx_list {
+    char *servername;
+    SSL_CTX *ctx;
+    struct ctx_list *next;
+} ctx_list;
+
+static ctx_list *sni_ctxs;
+
+#endif /* OPENSSL_NO_TLSEXT */
+
 /*
  * Proxied State
  *
  * All state associated with one proxied connection
  */
 typedef struct proxystate {
-    ringbuffer ring_ssl2clear; /* pushing bytes from secure to clear stream */
-    ringbuffer ring_clear2ssl; /* pushing bytes from clear to secure stream */
+    ringbuffer ring_ssl2clear;          /* Pushing bytes from secure to clear stream */
+    ringbuffer ring_clear2ssl;          /* Pushing bytes from clear to secure stream */
 
-    ev_io ev_r_ssl;        /* secure stream write event */
-    ev_io ev_w_ssl;        /* secure stream read event */
+    ev_io ev_r_ssl;                     /* Secure stream write event */
+    ev_io ev_w_ssl;                     /* Secure stream read event */
 
-    ev_io ev_r_handshake; /* secure stream handshake write event */
-    ev_io ev_w_handshake; /* secure stream handshake read event */
+    ev_io ev_r_handshake;               /* Secure stream handshake write event */
+    ev_io ev_w_handshake;               /* Secure stream handshake read event */
 
-    ev_io ev_w_connect;    /* backend connect event */
+    ev_io ev_w_connect;                 /* Backend connect event */
 
-    ev_io ev_r_clear;      /* clear stream write event */
-    ev_io ev_w_clear;      /* clear stream read event */
+    ev_io ev_r_clear;                   /* Clear stream write event */
+    ev_io ev_w_clear;                   /* Clear stream read event */
 
-    int fd_up;            /* Upstream (client) socket */
-    int fd_down;          /* Downstream (backend) socket */
+    ev_io ev_proxy;                     /* proxy read event */
 
-    int want_shutdown:1;  /* Connection is half-shutdown */
-    int handshaked:1;     /* Initial handshake happened */
-    int clear_connected:1; /* clear stream is connected  */
-    int renegotiation:1;  /* Renegotation is occuring */
+    int fd_up;                          /* Upstream (client) socket */
+    int fd_down;                        /* Downstream (backend) socket */
 
-    SSL *ssl;             /* OpenSSL SSL state */
+    int want_shutdown:1;                /* Connection is half-shutdown */
+    int handshaked:1;                   /* Initial handshake happened */
+    int clear_connected:1;              /* Clear stream is connected  */
+    int renegotiation:1;                /* Renegotation is occuring */
+
+    SSL *ssl;                           /* OpenSSL SSL state */
 
     struct sockaddr_storage remote_ip;  /* Remote ip returned from `accept` */
 } proxystate;
 
-#define LOG(...)                                        \
-    do {                                                \
-      if (!CONFIG->QUIET) fprintf(stdout, __VA_ARGS__); \
-      if (CONFIG->SYSLOG) syslog(LOG_INFO, __VA_ARGS__);                    \
+#define LOG(...)                                            \
+    do {                                                    \
+      if (!CONFIG->QUIET) fprintf(stdout, __VA_ARGS__);     \
+      if (CONFIG->SYSLOG) syslog(LOG_INFO, __VA_ARGS__);    \
     } while(0)
 
-#define ERR(...)                    \
-    do {                            \
-      fprintf(stderr, __VA_ARGS__); \
-      if (CONFIG->SYSLOG) syslog(LOG_ERR, __VA_ARGS__); \
+#define ERR(...)                                            \
+    do {                                                    \
+      fprintf(stderr, __VA_ARGS__);                         \
+      if (CONFIG->SYSLOG) syslog(LOG_ERR, __VA_ARGS__);     \
     } while(0)
 
 #define NULL_DEV "/dev/null"
 
-/* set a file descriptor (socket) to non-blocking mode */
+/* Set a file descriptor (socket) to non-blocking mode */
 static void setnonblocking(int fd) {
     int flag = 1;
 
-    assert (ioctl(fd, FIONBIO, &flag) == 0);
+    assert(ioctl(fd, FIONBIO, &flag) == 0);
 }
 
 /* set a tcp socket to use TCP Keepalive */
@@ -196,12 +218,12 @@ static void fail(const char* s) {
 }
 
 void die (char *fmt, ...) {
-  va_list args;
-  va_start(args, fmt);
-  vfprintf(stderr, fmt, args);
-  va_end(args);
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+    va_end(args);
 
-  exit(1);
+    exit(1);
 }
 
 #ifndef OPENSSL_NO_DH
@@ -213,8 +235,8 @@ static int init_dh(SSL_CTX *ctx, const char *cert) {
 
     bio = BIO_new_file(cert, "r");
     if (!bio) {
-      ERR_print_errors_fp(stderr);
-      return -1;
+        ERR_print_errors_fp(stderr);
+        return -1;
     }
 
     dh = PEM_read_bio_DHparams(bio, NULL, NULL, NULL);
@@ -233,7 +255,7 @@ static int init_dh(SSL_CTX *ctx, const char *cert) {
 #ifdef NID_X9_62_prime256v1
     EC_KEY *ecdh = NULL;
     ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
-    SSL_CTX_set_tmp_ecdh(ctx,ecdh);
+    SSL_CTX_set_tmp_ecdh(ctx, ecdh);
     EC_KEY_free(ecdh);
     LOG("{core} ECDH Initialized with NIST P-256\n");
 #endif /* NID_X9_62_prime256v1 */
@@ -272,7 +294,7 @@ static void handle_shcupd(struct ev_loop *loop, ev_io *w, int revents) {
     while ( ( r = recv(w->fd, msg, sizeof(msg), 0) ) > 0 ) {
 
         /* msg len must be greater than 1 Byte of data + sig length */
-        if (r < (int)(1+sizeof(shared_secret)))  
+        if (r < (int)(1+sizeof(shared_secret)))
            continue;
 
         /* compute sig */
@@ -287,13 +309,13 @@ static void handle_shcupd(struct ev_loop *loop, ev_io *w, int revents) {
            continue;
 
         /* msg len must be greater than 1 Byte of data + encdate length */
-        if (r < (int)(1+sizeof(uint32_t)))  
+        if (r < (int)(1+sizeof(uint32_t)))
            continue;
 
-        /* drop too unsync updates */ 
+        /* drop too unsync updates */
         r -= sizeof(uint32_t);
         encdate = *((uint32_t *)&msg[r]);
-        if (!(abs((int)(int32_t)now-ntohl(encdate)) < SSL_CTX_get_timeout(ssl_ctx)))
+        if (!(abs((int)(int32_t)now-ntohl(encdate)) < SSL_CTX_get_timeout(default_ctx)))
            continue;
 
         shctx_sess_add(msg, r, now);
@@ -370,7 +392,7 @@ static int create_shcupd_socket() {
     }
 
     int s = socket(ai->ai_family, SOCK_DGRAM, IPPROTO_UDP);
-    
+
     if (s == -1)
       fail("{socket: shared cache updates}");
 
@@ -415,7 +437,7 @@ static int create_shcupd_socket() {
 
         if (setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreqn, sizeof(mreqn)) < 0) {
             if (errno != EINVAL) { /* EINVAL if it is not a multicast address,
-						not an error we consider unicast */
+                                                not an error we consider unicast */
                 fail("{setsockopt: IP_ADD_MEMBERSIP}");
             }
         }
@@ -475,7 +497,7 @@ static int create_shcupd_socket() {
 
         if (setsockopt(s, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
             if (errno != EINVAL) { /* EINVAL if it is not a multicast address,
-						not an error we consider unicast */
+                                                not an error we consider unicast */
                 fail("{setsockopt: IPV6_ADD_MEMBERSIP}");
             }
         }
@@ -485,7 +507,7 @@ static int create_shcupd_socket() {
             if(setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &loop, sizeof(loop)) < 0) {
                fail("{setsockopt: IPV6_MULTICAST_LOOP}");
             }
-        } 
+        }
 
         /* optional set sockopts for sending to multicast msg */
         if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_IF,
@@ -521,92 +543,114 @@ RSA *load_rsa_privatekey(SSL_CTX *ctx, const char *file) {
 
     bio = BIO_new_file(file, "r");
     if (!bio) {
-      ERR_print_errors_fp(stderr);
-      return NULL;
+        ERR_print_errors_fp(stderr);
+        return NULL;
     }
 
     rsa = PEM_read_bio_RSAPrivateKey(bio, NULL,
           ctx->default_passwd_callback, ctx->default_passwd_callback_userdata);
     BIO_free(bio);
- 
+
     return rsa;
 }
 
-/* Init library and load specified certificate.
- * Establishes a SSL_ctx, to act as a template for
- * each connection */
-SSL_CTX * init_openssl() {
-    SSL_library_init();
-    SSL_load_error_strings();
-    SSL_CTX *ctx = NULL;
+#ifndef OPENSSL_NO_TLSEXT
+/*
+ * Switch the context of the current SSL object to the most appropriate one
+ * based on the SNI header
+ */
+int sni_switch_ctx(SSL *ssl, int *al, void *data) {
+    (void)data;
+    (void)al;
+    const char *servername;
+    const ctx_list *cl;
+
+    servername = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
+    if (!servername) return SSL_TLSEXT_ERR_NOACK;
+
+    // For now, just compare servernames as case insensitive strings. Someday,
+    // it might be nice to Do The Right Thing around star certs.
+    for (cl = sni_ctxs; cl != NULL; cl = cl->next) {
+        if (strcasecmp(servername, cl->servername) == 0) {
+            SSL_set_SSL_CTX(ssl, cl->ctx);
+            return SSL_TLSEXT_ERR_NOACK;
+        }
+    }
+
+    return SSL_TLSEXT_ERR_NOACK;
+}
+#endif /* OPENSSL_NO_TLSEXT */
+
+
+/*
+ * Initialize an SSL context
+ */
+
+SSL_CTX *make_ctx(const char *pemfile) {
+    SSL_CTX *ctx;
     RSA *rsa;
 
-    long ssloptions = SSL_OP_NO_SSLv2 | SSL_OP_ALL | 
+    long ssloptions = SSL_OP_NO_SSLv2 | SSL_OP_ALL |
             SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION;
-
-    if (CONFIG->ETYPE == ENC_TLS)
-        ctx = SSL_CTX_new((CONFIG->PMODE == SSL_CLIENT) ? TLSv1_client_method() : TLSv1_server_method());
-    else if (CONFIG->ETYPE == ENC_SSL)
-        ctx = SSL_CTX_new((CONFIG->PMODE == SSL_CLIENT) ? SSLv23_client_method() : SSLv23_server_method());
-    else
-        assert(CONFIG->ETYPE == ENC_TLS || CONFIG->ETYPE == ENC_SSL);
 
 #ifdef SSL_OP_NO_COMPRESSION
     ssloptions |= SSL_OP_NO_COMPRESSION;
 #endif
 
+    if (CONFIG->ETYPE == ENC_TLS) {
+        ctx = SSL_CTX_new((CONFIG->PMODE == SSL_CLIENT) ?
+                TLSv1_client_method() : TLSv1_server_method());
+    } else if (CONFIG->ETYPE == ENC_SSL) {
+        ctx = SSL_CTX_new((CONFIG->PMODE == SSL_CLIENT) ?
+                SSLv23_client_method() : SSLv23_server_method());
+    } else {
+        assert(CONFIG->ETYPE == ENC_TLS || CONFIG->ETYPE == ENC_SSL);
+        return NULL; // Won't happen, but gcc was complaining
+    }
+
     SSL_CTX_set_options(ctx, ssloptions);
     SSL_CTX_set_info_callback(ctx, info_callback);
 
-    if (CONFIG->ENGINE) {
-        ENGINE *e = NULL;
-        ENGINE_load_builtin_engines();
-        if (!strcmp(CONFIG->ENGINE, "auto"))
-            ENGINE_register_all_complete();
-        else {
-            if ((e = ENGINE_by_id(CONFIG->ENGINE)) == NULL ||
-                !ENGINE_init(e) ||
-                !ENGINE_set_default(e, ENGINE_METHOD_ALL)) {
-                ERR_print_errors_fp(stderr);
-                exit(1);
-            }
-            LOG("{core} will use OpenSSL engine %s.\n", ENGINE_get_id(e));
-            ENGINE_finish(e);
-            ENGINE_free(e);
+    if (CONFIG->CIPHER_SUITE) {
+        if (SSL_CTX_set_cipher_list(ctx, CONFIG->CIPHER_SUITE) != 1) {
+            ERR_print_errors_fp(stderr);
         }
     }
 
-    if (CONFIG->CIPHER_SUITE)
-        if (SSL_CTX_set_cipher_list(ctx, CONFIG->CIPHER_SUITE) != 1)
-            ERR_print_errors_fp(stderr);
-
-    if (CONFIG->PREFER_SERVER_CIPHERS)
+    if (CONFIG->PREFER_SERVER_CIPHERS) {
         SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
+    }
 
-
-    if (CONFIG->PMODE == SSL_CLIENT)
+    if (CONFIG->PMODE == SSL_CLIENT) {
         return ctx;
+    }
 
     /* SSL_SERVER Mode stuff */
-    if (SSL_CTX_use_certificate_chain_file(ctx, CONFIG->CERT_FILE) <= 0) {
+    if (SSL_CTX_use_certificate_chain_file(ctx, pemfile) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(1);
     }
 
-    rsa = load_rsa_privatekey(ctx, CONFIG->CERT_FILE);
-    if(!rsa) {
+    rsa = load_rsa_privatekey(ctx, pemfile);
+    if (!rsa) {
        ERR("Error loading rsa private key\n");
        exit(1);
     }
 
-    if (SSL_CTX_use_RSAPrivateKey(ctx,rsa) <= 0) {
+    if (SSL_CTX_use_RSAPrivateKey(ctx, rsa) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(1);
     }
 
 #ifndef OPENSSL_NO_DH
-    init_dh(ctx, CONFIG->CERT_FILE);
+    init_dh(ctx, pemfile);
 #endif /* OPENSSL_NO_DH */
+
+#ifndef OPENSSL_NO_TLSEXT
+    if (!SSL_CTX_set_tlsext_servername_callback(ctx, sni_switch_ctx)) {
+        ERR("Error setting up SNI support\n");
+    }
+#endif /* OPENSSL_NO_TLSEXT */
 
 #ifdef USE_SHARED_CACHE
     if (CONFIG->SHARED_CACHE) {
@@ -614,7 +658,7 @@ SSL_CTX * init_openssl() {
             ERR("Unable to alloc memory for shared cache.\n");
             exit(1);
         }
-	if (CONFIG->SHCUPD_PORT) {
+        if (CONFIG->SHCUPD_PORT) {
             if (compute_secret(rsa, shared_secret) < 0) {
                 ERR("Unable to compute shared secret.\n");
                 exit(1);
@@ -634,6 +678,102 @@ SSL_CTX * init_openssl() {
     return ctx;
 }
 
+/* Init library and load specified certificate.
+ * Establishes a SSL_ctx, to act as a template for
+ * each connection */
+void init_openssl() {
+    SSL_library_init();
+    SSL_load_error_strings();
+
+    assert(CONFIG->CERT_FILES != NULL);
+
+    // The first file (i.e., the last file listed in config) is always the
+    // "default" cert
+    default_ctx = make_ctx(CONFIG->CERT_FILES->CERT_FILE);
+
+#ifndef OPENSSL_NO_TLSEXT
+    {
+    struct cert_files *cf;
+    int i;
+    SSL_CTX *ctx;
+    X509 *x509;
+    BIO *f;
+
+    STACK_OF(GENERAL_NAME) *names = NULL;
+    GENERAL_NAME *name;
+
+#define PUSH_CTX(asn1_str, ctx)                                             \
+    do {                                                                    \
+        struct ctx_list *cl;                                                \
+        cl = calloc(1, sizeof(*cl));                                        \
+        ASN1_STRING_to_UTF8((unsigned char **)&cl->servername, asn1_str);   \
+        cl->ctx = ctx;                                                      \
+        cl->next = sni_ctxs;                                                \
+        sni_ctxs = cl;                                                      \
+    } while (0)
+
+    // Go through the list of PEMs and make some SSL contexts for them. We also
+    // keep track of the names associated with each cert so we can do SNI on
+    // them later
+    for (cf = CONFIG->CERT_FILES->NEXT; cf != NULL; cf = cf->NEXT) {
+        ctx = make_ctx(cf->CERT_FILE);
+        f = BIO_new(BIO_s_file());
+        // TODO: error checking
+        if (!BIO_read_filename(f, cf->CERT_FILE)) {
+            ERR("Could not read cert '%s'\n", cf->CERT_FILE);
+        }
+        x509 = PEM_read_bio_X509_AUX(f, NULL, NULL, NULL);
+        BIO_free(f);
+
+        // First, look for Subject Alternative Names
+        names = X509_get_ext_d2i(x509, NID_subject_alt_name, NULL, NULL);
+        for (i = 0; i < sk_GENERAL_NAME_num(names); i++) {
+            name = sk_GENERAL_NAME_value(names, i);
+            if (name->type == GEN_DNS) {
+                PUSH_CTX(name->d.dNSName, ctx);
+            }
+        }
+        if (sk_GENERAL_NAME_num(names) > 0) {
+            sk_GENERAL_NAME_pop_free(names, GENERAL_NAME_free);
+            // If we actally found some, don't bother looking any further
+            continue;
+        } else if (names != NULL) {
+            sk_GENERAL_NAME_pop_free(names, GENERAL_NAME_free);
+        }
+
+        // Now we're left looking at the CN on the cert
+        X509_NAME *x509_name = X509_get_subject_name(x509);
+        i = X509_NAME_get_index_by_NID(x509_name, NID_commonName, -1);
+        if (i < 0) {
+            ERR("Could not find Subject Alternative Names or a CN on cert %s\n",
+                    cf->CERT_FILE);
+        }
+        X509_NAME_ENTRY *x509_entry = X509_NAME_get_entry(x509_name, i);
+        PUSH_CTX(x509_entry->value, ctx);
+    }
+    }
+#undef APPEND_CTX
+#endif /* OPENSSL_NO_TLSEXT */
+
+    if (CONFIG->ENGINE) {
+        ENGINE *e = NULL;
+        ENGINE_load_builtin_engines();
+        if (!strcmp(CONFIG->ENGINE, "auto"))
+            ENGINE_register_all_complete();
+        else {
+            if ((e = ENGINE_by_id(CONFIG->ENGINE)) == NULL ||
+                !ENGINE_init(e) ||
+                !ENGINE_set_default(e, ENGINE_METHOD_ALL)) {
+                ERR_print_errors_fp(stderr);
+                exit(1);
+            }
+            LOG("{core} will use OpenSSL engine %s.\n", ENGINE_get_id(e));
+            ENGINE_finish(e);
+            ENGINE_free(e);
+        }
+    }
+}
+
 static void prepare_proxy_line(struct sockaddr* ai_addr) {
     tcp_proxy_line[0] = 0;
     char tcp6_address_string[INET6_ADDRSTRLEN];
@@ -651,10 +791,10 @@ static void prepare_proxy_line(struct sockaddr* ai_addr) {
       struct sockaddr_in6* addr = (struct sockaddr_in6*)ai_addr;
       inet_ntop(AF_INET6,&(addr->sin6_addr),tcp6_address_string,INET6_ADDRSTRLEN);
       size_t res = snprintf(tcp_proxy_line,
-			    sizeof(tcp_proxy_line),
-			    "PROXY %%s %%s %s %%hu %hu\r\n",
-			    tcp6_address_string,
-			    ntohs(addr->sin6_port));
+                            sizeof(tcp_proxy_line),
+                            "PROXY %%s %%s %s %%hu %hu\r\n",
+                            tcp6_address_string,
+                            ntohs(addr->sin6_port));
       assert(res < sizeof(tcp_proxy_line));
     }
     else {
@@ -678,7 +818,7 @@ static int create_main_socket() {
     }
 
     int s = socket(ai->ai_family, SOCK_STREAM, IPPROTO_TCP);
-    
+
     if (s == -1)
       fail("{socket: main}");
 
@@ -695,7 +835,7 @@ static int create_main_socket() {
 
 #ifndef NO_DEFER_ACCEPT
 #if TCP_DEFER_ACCEPT
-    int timeout = 1; 
+    int timeout = 1;
     setsockopt(s, IPPROTO_TCP, TCP_DEFER_ACCEPT, &timeout, sizeof(int) );
 #endif /* TCP_DEFER_ACCEPT */
 #endif
@@ -744,6 +884,7 @@ static void shutdown_proxy(proxystate *ps, SHUTDOWN_REQUESTOR req) {
         ev_io_stop(loop, &ps->ev_w_connect);
         ev_io_stop(loop, &ps->ev_w_clear);
         ev_io_stop(loop, &ps->ev_r_clear);
+        ev_io_stop(loop, &ps->ev_proxy);
 
         close(ps->fd_up);
         close(ps->fd_down);
@@ -947,7 +1088,7 @@ static void end_handshake(proxystate *ps) {
                                   "TCP6",
                                   tcp6_address_string,
                                   ntohs(addr->sin6_port));
-            }   
+            }
             ringbuffer_write_append(&ps->ring_ssl2clear, written);
         }
         else if (CONFIG->WRITE_IP_OCTET) {
@@ -966,7 +1107,7 @@ static void end_handshake(proxystate *ps) {
                 ringbuffer_write_append(&ps->ring_ssl2clear, 1U + 4U);
             }
         }
-	/* start connect now */
+        /* start connect now */
         start_connect(ps);
     }
     else {
@@ -986,6 +1127,47 @@ static void end_handshake(proxystate *ps) {
     if (!ringbuffer_is_empty(&ps->ring_clear2ssl))
         // not safe.. we want to resume stream even during half-closed
         ev_io_start(loop, &ps->ev_w_ssl);
+}
+
+static void client_proxy_proxy(struct ev_loop *loop, ev_io *w, int revents) {
+    (void) revents;
+    int t;
+    char *proxy = tcp_proxy_line, *end = tcp_proxy_line + sizeof(tcp_proxy_line);
+    proxystate *ps = (proxystate *)w->data;
+    BIO *b = SSL_get_rbio(ps->ssl);
+
+    // Copy characters one-by-one until we hit a \n or an error
+    while (proxy != end && (t = BIO_read(b, proxy, 1)) == 1) {
+        if (*proxy++ == '\n') break;
+    }
+
+    if (proxy == end) {
+        LOG("{client} Unexpectedly long PROXY line. Perhaps a malformed request?");
+        shutdown_proxy(ps, SHUTDOWN_SSL);
+    }
+    else if (t == 1) {
+        if (ringbuffer_is_full(&ps->ring_ssl2clear)) {
+            LOG("{client} Error writing PROXY line");
+            shutdown_proxy(ps, SHUTDOWN_SSL);
+            return;
+        }
+
+        char *ring = ringbuffer_write_ptr(&ps->ring_ssl2clear);
+        memcpy(ring, tcp_proxy_line, proxy - tcp_proxy_line);
+        ringbuffer_write_append(&ps->ring_ssl2clear, proxy - tcp_proxy_line);
+
+        // Finished reading the PROXY header
+        if (*(proxy - 1) == '\n') {
+            ev_io_stop(loop, &ps->ev_proxy);
+
+            // Start the real handshake
+            start_handshake(ps, SSL_ERROR_WANT_READ);
+        }
+    }
+    else if (!BIO_should_retry(b)) {
+        LOG("{client} Unexpected error reading PROXY line");
+        shutdown_proxy(ps, SHUTDOWN_SSL);
+    }
 }
 
 /* The libev I/O handler during the OpenSSL handshake phase.  Basically, just
@@ -1039,7 +1221,7 @@ static void handle_fatal_ssl_error(proxystate *ps, int err, int backend) {
  * and buffer anything we get for writing to the backend */
 static void ssl_read(struct ev_loop *loop, ev_io *w, int revents) {
     (void) revents;
-    int t;    
+    int t;
     proxystate *ps = (proxystate *)w->data;
     if (ps->want_shutdown) {
         ev_io_stop(loop, &ps->ev_r_ssl);
@@ -1190,6 +1372,8 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     ev_io_init(&ps->ev_r_handshake, client_handshake, client, EV_READ);
     ev_io_init(&ps->ev_w_handshake, client_handshake, client, EV_WRITE);
 
+    ev_io_init(&ps->ev_proxy, client_proxy_proxy, client, EV_READ);
+
     ev_io_init(&ps->ev_w_connect, handle_connect, back, EV_WRITE);
 
     ev_io_init(&ps->ev_w_clear, clear_write, back, EV_WRITE);
@@ -1199,6 +1383,7 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     ps->ev_w_ssl.data = ps;
     ps->ev_r_clear.data = ps;
     ps->ev_w_clear.data = ps;
+    ps->ev_proxy.data = ps;
     ps->ev_w_connect.data = ps;
     ps->ev_r_handshake.data = ps;
     ps->ev_w_handshake.data = ps;
@@ -1206,7 +1391,12 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     /* Link back proxystate to SSL state */
     SSL_set_app_data(ssl, ps);
 
-    start_handshake(ps, SSL_ERROR_WANT_READ); /* for client-first handshake */
+    if (CONFIG->PROXY_PROXY_LINE) {
+        ev_io_start(loop, &ps->ev_proxy);
+    }
+    else {
+        start_handshake(ps, SSL_ERROR_WANT_READ); /* for client-first handshake */
+    }
 }
 
 
@@ -1350,7 +1540,7 @@ static void handle_connections() {
     ev_timer_start(loop, &timer_ppid_check);
 
     ev_io_init(&listener, (CONFIG->PMODE == SSL_CLIENT) ? handle_clear_accept : handle_accept, listener_socket, EV_READ);
-    listener.data = ssl_ctx;
+    listener.data = default_ctx;
     ev_io_start(loop, &listener);
 
     ev_loop(loop, 0);
@@ -1444,7 +1634,7 @@ void start_children(int start_index, int count) {
 void replace_child_with_pid(pid_t pid) {
     int i;
 
-    /* find old child's slot and put a new child there */ 
+    /* find old child's slot and put a new child there */
     for (i = 0; i < CONFIG->NCORES; i++) {
         if (child_pids[i] == pid) {
             start_children(i, 1);
@@ -1601,12 +1791,12 @@ void openssl_check_version() {
     /* compiled with */
     if ((openssl_version ^ OPENSSL_VERSION_NUMBER) & ~0xff0L) {
         ERR(
-	    "WARNING: {core} OpenSSL version mismatch; stud was compiled with %lx, now using %lx.\n",
-	    (unsigned long int) OPENSSL_VERSION_NUMBER,
-	    (unsigned long int) openssl_version
-	);
-	/* now what? exit now? */
-	/* exit(1); */
+            "WARNING: {core} OpenSSL version mismatch; stud was compiled with %lx, now using %lx.\n",
+            (unsigned long int) OPENSSL_VERSION_NUMBER,
+            (unsigned long int) openssl_version
+        );
+        /* now what? exit now? */
+        /* exit(1); */
     }
 
     LOG("{core} Using OpenSSL version %lx.\n", (unsigned long int) openssl_version);
@@ -1617,10 +1807,10 @@ void openssl_check_version() {
 int main(int argc, char **argv) {
     // initialize configuration
     CONFIG = config_new();
-    
+
     // parse command line
     config_parse_cli(argc, argv, CONFIG);
-    
+
     create_workers = 1;
 
     openssl_check_version();
@@ -1635,12 +1825,12 @@ int main(int argc, char **argv) {
     if (CONFIG->SHCUPD_PORT) {
         /* create socket to send(children) and
                receive(parent) cache updates */
-    	shcupd_socket = create_shcupd_socket();
+        shcupd_socket = create_shcupd_socket();
     }
 #endif /* USE_SHARED_CACHE */
 
-    /* load certificate, pass to handle_connections */
-    ssl_ctx = init_openssl();
+    /* load certificates, pass to handle_connections */
+    init_openssl();
 
     if (CONFIG->CHROOT && CONFIG->CHROOT[0])
         change_root();
@@ -1670,7 +1860,7 @@ int main(int argc, char **argv) {
 
         ev_io_init(&shcupd_listener, handle_shcupd, shcupd_socket, EV_READ);
         ev_io_start(loop, &shcupd_listener);
-            
+
         ev_loop(loop, 0);
     }
 #endif /* USE_SHARED_CACHE */
@@ -1680,6 +1870,6 @@ int main(int argc, char **argv) {
          * Parent will be woken up if a signal arrives */
         pause();
     }
-    
+
     exit(0); /* just a formality; we never get here */
 }

@@ -1,15 +1,15 @@
 /*
  * shctx.c
  *
- * Copyright (C) 2011 EXCELIANCE 
- * 
+ * Copyright (C) 2011 EXCELIANCE
+ *
  * Author: Emeric Brun - emeric@exceliance.fr
  *
  */
 #include <sys/mman.h>
 #ifdef USE_SYSCALL_FUTEX
 #include <unistd.h>
-#include <linux/futex.h>  
+#include <linux/futex.h>
 #include <sys/syscall.h>
 #else /* USE_SYSCALL_FUTEX */
 #include <pthread.h>
@@ -157,7 +157,7 @@ static inline void shared_context_unlock(void)
 
 #define shsess_set_key(s,k,l)	{ memcpy((s)->key_data, (k), (l)); \
 					if ((l) < SSL_MAX_SSL_SESSION_ID_LENGTH) \
-						memset((s)->key_data+(l), 0, SSL_MAX_SSL_SESSION_ID_LENGTH-(l)); }; 
+						memset((s)->key_data+(l), 0, SSL_MAX_SSL_SESSION_ID_LENGTH-(l)); };
 
 
 /* SSL context callbacks */
@@ -180,7 +180,7 @@ int shctx_new_cb(SSL *ssl, SSL_SESSION *sess) {
 	i2d_SSL_SESSION(sess, &p);
 
 	shared_context_lock();
-    
+
 	shsess = shsess_get_next();
 
 	shsess_tree_delete(shsess);
@@ -193,7 +193,7 @@ int shctx_new_cb(SSL *ssl, SSL_SESSION *sess) {
 	/* store ASN1 encoded session into cache */
 	shsess->data_len = data_len;
 	memcpy(shsess->data, data, data_len);
-    
+
 	/* store creation date */
 	shsess->c_date = SSL_SESSION_get_time(sess);
 
@@ -206,7 +206,7 @@ int shctx_new_cb(SSL *ssl, SSL_SESSION *sess) {
 		/* copy sessionid padded with 0 into the sessionid + data aligned buffer */
 		memcpy(encsess, sess->session_id, sess->session_id_length);
 		if (sess->session_id_length < SSL_MAX_SSL_SESSION_ID_LENGTH)
-			memset(encsess+sess->session_id_length, 0, SSL_MAX_SSL_SESSION_ID_LENGTH-sess->session_id_length); 
+			memset(encsess+sess->session_id_length, 0, SSL_MAX_SSL_SESSION_ID_LENGTH-sess->session_id_length);
 
 		shared_session_new_cbk(encsess, SSL_MAX_SSL_SESSION_ID_LENGTH+data_len, SSL_SESSION_get_time(sess));
 	}
@@ -230,7 +230,7 @@ SSL_SESSION *shctx_get_cb(SSL *ssl, unsigned char *key, int key_len, int *do_cop
 	/* tree key is zeros padded sessionid */
 	if ( key_len < SSL_MAX_SSL_SESSION_ID_LENGTH ) {
 		memcpy(tmpkey, key, key_len);
-		memset(tmpkey+key_len, 0, SSL_MAX_SSL_SESSION_ID_LENGTH-key_len); 
+		memset(tmpkey+key_len, 0, SSL_MAX_SSL_SESSION_ID_LENGTH-key_len);
 		key = tmpkey;
 	}
 
@@ -260,7 +260,7 @@ SSL_SESSION *shctx_get_cb(SSL *ssl, unsigned char *key, int key_len, int *do_cop
         p = data;
 	sess = d2i_SSL_SESSION(NULL, (const unsigned char **)&p, data_len);
 
-	/* reset creation date */ 
+	/* reset creation date */
 	if (sess)
 		SSL_SESSION_set_time(sess, cdate);
 
@@ -277,7 +277,7 @@ void shctx_remove_cb(SSL_CTX *ctx, SSL_SESSION *sess) {
 	/* tree key is zeros padded sessionid */
 	if ( sess->session_id_length < SSL_MAX_SSL_SESSION_ID_LENGTH ) {
 		memcpy(tmpkey, sess->session_id, sess->session_id_length);
-		memset(tmpkey+sess->session_id_length, 0, SSL_MAX_SSL_SESSION_ID_LENGTH-sess->session_id_length); 
+		memset(tmpkey+sess->session_id_length, 0, SSL_MAX_SSL_SESSION_ID_LENGTH-sess->session_id_length);
 		key = tmpkey;
 	}
 
@@ -303,7 +303,7 @@ void shctx_sess_add(const unsigned char *encsess, unsigned int len, long cdate) 
 		 || (len > SHSESS_MAX_DATA_LEN+SSL_MAX_SSL_SESSION_ID_LENGTH) )
 		return;
 
- 
+
 	shared_context_lock();
 
 	shsess = shsess_get_next();
@@ -334,7 +334,7 @@ void shsess_set_new_cbk(void (*func)(unsigned char *, unsigned int, long)) {
 }
 
 /* Init shared memory context if not allocated and set SSL context callbacks
- * size is the max number of stored session 
+ * size is the max number of stored session
  * Returns: -1 on alloc failure, size if performs context alloc, and 0 if just perform
  * callbacks registration */
 int shared_context_init(SSL_CTX *ctx, int size)
@@ -367,9 +367,9 @@ int shared_context_init(SSL_CTX *ctx, int size)
 		/* No duplicate authorized in tree: */
 		shctx->active.key.node.branches.b[1] = (void *)1;
 
-		cur = &shctx->active; 
+		cur = &shctx->active;
 		cur->n = cur->p = cur;
-		
+
 		cur = &shctx->free;
 		for ( i = 0 ; i < size ; i++) {
 			prev = cur;
@@ -393,4 +393,3 @@ int shared_context_init(SSL_CTX *ctx, int size)
 
 	return ret;
 }
-

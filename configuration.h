@@ -31,12 +31,18 @@ typedef enum {
     SSL_CLIENT
 } PROXY_MODE;
 
+struct cert_files {
+    char *CERT_FILE;
+    struct cert_files *NEXT;
+};
+
 /* configuration structure */
 struct __stud_config {
     ENC_TYPE ETYPE;
     PROXY_MODE PMODE;
     int WRITE_IP_OCTET;
     int WRITE_PROXY_LINE;
+    int PROXY_PROXY_LINE;
     char *CHROOT;
     uid_t UID;
     gid_t GID;
@@ -45,7 +51,7 @@ struct __stud_config {
     char *BACK_IP;
     char *BACK_PORT;
     long NCORES;
-    char *CERT_FILE;
+    struct cert_files *CERT_FILES;
     char *CIPHER_SUITE;
     char *ENGINE;
     int BACKLOG;
