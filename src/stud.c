@@ -206,11 +206,13 @@ static void VWLOG (const char* fmt, va_list ap)
 	struct tm tm;
 	char buf[1024];
 	int n;
+	va_list ap1;
 
 	localtime_r(&tv.tv_sec, &tm);
 	n = strftime(buf, sizeof(buf), "%Y%m%dT%H%M%S", &tm);
 	sprintf(buf+n, ".%06ld [%5d] %s", tv.tv_usec, getpid(), fmt);
-	vfprintf(logf, buf, ap);
+	va_copy(ap1, ap);
+	vfprintf(logf, buf, ap1);
     }
     if (CONFIG->SYSLOG) {
 	vsyslog(LOG_INFO, fmt, ap);
@@ -254,10 +256,10 @@ logproxy (const proxystate* ps, const char* fmt, ...)
 }
 
 #define LOGPROXY(...) \
-    if (!CONFIG->QUIET)	logproxy( __VA_ARGS__ )
+    if (!CONFIG->QUIET && (logf || CONFIG->SYSLOG)) logproxy( __VA_ARGS__ )
 
 #define ERRPROXY(...) \
-    logproxy( __VA_ARGS__ )
+    if (logf || CONFIG->SYSLOG) logproxy( __VA_ARGS__ )
 
 
 #define NULL_DEV "/dev/null"
@@ -1906,6 +1908,10 @@ void init_signals() {
 }
 
 void daemonize () {
+    if (logf == stdout) {
+	logf = NULL;
+    }
+
     /* go to root directory */
     if (chdir("/") != 0) {
         ERR("Unable change directory to /: %s\n", strerror(errno));
