@@ -730,9 +730,9 @@ void config_param_validate (char *k, char *v, stud_config *cfg, char *file, int 
       r = config_param_val_int_pos(v, &cfg->SEND_BUFSIZE);
   }
   else if (strcmp(k, CFG_LOG_FILENAME) == 0) {
-      if (v != NULL && strlen(v) > 0) {
-	  config_assign_str(&cfg->LOG_FILENAME, v);
-      }
+    if (v != NULL && strlen(v) > 0) {
+      config_assign_str(&cfg->LOG_FILENAME, v);
+    }
   }
   else {
     fprintf(

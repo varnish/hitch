@@ -1987,6 +1987,8 @@ int main(int argc, char **argv) {
 	    ERR("FATAL: Unable to open log file: %s: %s\n", CONFIG->LOG_FILENAME, strerror(errno));
 	    exit(2);
 	}
+	fstat(fileno(logf), &logf_st);
+	logf_check_t = time(NULL);
     } else {
 	logf = stdout;
 	setbuf(logf, NULL);
