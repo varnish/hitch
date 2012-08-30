@@ -180,33 +180,32 @@ typedef struct proxystate {
     int connect_port;	/* local port for connection */
 } proxystate;
 
-#define LOG(...)	if (!CONFIG->QUIET) WLOG( __VA_ARGS__ )
-
-static void VWLOG (const char* fmt, va_list ap)
+static void VWLOG (int level, const char* fmt, va_list ap)
 {
     struct timeval tv;
 
     gettimeofday(&tv,NULL);
-    if (logf != stdout && tv.tv_sec >= logf_check_t+LOG_REOPEN_INTERVAL) {
-	struct stat st;
-	if (stat(CONFIG->LOG_FILENAME, &st) < 0
-		|| st.st_dev != logf_st.st_dev
-		|| st.st_ino != logf_st.st_ino)
-	{
-	    fclose(logf);
-	    if ((logf = fopen(CONFIG->LOG_FILENAME, "a")) != NULL) {
-		logf_st = st;
-	    } else {
-		memset(&logf_st, 0, sizeof(logf_st));
-	    }
-	}
-	logf_check_t = tv.tv_sec;
-    }
     if (logf) {
 	struct tm tm;
 	char buf[1024];
 	int n;
 	va_list ap1;
+
+	if (logf != stdout && tv.tv_sec >= logf_check_t+LOG_REOPEN_INTERVAL) {
+	    struct stat st;
+	    if (stat(CONFIG->LOG_FILENAME, &st) < 0
+		    || st.st_dev != logf_st.st_dev
+		    || st.st_ino != logf_st.st_ino)
+	    {
+		fclose(logf);
+		if ((logf = fopen(CONFIG->LOG_FILENAME, "a")) != NULL) {
+		    logf_st = st;
+		} else {
+		    memset(&logf_st, 0, sizeof(logf_st));
+		}
+	    }
+	    logf_check_t = tv.tv_sec;
+	}
 
 	localtime_r(&tv.tv_sec, &tm);
 	n = strftime(buf, sizeof(buf), "%Y%m%dT%H%M%S", &tm);
@@ -215,20 +214,21 @@ static void VWLOG (const char* fmt, va_list ap)
 	vfprintf(logf, buf, ap1);
     }
     if (CONFIG->SYSLOG) {
-	vsyslog(LOG_INFO, fmt, ap);
+	vsyslog(level, fmt, ap);
     }
 }
 
-static void WLOG (const char* fmt, ...)
+static void WLOG (int level, const char* fmt, ...)
 {
     va_list ap;
 
     va_start(ap, fmt);
-    VWLOG(fmt, ap);
+    VWLOG(level, fmt, ap);
     va_end(ap);
 }
 
-#define ERR(...)	WLOG( __VA_ARGS__ )
+#define LOG(...)	if (!CONFIG->QUIET) WLOG(LOG_INFO, __VA_ARGS__ )
+#define ERR(...)	WLOG(LOG_ERR, __VA_ARGS__ )
 
 
 #define SOCKERR(msg) \
@@ -239,7 +239,7 @@ static void WLOG (const char* fmt, ...)
     }
 
 static void
-logproxy (const proxystate* ps, const char* fmt, ...)
+logproxy (int level, const proxystate* ps, const char* fmt, ...)
 {
     char buf[1024];
     char abuf[INET_ADDRSTRLEN+1];
@@ -252,14 +252,14 @@ logproxy (const proxystate* ps, const char* fmt, ...)
 	     ps->connect_port,
 	     ps->fd_up, ps->fd_down,
 	     fmt);
-    VWLOG(buf, ap);
+    VWLOG(level, buf, ap);
 }
 
 #define LOGPROXY(...) \
-    if (!CONFIG->QUIET && (logf || CONFIG->SYSLOG)) logproxy( __VA_ARGS__ )
+    if (!CONFIG->QUIET && (logf || CONFIG->SYSLOG)) logproxy(LOG_INFO, __VA_ARGS__ )
 
 #define ERRPROXY(...) \
-    if (logf || CONFIG->SYSLOG) logproxy( __VA_ARGS__ )
+    if (logf || CONFIG->SYSLOG) logproxy(LOG_ERR, __VA_ARGS__ )
 
 
 #define NULL_DEV "/dev/null"
