@@ -71,6 +71,9 @@ struct __stud_config {
     int PREFER_SERVER_CIPHERS;
     int BACKEND_CONNECT_TIMEOUT;
     int SSL_HANDSHAKE_TIMEOUT;
+    int RECV_BUFSIZE;
+    int SEND_BUFSIZE;
+    char* LOG_FILENAME;
 };
 
 typedef struct __stud_config stud_config;

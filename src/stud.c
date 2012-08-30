@@ -101,6 +101,11 @@ static pid_t *child_pids;
 static SSL_CTX *default_ctx;
 static SSL_SESSION *client_session;
 
+#define LOG_REOPEN_INTERVAL 60
+static FILE* logf;
+static struct stat logf_st;
+static time_t logf_check_t;
+
 #ifdef USE_SHARED_CACHE
 static ev_io shcupd_listener;
 static int shcupd_socket;
@@ -175,23 +180,61 @@ typedef struct proxystate {
     int connect_port;	/* local port for connection */
 } proxystate;
 
-#define LOG(...)                                            \
-    do {                                                    \
-      if (!CONFIG->QUIET) fprintf(stdout, __VA_ARGS__);     \
-      if (!CONFIG->QUIET && CONFIG->SYSLOG) syslog(LOG_INFO, __VA_ARGS__);                    \
-    } while(0)
+#define LOG(...)	if (!CONFIG->QUIET) WLOG( __VA_ARGS__ )
 
-#define ERR(...)                                            \
-    do {                                                    \
-      fprintf(stderr, __VA_ARGS__);                         \
-      if (CONFIG->SYSLOG) syslog(LOG_ERR, __VA_ARGS__);     \
-    } while(0)
+static void VWLOG (const char* fmt, va_list ap)
+{
+    struct timeval tv;
+
+    gettimeofday(&tv,NULL);
+    if (logf != stdout && tv.tv_sec >= logf_check_t+LOG_REOPEN_INTERVAL) {
+	struct stat st;
+	if (stat(CONFIG->LOG_FILENAME, &st) < 0
+		|| st.st_dev != logf_st.st_dev
+		|| st.st_ino != logf_st.st_ino)
+	{
+	    fclose(logf);
+	    if ((logf = fopen(CONFIG->LOG_FILENAME, "a")) != NULL) {
+		logf_st = st;
+	    } else {
+		memset(&logf_st, 0, sizeof(logf_st));
+	    }
+	}
+	logf_check_t = tv.tv_sec;
+    }
+    if (logf) {
+	struct tm tm;
+	char buf[1024];
+	int n;
+
+	localtime_r(&tv.tv_sec, &tm);
+	n = strftime(buf, sizeof(buf), "%Y%m%dT%H%M%S", &tm);
+	sprintf(buf+n, ".%06ld [%5d] %s", tv.tv_usec, getpid(), fmt);
+	vfprintf(logf, buf, ap);
+    }
+    if (CONFIG->SYSLOG) {
+	vsyslog(LOG_INFO, fmt, ap);
+    }
+}
+
+static void WLOG (const char* fmt, ...)
+{
+    va_list ap;
+
+    va_start(ap, fmt);
+    VWLOG(fmt, ap);
+    va_end(ap);
+}
+
+#define ERR(...)	WLOG( __VA_ARGS__ )
+
 
 #define SOCKERR(msg) \
-    if (errno == ECONNRESET) \
+    if (errno == ECONNRESET) {\
 	LOG(msg ": %s\n", strerror(errno)); \
-    else \
-	ERR(msg ": %s\n", strerror(errno))
+    } else {\
+	ERR(msg ": %s\n", strerror(errno)); \
+    }
 
 static void
 logproxy (const proxystate* ps, const char* fmt, ...)
@@ -201,15 +244,13 @@ logproxy (const proxystate* ps, const char* fmt, ...)
     va_list ap;
 
     va_start(ap, fmt);
-    snprintf(buf, sizeof(buf), "[%d] %p %s:%d :%d %d:%d %s",
-	     getpid(), ps,
+    snprintf(buf, sizeof(buf), "%s:%d :%d %d:%d %s",
 	     inet_ntop(AF_INET, &((struct sockaddr_in*)&ps->remote_ip)->sin_addr, abuf, sizeof(abuf)),
 	     ntohs(((struct sockaddr_in*)&ps->remote_ip)->sin_port),
 	     ps->connect_port,
 	     ps->fd_up, ps->fd_down,
 	     fmt);
-    vfprintf(stdout, buf, ap);
-    va_end(ap);
+    VWLOG(buf, ap);
 }
 
 #define LOGPROXY(...) \
@@ -865,6 +906,12 @@ static int create_main_socket() {
     setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &t, sizeof(int));
 #endif
     setnonblocking(s);
+    if (CONFIG->RECV_BUFSIZE > 0) {
+	setsockopt(s, SOL_SOCKET, SO_RCVBUF, &CONFIG->RECV_BUFSIZE, sizeof(CONFIG->RECV_BUFSIZE));
+    }
+    if (CONFIG->SEND_BUFSIZE > 0) {
+	setsockopt(s, SOL_SOCKET, SO_RCVBUF, &CONFIG->SEND_BUFSIZE, sizeof(CONFIG->SEND_BUFSIZE));
+    }
 
     if (bind(s, ai->ai_addr, ai->ai_addrlen)) {
         fail("{bind-socket}");
@@ -1230,6 +1277,17 @@ static void client_proxy_proxy(struct ev_loop *loop, ev_io *w, int revents) {
     }
 }
 
+static void
+log_ssl_error (proxystate* ps, const char* what)
+{
+    int e;
+    while ((e = ERR_get_error())) {
+	char buf[1024];
+	ERR_error_string_n(e, buf, sizeof(buf));
+	ERRPROXY(ps, "%s: %s\n", what, buf);
+    }
+}
+
 /* The libev I/O handler during the OpenSSL handshake phase.  Basically, just
  * let OpenSSL do what it likes with the socket and obey its requests for reads
  * or writes */
@@ -1259,7 +1317,11 @@ static void client_handshake(struct ev_loop *loop, ev_io *w, int revents) {
             shutdown_proxy(ps, SHUTDOWN_SSL);
         }
         else {
-            LOG("{%s} Unexpected SSL error (in handshake): %d\n", w->fd == ps->fd_up ? "client" : "backend", err);
+            if (err == SSL_ERROR_SSL) {
+                log_ssl_error(ps, "Handshake failure");
+            } else {
+        	LOG("{%s} Unexpected SSL error (in handshake): %d\n", w->fd == ps->fd_up ? "client" : "backend", err);
+            }
             shutdown_proxy(ps, SHUTDOWN_SSL);
         }
     }
@@ -1310,6 +1372,11 @@ static void ssl_read(struct ev_loop *loop, ev_io *w, int revents) {
         ev_io_stop(loop, &ps->ev_r_ssl);
         return;
     }
+    if (ringbuffer_is_full(&ps->ring_ssl2clear)) {
+	ERRPROXY(ps, "attempt to read ssl when ring full");
+	ev_io_stop(loop, &ps->ev_r_ssl);
+	return;
+    }
     char * buf = ringbuffer_write_ptr(&ps->ring_ssl2clear);
     t = SSL_read(ps->ssl, buf, RING_DATA_LEN);
 
@@ -1332,8 +1399,14 @@ static void ssl_read(struct ev_loop *loop, ev_io *w, int revents) {
             start_handshake(ps, err);
         }
         else if (err == SSL_ERROR_WANT_READ) { } /* incomplete SSL data */
-        else
+        else {
+            if (err == SSL_ERROR_SSL) {
+        	log_ssl_error(ps, "SSL_read error");
+            } else {
+        	LOG("{%s} SSL_read error: %d\n", w->fd == ps->fd_up ? "client" : "backend", err);
+            }
             handle_fatal_ssl_error(ps, err, w->fd == ps->fd_up ? 0 : 1);
+        }
     }
 }
 
@@ -1370,8 +1443,14 @@ static void ssl_write(struct ev_loop *loop, ev_io *w, int revents) {
             start_handshake(ps, err);
         }
         else if (err == SSL_ERROR_WANT_WRITE) {} /* incomplete SSL data */
-        else
+        else {
+            if (err == SSL_ERROR_SSL) {
+        	log_ssl_error(ps, "SSL_write error");
+            } else {
+        	LOG("{%s} SSL_write error: %d\n", w->fd == ps->fd_up ? "client" : "backend", err);
+            }
             handle_fatal_ssl_error(ps, err,  w->fd == ps->fd_up ? 0 : 1);
+        }
     }
 }
 
@@ -1902,6 +1981,16 @@ void openssl_check_version() {
 int main(int argc, char **argv) {
     // initialize configuration
     CONFIG = config_new();
+
+    if (CONFIG->LOG_FILENAME) {
+	if ((logf = fopen(CONFIG->LOG_FILENAME, "a")) == NULL) {
+	    ERR("FATAL: Unable to open log file: %s: %s\n", CONFIG->LOG_FILENAME, strerror(errno));
+	    exit(2);
+	}
+    } else {
+	logf = stdout;
+	setbuf(logf, NULL);
+    }
 
     // parse command line
     config_parse_cli(argc, argv, CONFIG);
