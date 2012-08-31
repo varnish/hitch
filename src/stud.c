@@ -182,16 +182,15 @@ typedef struct proxystate {
 
 static void VWLOG (int level, const char* fmt, va_list ap)
 {
-    struct timeval tv;
-
-    gettimeofday(&tv,NULL);
     if (logf) {
+	struct timeval tv;
 	struct tm tm;
 	char buf[1024];
 	int n;
 	va_list ap1;
 
-	if (logf != stdout && tv.tv_sec >= logf_check_t+LOG_REOPEN_INTERVAL) {
+	gettimeofday(&tv,NULL);
+	if (logf != stdout && logf != stderr && tv.tv_sec >= logf_check_t+LOG_REOPEN_INTERVAL) {
 	    struct stat st;
 	    if (stat(CONFIG->LOG_FILENAME, &st) < 0
 		    || st.st_dev != logf_st.st_dev
@@ -199,7 +198,7 @@ static void VWLOG (int level, const char* fmt, va_list ap)
 	    {
 		fclose(logf);
 		if ((logf = fopen(CONFIG->LOG_FILENAME, "a")) != NULL) {
-		    logf_st = st;
+		    fstat(fileno(logf), &logf_st);
 		} else {
 		    memset(&logf_st, 0, sizeof(logf_st));
 		}
@@ -1732,9 +1731,9 @@ void change_root() {
 }
 
 void drop_privileges() {
-    if (setgid(CONFIG->GID))
+    if (CONFIG->GID >= 0 && setgid(CONFIG->GID) < 0)
         fail("setgid failed");
-    if (setuid(CONFIG->UID))
+    if (CONFIG->UID >= 0 && setuid(CONFIG->UID) < 0)
         fail("setuid failed");
 }
 
@@ -1908,7 +1907,7 @@ void init_signals() {
 }
 
 void daemonize () {
-    if (logf == stdout) {
+    if (logf == stdout || logf == stderr) {
 	logf = NULL;
     }
 
@@ -1989,16 +1988,21 @@ int main(int argc, char **argv) {
     CONFIG = config_new();
 
     if (CONFIG->LOG_FILENAME) {
-	if ((logf = fopen(CONFIG->LOG_FILENAME, "a")) == NULL) {
+	FILE* f;
+	if ((f = fopen(CONFIG->LOG_FILENAME, "a")) == NULL) {
 	    ERR("FATAL: Unable to open log file: %s: %s\n", CONFIG->LOG_FILENAME, strerror(errno));
 	    exit(2);
+	}
+	logf = f;
+	if (CONFIG->UID >=0 || CONFIG->GID >= 0) {
+	    fchown(fileno(logf), CONFIG->UID, CONFIG->GID);
 	}
 	fstat(fileno(logf), &logf_st);
 	logf_check_t = time(NULL);
     } else {
-	logf = stdout;
-	setbuf(logf, NULL);
+	logf = CONFIG->QUIET ? stderr : stdout;
     }
+    setbuf(logf, NULL);
 
     // parse command line
     config_parse_cli(argc, argv, CONFIG);
@@ -2027,15 +2031,11 @@ int main(int argc, char **argv) {
     if (CONFIG->CHROOT && CONFIG->CHROOT[0])
         change_root();
 
-    if (CONFIG->UID || CONFIG->GID)
+    if (CONFIG->UID >= 0 || CONFIG->GID >= 0)
         drop_privileges();
 
     /* should we daemonize ?*/
     if (CONFIG->DAEMONIZE) {
-        /* disable logging to stderr */
-        CONFIG->QUIET = 1;
-        CONFIG->SYSLOG = 1;
-
         /* become a daemon */
         daemonize();
     }

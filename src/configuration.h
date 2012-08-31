@@ -44,8 +44,8 @@ struct __stud_config {
     int WRITE_PROXY_LINE;
     int PROXY_PROXY_LINE;
     char *CHROOT;
-    uid_t UID;
-    gid_t GID;
+    int UID;
+    int GID;
     char *FRONT_IP;
     char *FRONT_PORT;
     char *BACK_IP;

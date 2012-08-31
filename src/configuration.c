@@ -122,8 +122,8 @@ stud_config * config_new (void) {
   r->WRITE_PROXY_LINE   = 0;
   r->PROXY_PROXY_LINE   = 0;
   r->CHROOT             = NULL;
-  r->UID                = 0;
-  r->GID                = 0;
+  r->UID                = -1;
+  r->GID                = -1;
   r->FRONT_IP           = NULL;
   r->FRONT_PORT         = strdup("8443");
   r->BACK_IP            = strdup("127.0.0.1");
