@@ -538,10 +538,10 @@ void config_param_validate (char *k, char *v, stud_config *cfg, char *file, int 
   struct stat st;
 
   if (strcmp(k, "tls") == 0) {
-    //cfg->ENC_TLS = 1;
+    cfg->ETYPE = ENC_TLS;
   }
   else if (strcmp(k, "ssl") == 0) {
-    //cfg->ENC_TLS = 0;
+    cfg->ETYPE = ENC_SSL;
   }
   else if (strcmp(k, CFG_CIPHERS) == 0) {
     if (v != NULL && strlen(v) > 0) {
