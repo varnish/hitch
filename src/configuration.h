@@ -41,6 +41,7 @@ struct __stud_config {
     ENC_TYPE ETYPE;
     PROXY_MODE PMODE;
     int WRITE_IP_OCTET;
+    int WRITE_PROXY_LINE_V2;
     int WRITE_PROXY_LINE;
     int PROXY_PROXY_LINE;
     char *CHROOT;

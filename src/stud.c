@@ -122,6 +122,7 @@ stud_config *CONFIG;
 
 static char tcp_proxy_line[128] = "";
 
+
 /* What agent/state requests the shutdown--for proper half-closed
  * handling */
 typedef enum _SHUTDOWN_REQUESTOR {
@@ -146,6 +147,37 @@ static ctx_list *sni_ctxs;
 
 #endif /* OPENSSL_NO_TLSEXT */
 
+
+union ha_proxy_v2_addr {
+    struct {        /* for TCP/UDP over IPv4, len = 12 */
+        uint32_t src_addr;
+        uint32_t dst_addr;
+        uint16_t src_port;
+        uint16_t dst_port;
+    } ipv4_addr;
+    struct {        /* for TCP/UDP over IPv6, len = 36 */
+         uint8_t  src_addr[16];
+         uint8_t  dst_addr[16];
+         uint16_t src_port;
+         uint16_t dst_port;
+    } ipv6_addr;
+    struct {        /* for AF_UNIX sockets, len = 216 */
+         uint8_t src_addr[108];
+         uint8_t dst_addr[108];
+    } unix_addr;
+};
+
+
+struct ha_proxy_v2_hdr {
+    uint8_t sig[12]; // = {0x0D, 0x0A, 0x0D,0x0A,0x00,0x0D,0x0A,0x51,0x55,0x49,0x54,0x0A};
+    uint8_t ver;    // = 0x02;      /* hex 02 */
+    uint8_t cmd;    // = 0x01;      /* We only support PROXY Command*/
+    uint8_t fam;      /* protocol family and address */
+    uint8_t len;      /* number of following bytes part of the header */
+};
+
+static struct ha_proxy_v2_hdr header_proxy_v2;
+static union ha_proxy_v2_addr frontend_addr;
 /*
  * Proxied State
  *
@@ -181,6 +213,8 @@ typedef struct proxystate {
 
     struct sockaddr_storage remote_ip;  /* Remote ip returned from `accept` */
     int connect_port;	/* local port for connection */
+
+    union ha_proxy_v2_addr proxy_addr;           /* proxy v2 protocol struct */
 } proxystate;
 
 static void VWLOG (int level, const char* fmt, va_list ap)
@@ -866,6 +900,12 @@ static void prepare_proxy_line(struct sockaddr* ai_addr) {
     tcp_proxy_line[0] = 0;
     char tcp6_address_string[INET6_ADDRSTRLEN];
 
+    memcpy(&header_proxy_v2.sig,"\r\n\r\n\0\r\nQUIT\n", 12);
+    header_proxy_v2.ver = 0x02;
+    header_proxy_v2.cmd = 0x01;
+    header_proxy_v2.fam = ai_addr->sa_family == AF_INET ? 0x11 : 0x21;
+    header_proxy_v2.len = ai_addr->sa_family == AF_INET ? 12 : 36;
+
     if (ai_addr->sa_family == AF_INET) {
         struct sockaddr_in* addr = (struct sockaddr_in*)ai_addr;
         size_t res = snprintf(tcp_proxy_line,
@@ -873,6 +913,10 @@ static void prepare_proxy_line(struct sockaddr* ai_addr) {
                 "PROXY %%s %%s %s %%hu %hu\r\n",
                 inet_ntoa(addr->sin_addr),
                 ntohs(addr->sin_port));
+
+        memcpy(&frontend_addr.ipv4_addr.dst_addr, &addr->sin_addr, sizeof(struct in_addr));
+        frontend_addr.ipv4_addr.dst_port = addr->sin_port;
+
         assert(res < sizeof(tcp_proxy_line));
     }
     else if (ai_addr->sa_family == AF_INET6 ) {
@@ -883,6 +927,10 @@ static void prepare_proxy_line(struct sockaddr* ai_addr) {
                             "PROXY %%s %%s %s %%hu %hu\r\n",
                             tcp6_address_string,
                             ntohs(addr->sin6_port));
+
+      memcpy(&frontend_addr.ipv6_addr.dst_addr,&addr->sin6_addr, sizeof(struct in6_addr));
+      frontend_addr.ipv6_addr.dst_port = addr->sin6_port;
+
       assert(res < sizeof(tcp_proxy_line));
     }
     else {
@@ -1185,7 +1233,22 @@ static void end_handshake(proxystate *ps) {
 
     /* Check if clear side is connected */
     if (!ps->clear_connected) {
-        if (CONFIG->WRITE_PROXY_LINE) {
+
+        if (CONFIG->WRITE_PROXY_LINE_V2) {
+
+            char *ring_pnt = ringbuffer_write_ptr(&ps->ring_ssl2clear);
+            assert(ps->remote_ip.ss_family == AF_INET ||
+                   ps->remote_ip.ss_family == AF_INET6);
+
+            
+            memcpy(ring_pnt, &header_proxy_v2, sizeof(header_proxy_v2));
+            memcpy(ring_pnt+sizeof(header_proxy_v2), &ps->proxy_addr, header_proxy_v2.len);
+
+            
+            
+            ringbuffer_write_append(&ps->ring_ssl2clear, header_proxy_v2.len+sizeof(header_proxy_v2));
+        }
+        else if (CONFIG->WRITE_PROXY_LINE) {
             char *ring_pnt = ringbuffer_write_ptr(&ps->ring_ssl2clear);
             assert(ps->remote_ip.ss_family == AF_INET ||
                    ps->remote_ip.ss_family == AF_INET6);
@@ -1568,6 +1631,19 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     ps->ev_r_handshake.data = ps;
     ps->ev_w_handshake.data = ps;
     ps->ev_t_handshake.data = ps;
+
+    memcpy(&ps->proxy_addr, &frontend_addr, sizeof(frontend_addr));
+
+    if(addr.ss_family == AF_INET) {
+        struct sockaddr_in* saddr = (struct sockaddr_in*)&addr;
+        memcpy(&ps->proxy_addr.ipv4_addr.src_addr, &saddr->sin_addr, sizeof(struct in_addr));
+        ps->proxy_addr.ipv4_addr.src_port = saddr->sin_port;
+    } else if(addr.ss_family == AF_INET6) {
+        struct sockaddr_in6* saddr = (struct sockaddr_in6*)&addr;
+        memcpy(&ps->proxy_addr.ipv6_addr.src_addr, &saddr->sin6_addr, sizeof(struct in6_addr));
+        ps->proxy_addr.ipv6_addr.src_port = saddr->sin6_port;
+    }
+    
 
     /* Link back proxystate to SSL state */
     SSL_set_app_data(ssl, ps);

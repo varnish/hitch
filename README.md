@@ -135,6 +135,9 @@ Detail about the entire set of options can be found by invoking `stud -h`:
           --write-proxy          Write HaProxy's PROXY (IPv4 or IPv6) protocol line
                                  before actual data
                                  (Default: off)
+          --write-proxy-v2       Write HaProxy's PROXY v2 binary (IPv4 or IPv6)  protocol line
+                                 before actual data
+                                 (Default: off)
           --proxy-proxy          Proxy HaProxy's PROXY (IPv4 or IPv6) protocol line
                                  before actual data
                                  (Default: off)
