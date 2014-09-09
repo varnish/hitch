@@ -29,16 +29,31 @@
 
 #include "ringbuffer.h"
 #include <assert.h>
+#include <stdlib.h>
 
 /* Initialize a ringbuffer structure to empty */
 
-void ringbuffer_init(ringbuffer *rb) {
+void ringbuffer_init(ringbuffer *rb, int num_slots, int data_len) {
+    rb->num_slots = num_slots ?: DEF_RING_SLOTS;
+    rb->data_len = data_len ?: DEF_RING_DATA_LEN;
+    rb->slots = (bufent*)malloc(rb->num_slots * sizeof(rb->slots[0]));
     rb->head = &rb->slots[0];
     rb->tail = &rb->slots[0];
-    rb->used = 0;
     int x;
-    for (x=0; x<RING_SLOTS; x++)
-        rb->slots[x].next = &(rb->slots[(x + 1) % RING_SLOTS]);
+    for (x=0; x<rb->num_slots; x++) {
+        rb->slots[x].next = &(rb->slots[(x + 1) % rb->num_slots]);
+        rb->slots[x].data = (char*)malloc(rb->data_len);
+    }
+    rb->used = 0;
+    rb->bytes_written = 0;
+}
+
+void ringbuffer_cleanup(ringbuffer *rb) {
+    int x;
+    for (x=0; x<rb->num_slots; x++) {
+        free(rb->slots[x].data);
+    }
+    free(rb->slots);
 }
 
 /** READ FUNCTIONS **/
@@ -69,14 +84,14 @@ void ringbuffer_read_pop(ringbuffer *rb) {
 
 /* Return the tail ptr (current target of new writes) */
 char * ringbuffer_write_ptr(ringbuffer *rb) {
-    assert(rb->used < RING_SLOTS);
+    assert(rb->used < rb->num_slots);
     return rb->tail->data;
 }
 
 /* Mark the tail appended for `length` bytes, and move the cursor
  * to the next slot */
 void ringbuffer_write_append(ringbuffer *rb, int length) {
-    assert(rb->used < RING_SLOTS);
+    assert(rb->used < rb->num_slots);
 
     rb->used++;
 
@@ -94,8 +109,7 @@ int ringbuffer_size(ringbuffer *rb) {
 
 /* Used size of the ringbuffer */
 int ringbuffer_capacity(ringbuffer *rb) {
-    (void) rb;
-    return RING_SLOTS;
+    return rb->num_slots;
 }
 
 /* Is the ringbuffer completely empty (implies: no data to be written) */
@@ -105,6 +119,6 @@ int ringbuffer_is_empty(ringbuffer *rb) {
 
 /* Is the ringbuffer completely full (implies: no more data should be read) */
 int ringbuffer_is_full(ringbuffer *rb) {
-    return rb->used == RING_SLOTS;
+    return rb->used == rb->num_slots;
 }
 

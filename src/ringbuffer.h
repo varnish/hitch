@@ -33,24 +33,28 @@
 #include <stddef.h>
 
 /* Tweak these for potential memory/throughput tradeoffs */
-#define RING_SLOTS 3
-#define RING_DATA_LEN 1024 * 32
+#define DEF_RING_SLOTS 3
+#define DEF_RING_DATA_LEN (1024 * 3)
 
 typedef struct bufent {
-    char data[RING_DATA_LEN];
+    char *data;
     char *ptr;
     size_t left;
     struct bufent *next;
 } bufent;
 
 typedef struct ringbuffer {
-    bufent slots[RING_SLOTS];
+    bufent *slots;
     bufent *head; // reads from the head
     bufent *tail; // writes to the tail
-    size_t used;
+    int used;
+    int num_slots;
+    int data_len;
+    size_t bytes_written;
 } ringbuffer;
 
-void ringbuffer_init(ringbuffer *rb);
+void ringbuffer_init(ringbuffer *rb, int num_slots, int data_len);
+void ringbuffer_cleanup(ringbuffer *rb);
 
 char * ringbuffer_read_next(ringbuffer *rb, int * length);
 void ringbuffer_read_skip(ringbuffer *rb, int length);

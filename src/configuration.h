@@ -74,6 +74,8 @@ struct __stud_config {
     int RECV_BUFSIZE;
     int SEND_BUFSIZE;
     char* LOG_FILENAME;
+    int RING_SLOTS;
+    int RING_DATA_LEN;
 };
 
 typedef struct __stud_config stud_config;

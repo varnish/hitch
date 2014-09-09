@@ -52,6 +52,8 @@
 #define CFG_RECV_BUFSIZE "recv-bufsize"
 #define CFG_SEND_BUFSIZE "send-bufsize"
 #define CFG_LOG_FILENAME "log-filename"
+#define CFG_RING_SLOTS "ring-slots"
+#define CFG_RING_DATA_LEN "ring-data-len"
 
 #ifdef USE_SHARED_CACHE
   #define CFG_SHARED_CACHE "shared-cache"
@@ -160,6 +162,9 @@ stud_config * config_new (void) {
   r->SEND_BUFSIZE = -1;
 
   r->LOG_FILENAME = NULL;
+
+  r->RING_SLOTS = 0;
+  r->RING_DATA_LEN = 0;
 
   return r;
 }
@@ -733,6 +738,12 @@ void config_param_validate (char *k, char *v, stud_config *cfg, char *file, int 
     if (v != NULL && strlen(v) > 0) {
       config_assign_str(&cfg->LOG_FILENAME, v);
     }
+  }
+  else if (strcmp(k, CFG_RING_SLOTS) == 0) {
+      r = config_param_val_int_pos(v, &cfg->RING_SLOTS);
+  }
+  else if (strcmp(k, CFG_RING_DATA_LEN) == 0) {
+      r = config_param_val_int_pos(v, &cfg->RING_DATA_LEN);
   }
   else {
     fprintf(
