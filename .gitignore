@@ -4,6 +4,7 @@ core
 core.*
 **.o
 **.in
+**.in~
 .deps
 **.sw[op]
 /src/stud
