@@ -911,7 +911,7 @@ static int create_main_socket() {
 	setsockopt(s, SOL_SOCKET, SO_RCVBUF, &CONFIG->RECV_BUFSIZE, sizeof(CONFIG->RECV_BUFSIZE));
     }
     if (CONFIG->SEND_BUFSIZE > 0) {
-	setsockopt(s, SOL_SOCKET, SO_RCVBUF, &CONFIG->SEND_BUFSIZE, sizeof(CONFIG->SEND_BUFSIZE));
+	setsockopt(s, SOL_SOCKET, SO_SNDBUF, &CONFIG->SEND_BUFSIZE, sizeof(CONFIG->SEND_BUFSIZE));
     }
 
     if (bind(s, ai->ai_addr, ai->ai_addrlen)) {
