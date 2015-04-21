@@ -1,8 +1,9 @@
+#!/bin/bash -x
+set -o errexit
 
 aclocal
 autoconf
 autoheader
 automake --add-missing --foreign
 ./configure
-
 #autoreconf -vfi
