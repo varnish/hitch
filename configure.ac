@@ -21,22 +21,6 @@ AC_CHECK_LIB([ssl], [SSL_CTX_free])
 # Checks for header files.
 AC_CHECK_HEADERS([stdlib.h unistd.h])
 
-AC_ARG_ENABLE([shctx],
-[  --enable-shctx Enable session key exchange. Requires ebtree.],
-[case "${enableval}" in
-  yes) shctx=true ;;
-  no)  shctx=false ;;
-  *) AC_MSG_ERROR([bad value ${enableval} for --enable-shctx]) ;;
-esac],[shctx=false])
-
-AM_CONDITIONAL([WANT_SHCTX], [test x$shctx = xtrue])
-AM_COND_IF([WANT_SHCTX],
-           [
-AC_CHECK_LIB([ebtree], [SSL_CTX_free])
-AC_CONFIG_FILES([wrapper:wrapper.in])
-])
-
-
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_UID_T
 AC_C_INLINE

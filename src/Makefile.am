@@ -11,7 +11,7 @@ stud_SOURCES = configuration.c ringbuffer.c stud.c
 stud_LDFLAGS = $(STUD_LIBS) $(AM_LDFLAG)
 stud_LDADD = $(AM_LDFLAGS)
 
-if WANT_SHCTX
-stud_SOURCES += shctx.c
-stud_LDADD += ebtree/libebtree.a
-endif
+#if WANT_SHCTX
+#stud_SOURCES += shctx.c
+#stud_LDADD += ebtree/libebtree.a
+#endif
