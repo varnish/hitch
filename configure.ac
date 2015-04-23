@@ -14,9 +14,8 @@ AC_PROG_INSTALL
 AC_PROG_MAKE_SET
 
 # Checks for libraries.
-AC_CHECK_LIB([crypto], [SSL_library_init])
-AC_CHECK_LIB([ev], [ev_default_loop])
-AC_CHECK_LIB([ssl], [SSL_CTX_free])
+AC_CHECK_LIB([ev], [ev_default_loop], [], AC_MSG_ERROR([Cannot find libev headers.]))
+AC_CHECK_LIB([ssl], [SSL_CTX_free], [], AC_MSG_ERROR([Cannot find libssl headers.]))
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdlib.h unistd.h])
