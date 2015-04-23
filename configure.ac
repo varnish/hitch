@@ -13,6 +13,8 @@ AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
 
+AM_MAINTAINER_MODE([disable])
+
 # Checks for libraries.
 AC_CHECK_LIB([ev], [ev_default_loop], [], AC_MSG_ERROR([Cannot find libev headers.]))
 AC_CHECK_LIB([ssl], [SSL_CTX_free], [], AC_MSG_ERROR([Cannot find libssl headers.]))
