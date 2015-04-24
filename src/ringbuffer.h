@@ -34,7 +34,7 @@
 
 /* Tweak these for potential memory/throughput tradeoffs */
 #define DEF_RING_SLOTS 3
-#define DEF_RING_DATA_LEN (1024 * 3)
+#define DEF_RING_DATA_LEN (1024 * 32)
 
 typedef struct bufent {
     char *data;
