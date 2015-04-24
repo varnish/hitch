@@ -226,16 +226,23 @@ static void WLOG (int level, const char* fmt, ...)
     va_end(ap);
 }
 
-#define LOG(...)	if (!CONFIG->QUIET) WLOG(LOG_INFO, __VA_ARGS__ )
+#define LOG(...)							\
+	do {								\
+		if (!CONFIG->QUIET)					\
+			WLOG(LOG_INFO, __VA_ARGS__ );			\
+	} while (0)
 #define ERR(...)	WLOG(LOG_ERR, __VA_ARGS__ )
 
 
-#define SOCKERR(msg) \
-    if (errno == ECONNRESET) {\
-	LOG(msg ": %s\n", strerror(errno)); \
-    } else {\
-	ERR(msg ": %s\n", strerror(errno)); \
-    }
+#define SOCKERR(msg)						\
+	do {							\
+		if (errno == ECONNRESET) {			\
+			LOG(msg ": %s\n", strerror(errno));	\
+		} else {					\
+			ERR(msg ": %s\n", strerror(errno));	\
+		}						\
+	} while (0)
+
 
 static void
 logproxy (int level, const proxystate* ps, const char* fmt, ...)
@@ -258,11 +265,17 @@ logproxy (int level, const proxystate* ps, const char* fmt, ...)
     VWLOG(level, buf, ap);
 }
 
-#define LOGPROXY(...) \
-    if (!CONFIG->QUIET && (logf || CONFIG->SYSLOG)) logproxy(LOG_INFO, __VA_ARGS__ )
+#define LOGPROXY(...)							\
+	do {								\
+		if (!CONFIG->QUIET && (logf || CONFIG->SYSLOG))		\
+			logproxy(LOG_INFO, __VA_ARGS__ );		\
+	} while(0)
 
-#define ERRPROXY(...) \
-    if (logf || CONFIG->SYSLOG) logproxy(LOG_ERR, __VA_ARGS__ )
+#define ERRPROXY(...)							\
+	do {								\
+		if (logf || CONFIG->SYSLOG)				\
+			logproxy(LOG_ERR, __VA_ARGS__ );		\
+	} while (0)
 
 
 #define NULL_DEV "/dev/null"
