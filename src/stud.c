@@ -113,6 +113,9 @@ struct addrinfo *shcupd_peers[MAX_SHCUPD_PEERS+1];
 static unsigned char shared_secret[SHA_DIGEST_LENGTH];
 #endif /*USE_SHARED_CACHE*/
 
+#define AZ(foo)		do { assert((foo) == 0); } while (0)
+#define AN(foo)		do { assert((foo) != 0); } while (0)
+
 long openssl_version;
 int create_workers;
 stud_config *CONFIG;
@@ -2004,7 +2007,7 @@ int main(int argc, char **argv) {
 	}
 	logf = f;
 	if (CONFIG->UID >=0 || CONFIG->GID >= 0) {
-	    fchown(fileno(logf), CONFIG->UID, CONFIG->GID);
+	    AZ(fchown(fileno(logf), CONFIG->UID, CONFIG->GID));
 	}
 	fstat(fileno(logf), &logf_st);
 	logf_check_t = time(NULL);
