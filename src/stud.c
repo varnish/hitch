@@ -249,11 +249,7 @@ logproxy (int level, const proxystate* ps, const char* fmt, ...)
 {
     char buf[1024];
     char abuf[INET_ADDRSTRLEN+1];
-    int bytes_up = -1;
-    int bytes_down = -1;
     va_list ap;
-    char sslbuf[33], clearbuf[33];
-    int i, j;
 
     va_start(ap, fmt);
     snprintf(buf, sizeof(buf), "%s:%d :%d %d:%d %s",
