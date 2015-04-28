@@ -1343,14 +1343,10 @@ void config_parse_cli(int argc, char **argv, stud_config *cfg) {
       cfg->PMODE = SSL_CLIENT;
   }
 
-  if (cfg->WRITE_IP_OCTET && cfg->WRITE_PROXY_LINE)
-    config_die("Options --write-ip and --write-proxy are mutually exclusive.");
-
-  if (cfg->WRITE_PROXY_LINE && cfg->PROXY_PROXY_LINE)
-    config_die("Options --write-proxy and --proxy-proxy are mutually exclusive.");
-
-  if (cfg->WRITE_IP_OCTET && cfg->PROXY_PROXY_LINE)
-    config_die("Options --write-ip and --proxy-proxy are mutually exclusive.");
+  if ((!!cfg->WRITE_IP_OCTET + !!cfg->PROXY_PROXY_LINE
+	  + !!cfg->WRITE_PROXY_LINE + !!cfg->WRITE_PROXY_LINE_V2) >= 2)
+	  config_die("Options --write-ip, --write-proxy-proxy,"
+	      " --write-proxy and --write-proxy-v2 are mutually exclusive.");
 
   if (cfg->DAEMONIZE) {
     cfg->SYSLOG = 1;
