@@ -1238,18 +1238,14 @@ static void end_handshake(proxystate *ps) {
     if (!ps->clear_connected) {
 
         if (CONFIG->WRITE_PROXY_LINE_V2) {
-
             char *ring_pnt = ringbuffer_write_ptr(&ps->ring_ssl2clear);
             assert(ps->remote_ip.ss_family == AF_INET ||
                    ps->remote_ip.ss_family == AF_INET6);
-
-            
             memcpy(ring_pnt, &header_proxy_v2, sizeof(header_proxy_v2));
-            memcpy(ring_pnt+sizeof(header_proxy_v2), &ps->proxy_addr, header_proxy_v2.len);
-
-            
-            
-            ringbuffer_write_append(&ps->ring_ssl2clear, header_proxy_v2.len+sizeof(header_proxy_v2));
+            memcpy(ring_pnt+sizeof(header_proxy_v2), &ps->proxy_addr,
+		header_proxy_v2.len);
+            ringbuffer_write_append(&ps->ring_ssl2clear,
+		header_proxy_v2.len+sizeof(header_proxy_v2));
         }
         else if (CONFIG->WRITE_PROXY_LINE) {
             char *ring_pnt = ringbuffer_write_ptr(&ps->ring_ssl2clear);
@@ -1265,8 +1261,10 @@ static void end_handshake(proxystate *ps) {
                                   ntohs(addr->sin_port));
                }
                else if (ps->remote_ip.ss_family == AF_INET6) {
-                        struct sockaddr_in6* addr = (struct sockaddr_in6*)&ps->remote_ip;
-                        inet_ntop(AF_INET6,&(addr->sin6_addr),tcp6_address_string,INET6_ADDRSTRLEN);
+                        struct sockaddr_in6* addr =
+			    (struct sockaddr_in6*)&ps->remote_ip;
+                        inet_ntop(AF_INET6,&(addr->sin6_addr),
+			    tcp6_address_string, INET6_ADDRSTRLEN);
                         written = snprintf(ring_pnt,
                         	  ps->ring_ssl2clear.data_len,
                                   tcp_proxy_line,
