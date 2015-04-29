@@ -63,6 +63,7 @@
 #include <ev.h>
 
 #include "ringbuffer.h"
+#include "miniobj.h"
 #include "shctx.h"
 #include "configuration.h"
 
@@ -138,9 +139,12 @@ typedef enum _SHUTDOWN_REQUESTOR {
  * doesn't matter.
  */
 typedef struct ctx_list {
-    char *servername;
-    SSL_CTX *ctx;
-    struct ctx_list *next;
+	unsigned	magic;
+#define CTX_LIST_MAGIC	c179597c
+	char		*servername;
+	int		is_wildcard;
+	SSL_CTX		*ctx;
+	struct ctx_list	*next;
 } ctx_list;
 
 static ctx_list *sni_ctxs;
@@ -824,6 +828,7 @@ void init_openssl() {
         struct ctx_list *cl;                                                \
         cl = calloc(1, sizeof(*cl));                                        \
         ASN1_STRING_to_UTF8((unsigned char **)&cl->servername, asn1_str);   \
+        cl->is_wildcard = (strstr(cl->servername, "*.") == cl->servername); \
         cl->ctx = ctx;                                                      \
         cl->next = sni_ctxs;                                                \
         sni_ctxs = cl;                                                      \
