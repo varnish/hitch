@@ -826,7 +826,7 @@ void init_openssl() {
 #define PUSH_CTX(asn1_str, ctx)                                             \
     do {                                                                    \
         struct ctx_list *cl;                                                \
-        cl = calloc(1, sizeof(*cl));                                        \
+        ALLOC_OBJ(cl, CTX_LIST_MAGIC);                                      \
         ASN1_STRING_to_UTF8((unsigned char **)&cl->servername, asn1_str);   \
         cl->is_wildcard = (strstr(cl->servername, "*.") == cl->servername); \
         cl->ctx = ctx;                                                      \
