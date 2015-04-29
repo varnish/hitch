@@ -709,8 +709,6 @@ int sni_switch_ctx(SSL *ssl, int *al, void *data) {
     servername = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
     if (!servername) return SSL_TLSEXT_ERR_NOACK;
 
-    // For now, just compare servernames as case insensitive strings. Someday,
-    // it might be nice to Do The Right Thing around star certs.
     for (cl = sni_ctxs; cl != NULL; cl = cl->next) {
         CHECK_OBJ_NOTNULL(cl, CTX_LIST_MAGIC);
         if (sni_match(cl, servername)) {
