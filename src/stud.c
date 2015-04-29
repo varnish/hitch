@@ -154,30 +154,27 @@ union ha_proxy_v2_addr {
         uint32_t dst_addr;
         uint16_t src_port;
         uint16_t dst_port;
-    } ipv4_addr;
+    } ipv4;
     struct {        /* for TCP/UDP over IPv6, len = 36 */
          uint8_t  src_addr[16];
          uint8_t  dst_addr[16];
          uint16_t src_port;
          uint16_t dst_port;
-    } ipv6_addr;
+    } ipv6;
     struct {        /* for AF_UNIX sockets, len = 216 */
          uint8_t src_addr[108];
          uint8_t dst_addr[108];
-    } unix_addr;
+    } unix;
 };
-
 
 struct ha_proxy_v2_hdr {
-    uint8_t sig[12]; // = {0x0D, 0x0A, 0x0D,0x0A,0x00,0x0D,0x0A,0x51,0x55,0x49,0x54,0x0A};
-    uint8_t ver;    // = 0x02;      /* hex 02 */
-    uint8_t cmd;    // = 0x01;      /* We only support PROXY Command*/
-    uint8_t fam;      /* protocol family and address */
-    uint8_t len;      /* number of following bytes part of the header */
+	uint8_t sig[12];
+	uint8_t ver_cmd;
+	uint8_t fam;
+	uint16_t len;	/* number of following bytes part of the header */
+	union ha_proxy_v2_addr addr;
 };
 
-static struct ha_proxy_v2_hdr header_proxy_v2;
-static union ha_proxy_v2_addr frontend_addr;
 /*
  * Proxied State
  *
@@ -213,8 +210,6 @@ typedef struct proxystate {
 
     struct sockaddr_storage remote_ip;  /* Remote ip returned from `accept` */
     int connect_port;	/* local port for connection */
-
-    union ha_proxy_v2_addr proxy_addr;           /* proxy v2 protocol struct */
 } proxystate;
 
 static void VWLOG (int level, const char* fmt, va_list ap)
@@ -896,49 +891,6 @@ void init_openssl() {
     }
 }
 
-static void prepare_proxy_line(struct sockaddr* ai_addr) {
-    tcp_proxy_line[0] = 0;
-    char tcp6_address_string[INET6_ADDRSTRLEN];
-
-    memcpy(&header_proxy_v2.sig,"\r\n\r\n\0\r\nQUIT\n", 12);
-    header_proxy_v2.ver = 0x02;
-    header_proxy_v2.cmd = 0x01;
-    header_proxy_v2.fam = ai_addr->sa_family == AF_INET ? 0x11 : 0x21;
-    header_proxy_v2.len = ai_addr->sa_family == AF_INET ? 12 : 36;
-
-    if (ai_addr->sa_family == AF_INET) {
-        struct sockaddr_in* addr = (struct sockaddr_in*)ai_addr;
-        size_t res = snprintf(tcp_proxy_line,
-                sizeof(tcp_proxy_line),
-                "PROXY %%s %%s %s %%hu %hu\r\n",
-                inet_ntoa(addr->sin_addr),
-                ntohs(addr->sin_port));
-
-        memcpy(&frontend_addr.ipv4_addr.dst_addr, &addr->sin_addr, sizeof(struct in_addr));
-        frontend_addr.ipv4_addr.dst_port = addr->sin_port;
-
-        assert(res < sizeof(tcp_proxy_line));
-    }
-    else if (ai_addr->sa_family == AF_INET6 ) {
-      struct sockaddr_in6* addr = (struct sockaddr_in6*)ai_addr;
-      inet_ntop(AF_INET6,&(addr->sin6_addr),tcp6_address_string,INET6_ADDRSTRLEN);
-      size_t res = snprintf(tcp_proxy_line,
-                            sizeof(tcp_proxy_line),
-                            "PROXY %%s %%s %s %%hu %hu\r\n",
-                            tcp6_address_string,
-                            ntohs(addr->sin6_port));
-
-      memcpy(&frontend_addr.ipv6_addr.dst_addr,&addr->sin6_addr, sizeof(struct in6_addr));
-      frontend_addr.ipv6_addr.dst_port = addr->sin6_port;
-
-      assert(res < sizeof(tcp_proxy_line));
-    }
-    else {
-        ERR("The --write-proxy mode is not implemented for this address family.\n");
-        exit(1);
-    }
-}
-
 /* Create the bound socket in the parent process */
 static int create_main_socket() {
     struct addrinfo *ai, hints;
@@ -981,8 +933,6 @@ static int create_main_socket() {
     setsockopt(s, IPPROTO_TCP, TCP_DEFER_ACCEPT, &timeout, sizeof(int) );
 #endif /* TCP_DEFER_ACCEPT */
 #endif
-
-    prepare_proxy_line(ai->ai_addr);
 
     freeaddrinfo(ai);
     listen(s, CONFIG->BACKLOG);
@@ -1218,100 +1168,163 @@ static void start_handshake(proxystate *ps, int err) {
     ev_timer_start(loop, &ps->ev_t_handshake);
 }
 
+static void
+write_proxy_v2(proxystate *ps, const struct sockaddr *local)
+{
+	struct ha_proxy_v2_hdr *p;
+	union addr {
+		struct sockaddr		sa;
+		struct sockaddr_in	sa4;
+		struct sockaddr_in6	sa6;
+	} *l, *r;
+	p = (struct ha_proxy_v2_hdr *)
+	    ringbuffer_write_ptr(&ps->ring_ssl2clear);
+	size_t len = 16;
+	l = (union addr *) local;
+	r = (union addr *) &ps->remote_ip;
+
+	memcpy(&p->sig,"\r\n\r\n\0\r\nQUIT\n", 12);
+	p->ver_cmd = 0x21; 	/* v2|PROXY */
+	p->fam = l->sa.sa_family == AF_INET ? 0x11 : 0x21;
+	p->len = l->sa.sa_family == AF_INET ? htons(12) : htons(36);
+
+	if (l->sa.sa_family == AF_INET) {
+		len += 12;
+
+		/* src/client */
+		memcpy(&p->addr.ipv4.src_addr, &r->sa4.sin_addr.s_addr,
+		    sizeof p->addr.ipv4.src_addr);
+		memcpy(&p->addr.ipv4.src_port, &r->sa4.sin_port,
+		    sizeof p->addr.ipv4.src_port);
+
+		/* dst/server */
+		memcpy(&p->addr.ipv4.dst_addr, &l->sa4.sin_addr.s_addr,
+		    sizeof p->addr.ipv4.dst_addr);
+		memcpy(&p->addr.ipv4.dst_port, &l->sa4.sin_port,
+		    sizeof p->addr.ipv4.dst_port);
+	} else {
+		assert (l->sa.sa_family == AF_INET6);
+		len += 36;
+
+		/* src/client */
+		memcpy(&p->addr.ipv6.src_addr, &r->sa6.sin6_addr.s6_addr,
+		    sizeof p->addr.ipv6.src_addr);
+		memcpy(&p->addr.ipv6.src_port, &r->sa6.sin6_port,
+		    sizeof p->addr.ipv6.src_port);
+
+		/* dst/server */
+		memcpy(&p->addr.ipv6.dst_addr, &l->sa6.sin6_addr.s6_addr,
+		    sizeof p->addr.ipv6.dst_addr);
+		memcpy(&p->addr.ipv6.dst_port, &l->sa6.sin6_port,
+		    sizeof p->addr.ipv6.dst_port);
+	}
+	ringbuffer_write_append(&ps->ring_ssl2clear, len);
+}
+
+static void
+write_proxy_v1(proxystate *ps, const struct sockaddr *local, socklen_t slen)
+{
+	char *p = ringbuffer_write_ptr(&ps->ring_ssl2clear);
+	char src_addr[INET6_ADDRSTRLEN], dst_addr[INET6_ADDRSTRLEN];
+	char src_port[8], dst_port[8];
+	size_t len;
+	int n;
+
+	n = getnameinfo(local, slen, dst_addr, sizeof dst_addr, dst_port,
+	    sizeof dst_port, NI_NUMERICHOST | NI_NUMERICSERV);
+	assert (n == 0);
+
+	n = getnameinfo((struct sockaddr *) &ps->remote_ip, slen, src_addr,
+	    sizeof src_addr, src_port, sizeof src_port,
+	    NI_NUMERICHOST | NI_NUMERICSERV);
+	assert (n == 0);
+
+	if (local->sa_family == AF_INET) {
+		len = sprintf(p, "PROXY TCP4 %s %s %s %s\r\n", src_addr,
+		    dst_addr, src_port, dst_port);
+	} else {
+		assert (local->sa_family == AF_INET6);
+		len = sprintf(p, "PROXY TCP6 %s %s %s %s\r\n", src_addr,
+		    dst_addr, src_port, dst_port);
+	}
+	assert (len > 0);
+	ringbuffer_write_append(&ps->ring_ssl2clear, len);
+}
+
+static void
+write_ip_octet(proxystate *ps)
+{
+	char *ring_pnt =
+	    ringbuffer_write_ptr(&ps->ring_ssl2clear);
+	assert(ps->remote_ip.ss_family == AF_INET ||
+	    ps->remote_ip.ss_family == AF_INET6);
+	*ring_pnt++ = (unsigned char) ps->remote_ip.ss_family;
+	if (ps->remote_ip.ss_family == AF_INET6) {
+		memcpy(ring_pnt,
+		    &((struct sockaddr_in6 *)
+			&ps->remote_ip)->sin6_addr.s6_addr, 16U);
+		ringbuffer_write_append(&ps->ring_ssl2clear, 1U + 16U);
+	}
+	else {
+		memcpy(ring_pnt, &((struct sockaddr_in *)
+			&ps->remote_ip)->sin_addr.s_addr, 4U);
+		ringbuffer_write_append(&ps->ring_ssl2clear, 1U + 4U);
+	}
+}
 /* After OpenSSL is done with a handshake, re-wire standard read/write handlers
  * for data transmission */
 static void end_handshake(proxystate *ps) {
-    char tcp6_address_string[INET6_ADDRSTRLEN];
-    size_t written = 0;
-    ev_io_stop(loop, &ps->ev_r_handshake);
-    ev_io_stop(loop, &ps->ev_w_handshake);
-    ev_timer_stop(loop, &ps->ev_t_handshake);
+	ev_io_stop(loop, &ps->ev_r_handshake);
+	ev_io_stop(loop, &ps->ev_w_handshake);
+	ev_timer_stop(loop, &ps->ev_t_handshake);
 
-    LOGPROXY(ps,"ssl end handshake\n");
-    /* Disable renegotiation (CVE-2009-3555) */
-    if (ps->ssl->s3) {
-        ps->ssl->s3->flags |= SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS;
-    }
-    ps->handshaked = 1;
+	LOGPROXY(ps,"ssl end handshake\n");
+	/* Disable renegotiation (CVE-2009-3555) */
+	if (ps->ssl->s3) {
+		ps->ssl->s3->flags |= SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS;
+	}
+	ps->handshaked = 1;
 
-    /* Check if clear side is connected */
-    if (!ps->clear_connected) {
+	/* Check if clear side is connected */
+	if (!ps->clear_connected) {
+		if (CONFIG->WRITE_PROXY_LINE_V2 || CONFIG->WRITE_PROXY_LINE) {
+			struct sockaddr_storage local;
+			socklen_t slen = sizeof local;
+			if (getsockname(ps->fd_up, (struct sockaddr *) &local,
+				&slen) != 0) {
+				SOCKERR("getsockname");
+			}
+			if (CONFIG->WRITE_PROXY_LINE)
+				write_proxy_v1(ps, (struct sockaddr *) &local,
+				    slen);
+			else
+				write_proxy_v2(ps, (struct sockaddr *) &local);
+		}
+		else if (CONFIG->WRITE_IP_OCTET) {
+			write_ip_octet(ps);
+		}
+		/* start connect now */
+		if (0 != start_connect(ps)) {
+			return;
+		}
+	}
+	else {
+		/* stud used in client mode, keep client session ) */
+		if (!SSL_session_reused(ps->ssl)) {
+			if (client_session)
+				SSL_SESSION_free(client_session);
+			client_session = SSL_get1_session(ps->ssl);
+		}
+	}
 
-        if (CONFIG->WRITE_PROXY_LINE_V2) {
-            char *ring_pnt = ringbuffer_write_ptr(&ps->ring_ssl2clear);
-            assert(ps->remote_ip.ss_family == AF_INET ||
-                   ps->remote_ip.ss_family == AF_INET6);
-            memcpy(ring_pnt, &header_proxy_v2, sizeof(header_proxy_v2));
-            memcpy(ring_pnt+sizeof(header_proxy_v2), &ps->proxy_addr,
-		header_proxy_v2.len);
-            ringbuffer_write_append(&ps->ring_ssl2clear,
-		header_proxy_v2.len+sizeof(header_proxy_v2));
-        }
-        else if (CONFIG->WRITE_PROXY_LINE) {
-            char *ring_pnt = ringbuffer_write_ptr(&ps->ring_ssl2clear);
-            assert(ps->remote_ip.ss_family == AF_INET ||
-                   ps->remote_ip.ss_family == AF_INET6);
-            if(ps->remote_ip.ss_family == AF_INET) {
-               struct sockaddr_in* addr = (struct sockaddr_in*)&ps->remote_ip;
-               written = snprintf(ring_pnt,
-        			  ps->ring_ssl2clear.data_len,
-                                  tcp_proxy_line,
-                                  "TCP4",
-                                  inet_ntoa(addr->sin_addr),
-                                  ntohs(addr->sin_port));
-               }
-               else if (ps->remote_ip.ss_family == AF_INET6) {
-                        struct sockaddr_in6* addr =
-			    (struct sockaddr_in6*)&ps->remote_ip;
-                        inet_ntop(AF_INET6,&(addr->sin6_addr),
-			    tcp6_address_string, INET6_ADDRSTRLEN);
-                        written = snprintf(ring_pnt,
-                        	  ps->ring_ssl2clear.data_len,
-                                  tcp_proxy_line,
-                                  "TCP6",
-                                  tcp6_address_string,
-                                  ntohs(addr->sin6_port));
-            }
-            ringbuffer_write_append(&ps->ring_ssl2clear, written);
-        }
-        else if (CONFIG->WRITE_IP_OCTET) {
-            char *ring_pnt = ringbuffer_write_ptr(&ps->ring_ssl2clear);
-            assert(ps->remote_ip.ss_family == AF_INET ||
-                   ps->remote_ip.ss_family == AF_INET6);
-            *ring_pnt++ = (unsigned char) ps->remote_ip.ss_family;
-            if (ps->remote_ip.ss_family == AF_INET6) {
-                memcpy(ring_pnt, &((struct sockaddr_in6 *) &ps->remote_ip)
-                       ->sin6_addr.s6_addr, 16U);
-                ringbuffer_write_append(&ps->ring_ssl2clear, 1U + 16U);
-            }
-            else {
-                memcpy(ring_pnt, &((struct sockaddr_in *) &ps->remote_ip)
-                       ->sin_addr.s_addr, 4U);
-                ringbuffer_write_append(&ps->ring_ssl2clear, 1U + 4U);
-            }
-        }
-        /* start connect now */
-        if (0 != start_connect(ps)) {
-            return;
-        }
-    }
-    else {
-        /* stud used in client mode, keep client session ) */
-        if (!SSL_session_reused(ps->ssl)) {
-            if (client_session)
-                SSL_SESSION_free(client_session);
-            client_session = SSL_get1_session(ps->ssl);
-        }
-    }
+	/* if incoming buffer is not full */
+	if (!ringbuffer_is_full(&ps->ring_ssl2clear))
+		safe_enable_io(ps, &ps->ev_r_ssl);
 
-    /* if incoming buffer is not full */
-    if (!ringbuffer_is_full(&ps->ring_ssl2clear))
-        safe_enable_io(ps, &ps->ev_r_ssl);
-
-    /* if outgoing buffer is not empty */
-    if (!ringbuffer_is_empty(&ps->ring_clear2ssl))
-        // not safe.. we want to resume stream even during half-closed
-        ev_io_start(loop, &ps->ev_w_ssl);
+	/* if outgoing buffer is not empty */
+	if (!ringbuffer_is_empty(&ps->ring_clear2ssl))
+		// not safe.. we want to resume stream even during half-closed
+		ev_io_start(loop, &ps->ev_w_ssl);
 }
 
 static void client_proxy_proxy(struct ev_loop *loop, ev_io *w, int revents) {
@@ -1634,19 +1647,6 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     ps->ev_r_handshake.data = ps;
     ps->ev_w_handshake.data = ps;
     ps->ev_t_handshake.data = ps;
-
-    memcpy(&ps->proxy_addr, &frontend_addr, sizeof(frontend_addr));
-
-    if(addr.ss_family == AF_INET) {
-        struct sockaddr_in* saddr = (struct sockaddr_in*)&addr;
-        memcpy(&ps->proxy_addr.ipv4_addr.src_addr, &saddr->sin_addr, sizeof(struct in_addr));
-        ps->proxy_addr.ipv4_addr.src_port = saddr->sin_port;
-    } else if(addr.ss_family == AF_INET6) {
-        struct sockaddr_in6* saddr = (struct sockaddr_in6*)&addr;
-        memcpy(&ps->proxy_addr.ipv6_addr.src_addr, &saddr->sin6_addr, sizeof(struct in6_addr));
-        ps->proxy_addr.ipv6_addr.src_port = saddr->sin6_port;
-    }
-    
 
     /* Link back proxystate to SSL state */
     SSL_set_app_data(ssl, ps);
