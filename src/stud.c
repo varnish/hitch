@@ -185,6 +185,8 @@ struct ha_proxy_v2_hdr {
  * All state associated with one proxied connection
  */
 typedef struct proxystate {
+    unsigned magic;
+#define PROXYSTATE_MAGIC 0xcf877ed9
     ringbuffer ring_ssl2clear;          /* Pushing bytes from secure to clear stream */
     ringbuffer ring_clear2ssl;          /* Pushing bytes from clear to secure stream */
 
@@ -286,6 +288,8 @@ logproxy (int level, const proxystate* ps, const char* fmt, ...)
     char buf[1024];
     char abuf[INET_ADDRSTRLEN+1];
     va_list ap;
+
+    CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
 
     va_start(ap, fmt);
     snprintf(buf, sizeof(buf), "%s:%d :%d %d:%d %s",
@@ -398,9 +402,10 @@ static int init_dh(SSL_CTX *ctx, const char *cert) {
  * client-initiated renegotiations.
  */
 static void info_callback(const SSL *ssl, int where, int ret) {
+    proxystate *ps;
     (void)ret;
     if (where & SSL_CB_HANDSHAKE_START) {
-        proxystate *ps = (proxystate *)SSL_get_app_data(ssl);
+        CAST_OBJ_NOTNULL(ps, SSL_get_app_data(ssl), PROXYSTATE_MAGIC);
         if (ps->handshaked) {
             ps->renegotiation = 1;
             LOG("{core} SSL renegotiation asked by client\n");
@@ -978,6 +983,7 @@ static int create_back_socket() {
 /* Only enable a libev ev_io event if the proxied connection still
  * has both up and down connected */
 static void safe_enable_io(proxystate *ps, ev_io *w) {
+    CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
     if (!ps->want_shutdown)
         ev_io_start(loop, w);
 }
@@ -985,6 +991,7 @@ static void safe_enable_io(proxystate *ps, ev_io *w) {
 /* Only enable a libev ev_io event if the proxied connection still
  * has both up and down connected */
 static void shutdown_proxy(proxystate *ps, SHUTDOWN_REQUESTOR req) {
+    CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
     LOGPROXY(ps, "proxy shutdown req=%d\n", req);
     if (ps->want_shutdown || req == SHUTDOWN_HARD) {
         ev_io_stop(loop, &ps->ev_w_ssl);
@@ -1021,6 +1028,7 @@ static void shutdown_proxy(proxystate *ps, SHUTDOWN_REQUESTOR req) {
 
 /* Handle various socket errors */
 static void handle_socket_errno(proxystate *ps, int backend) {
+    CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
     if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
         return;
 
@@ -1034,6 +1042,7 @@ static void handle_socket_errno(proxystate *ps, int backend) {
 /* Start connect to backend */
 static int start_connect(proxystate *ps) {
     int t = 1;
+    CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
     t = connect(ps->fd_down, backaddr->ai_addr, backaddr->ai_addrlen);
     if (t == 0 || errno == EINPROGRESS || errno == EINTR) {
         ev_io_start(loop, &ps->ev_w_connect);
@@ -1051,7 +1060,8 @@ static int start_connect(proxystate *ps) {
 static void clear_read(struct ev_loop *loop, ev_io *w, int revents) {
     (void) revents;
     int t;
-    proxystate *ps = (proxystate *)w->data;
+    proxystate *ps;
+    CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
     if (ps->want_shutdown) {
         ev_io_stop(loop, &ps->ev_r_clear);
         return;
@@ -1081,10 +1091,11 @@ static void clear_read(struct ev_loop *loop, ev_io *w, int revents) {
 static void clear_write(struct ev_loop *loop, ev_io *w, int revents) {
     (void) revents;
     int t;
-    proxystate *ps = (proxystate *)w->data;
+    proxystate *ps;
     int fd = w->fd;
     int sz;
 
+    CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
     assert(!ringbuffer_is_empty(&ps->ring_ssl2clear));
 
     char *next = ringbuffer_read_next(&ps->ring_ssl2clear, &sz);
@@ -1120,7 +1131,10 @@ static void start_handshake(proxystate *ps, int err);
 static void handle_connect(struct ev_loop *loop, ev_io *w, int revents) {
     (void) revents;
     int t;
-    proxystate *ps = (proxystate *)w->data;
+    proxystate *ps;
+
+    CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
+
     t = connect(ps->fd_down, backaddr->ai_addr, backaddr->ai_addrlen);
     if (!t || errno == EISCONN || !errno) {
         ev_io_stop(loop, &ps->ev_w_connect);
@@ -1164,7 +1178,8 @@ static void connect_timeout(EV_P_ ev_timer *w, int revents)
 {
     (void) loop;
     (void) revents;
-    proxystate *ps = (proxystate *)w->data;
+    proxystate *ps;
+    CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
     ERRPROXY(ps,"backend connect timeout\n");
     //shutdown_proxy(ps, SHUTDOWN_HARD);
 }
@@ -1172,6 +1187,8 @@ static void connect_timeout(EV_P_ ev_timer *w, int revents)
 /* Upon receiving a signal from OpenSSL that a handshake is required, re-wire
  * the read/write events to hook up to the handshake handlers */
 static void start_handshake(proxystate *ps, int err) {
+    CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
+
     ev_io_stop(loop, &ps->ev_r_ssl);
     ev_io_stop(loop, &ps->ev_w_ssl);
 
@@ -1194,6 +1211,7 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 		struct sockaddr_in	sa4;
 		struct sockaddr_in6	sa6;
 	} *l, *r;
+	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
 	p = (struct ha_proxy_v2_hdr *)
 	    ringbuffer_write_ptr(&ps->ring_ssl2clear);
 	size_t len = 16;
@@ -1241,12 +1259,15 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 static void
 write_proxy_v1(proxystate *ps, const struct sockaddr *local, socklen_t slen)
 {
-	char *p = ringbuffer_write_ptr(&ps->ring_ssl2clear);
+	char *p;
 	char src_addr[INET6_ADDRSTRLEN], dst_addr[INET6_ADDRSTRLEN];
 	char src_port[8], dst_port[8];
 	size_t len;
 	int n;
 
+	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
+
+	p = ringbuffer_write_ptr(&ps->ring_ssl2clear);
 	n = getnameinfo(local, slen, dst_addr, sizeof dst_addr, dst_port,
 	    sizeof dst_port, NI_NUMERICHOST | NI_NUMERICSERV);
 	assert (n == 0);
@@ -1271,8 +1292,10 @@ write_proxy_v1(proxystate *ps, const struct sockaddr *local, socklen_t slen)
 static void
 write_ip_octet(proxystate *ps)
 {
-	char *ring_pnt =
-	    ringbuffer_write_ptr(&ps->ring_ssl2clear);
+	char *ring_pnt;
+
+	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
+	ring_pnt = ringbuffer_write_ptr(&ps->ring_ssl2clear);
 	assert(ps->remote_ip.ss_family == AF_INET ||
 	    ps->remote_ip.ss_family == AF_INET6);
 	*ring_pnt++ = (unsigned char) ps->remote_ip.ss_family;
@@ -1291,6 +1314,7 @@ write_ip_octet(proxystate *ps)
 /* After OpenSSL is done with a handshake, re-wire standard read/write handlers
  * for data transmission */
 static void end_handshake(proxystate *ps) {
+	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
 	ev_io_stop(loop, &ps->ev_r_handshake);
 	ev_io_stop(loop, &ps->ev_w_handshake);
 	ev_timer_stop(loop, &ps->ev_t_handshake);
@@ -1348,8 +1372,11 @@ static void client_proxy_proxy(struct ev_loop *loop, ev_io *w, int revents) {
     (void) revents;
     int t;
     char *proxy = tcp_proxy_line, *end = tcp_proxy_line + sizeof(tcp_proxy_line);
-    proxystate *ps = (proxystate *)w->data;
-    BIO *b = SSL_get_rbio(ps->ssl);
+    proxystate *ps;
+    BIO *b;
+
+    CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
+    b = SSL_get_rbio(ps->ssl);
 
     // Copy characters one-by-one until we hit a \n or an error
     while (proxy != end && (t = BIO_read(b, proxy, 1)) == 1) {
@@ -1389,6 +1416,7 @@ static void
 log_ssl_error (proxystate* ps, const char* what)
 {
     int e;
+    CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
     while ((e = ERR_get_error())) {
 	char buf[1024];
 	ERR_error_string_n(e, buf, sizeof(buf));
@@ -1402,7 +1430,9 @@ log_ssl_error (proxystate* ps, const char* what)
 static void client_handshake(struct ev_loop *loop, ev_io *w, int revents) {
     (void) revents;
     int t;
-    proxystate *ps = (proxystate *)w->data;
+    proxystate *ps;
+
+    CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
 
     LOGPROXY(ps,"ssl client handshake revents=%x\n",revents);
     t = SSL_do_handshake(ps->ssl);
@@ -1439,7 +1469,8 @@ static void handshake_timeout(EV_P_ ev_timer *w, int revents)
 {
     (void) loop;
     (void) revents;
-    proxystate *ps = (proxystate *)w->data;
+    proxystate *ps;
+    CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
     LOGPROXY(ps,"SSL handshake timeout\n");
     shutdown_proxy(ps, SHUTDOWN_HARD);
 }
@@ -1462,6 +1493,7 @@ default: \
 
     /* Handle a socket error condition passed to us from OpenSSL */
 static void handle_fatal_ssl_error(proxystate *ps, int err, int backend) {
+    CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
     if (backend) {
 	SSLERR(ps, "backend", ERRPROXY);
     } else {
@@ -1475,7 +1507,10 @@ static void handle_fatal_ssl_error(proxystate *ps, int err, int backend) {
 static void ssl_read(struct ev_loop *loop, ev_io *w, int revents) {
     (void) revents;
     int t;
-    proxystate *ps = (proxystate *)w->data;
+    proxystate *ps;
+
+    CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
+
     if (ps->want_shutdown) {
         ev_io_stop(loop, &ps->ev_r_ssl);
         return;
@@ -1524,7 +1559,10 @@ static void ssl_write(struct ev_loop *loop, ev_io *w, int revents) {
     (void) revents;
     int t;
     int sz;
-    proxystate *ps = (proxystate *)w->data;
+    proxystate *ps;
+
+    CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
+
     assert(!ringbuffer_is_empty(&ps->ring_clear2ssl));
     char * next = ringbuffer_read_next(&ps->ring_clear2ssl, &sz);
     t = SSL_write(ps->ssl, next, sz);
@@ -1569,6 +1607,7 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     (void) revents;
     (void) loop;
     struct sockaddr_storage addr;
+    proxystate *ps;
     socklen_t sl = sizeof(addr);
     int client = accept(w->fd, (struct sockaddr *) &addr, &sl);
     if (client == -1) {
@@ -1623,7 +1662,7 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
     SSL_set_accept_state(ssl);
     SSL_set_fd(ssl, client);
 
-    proxystate *ps = (proxystate *)malloc(sizeof(proxystate));
+    ALLOC_OBJ(ps, PROXYSTATE_MAGIC);
 
     ps->fd_up = client;
     ps->fd_down = back;
@@ -1694,6 +1733,7 @@ static void handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents) {
     (void) revents;
     (void) loop;
     struct sockaddr_storage addr;
+    proxystate *ps;
     socklen_t sl = sizeof(addr);
     int client = accept(w->fd, (struct sockaddr *) &addr, &sl);
     if (client == -1) {
@@ -1752,7 +1792,7 @@ static void handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents) {
     if (client_session)
         SSL_set_session(ssl, client_session);
 
-    proxystate *ps = (proxystate *)malloc(sizeof(proxystate));
+    ALLOC_OBJ(ps, PROXYSTATE_MAGIC);
 
     ps->fd_up = client;
     ps->fd_down = back;
