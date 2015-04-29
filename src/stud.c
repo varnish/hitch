@@ -140,7 +140,7 @@ typedef enum _SHUTDOWN_REQUESTOR {
  */
 typedef struct ctx_list {
 	unsigned	magic;
-#define CTX_LIST_MAGIC	c179597c
+#define CTX_LIST_MAGIC	0xc179597c
 	char		*servername;
 	int		is_wildcard;
 	SSL_CTX		*ctx;
