@@ -286,18 +286,26 @@ static void
 logproxy (int level, const proxystate* ps, const char* fmt, ...)
 {
     char buf[1024];
-    char abuf[INET_ADDRSTRLEN+1];
+    char hbuf[INET6_ADDRSTRLEN+1];
+    char sbuf[8];
+    int n;
     va_list ap;
+    socklen_t salen;
 
     CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
 
+    salen = (ps->remote_ip.ss_family == AF_INET) ?
+	sizeof(struct sockaddr) : sizeof(struct sockaddr_in6);
+    n = getnameinfo((struct sockaddr *) &ps->remote_ip, salen, hbuf,
+	sizeof hbuf, sbuf, sizeof sbuf, NI_NUMERICHOST | NI_NUMERICSERV);
+    if (n != 0) {
+	    strcpy(hbuf, "n/a");
+	    strcpy(sbuf, "n/a");
+    }
+
     va_start(ap, fmt);
-    snprintf(buf, sizeof(buf), "%s:%d :%d %d:%d %s",
-	     inet_ntop(AF_INET, &((struct sockaddr_in*)&ps->remote_ip)->sin_addr, abuf, sizeof(abuf)),
-	     ntohs(((struct sockaddr_in*)&ps->remote_ip)->sin_port),
-	     ps->connect_port,
-	     ps->fd_up, ps->fd_down,
-	     fmt);
+    snprintf(buf, sizeof(buf), "%s:%s :%d %d:%d %s",
+	     hbuf, sbuf, ps->connect_port, ps->fd_up, ps->fd_down, fmt);
     VWLOG(level, buf, ap);
 }
 
