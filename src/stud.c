@@ -304,8 +304,12 @@ logproxy (int level, const proxystate* ps, const char* fmt, ...)
     }
 
     va_start(ap, fmt);
-    snprintf(buf, sizeof(buf), "%s:%s :%d %d:%d %s",
-	     hbuf, sbuf, ps->connect_port, ps->fd_up, ps->fd_down, fmt);
+    if (ps->remote_ip.ss_family == AF_INET)
+	    snprintf(buf, sizeof(buf), "%s:%s :%d %d:%d %s",
+		hbuf, sbuf, ps->connect_port, ps->fd_up, ps->fd_down, fmt);
+    else
+	    snprintf(buf, sizeof(buf), "[%s]:%s :%d %d:%d %s",
+		hbuf, sbuf, ps->connect_port, ps->fd_up, ps->fd_down, fmt);
     VWLOG(level, buf, ap);
 }
 
