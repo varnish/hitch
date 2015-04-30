@@ -995,7 +995,7 @@ create_listen_sock(void)
 #endif /* TCP_DEFER_ACCEPT */
 #endif
 		if (listen(s, CONFIG->BACKLOG) != 0) {
-			/* XXX */
+			fail("{listen-socket}");
 		}
 
 		ls->sock = s;
@@ -1004,8 +1004,8 @@ create_listen_sock(void)
 		n = getnameinfo(it->ai_addr, it->ai_addrlen, abuf,
 		    sizeof abuf, pbuf, sizeof pbuf,
 		    NI_NUMERICHOST | NI_NUMERICSERV);
-		if (n == 0) {
-			/* XXX */
+		if (n != 0) {
+			fail("{getnameinfo}");
 		}
 
 		if (it->ai_addr->sa_family == AF_INET6) {
@@ -1018,6 +1018,8 @@ create_listen_sock(void)
 
 		VTAILQ_INSERT_TAIL(&listen_socks, ls, list);
 		nlisten_socks++;
+
+		LOG("{core} Listening on %s\n", ls->name);
 	}
 
 	freeaddrinfo(ai);
