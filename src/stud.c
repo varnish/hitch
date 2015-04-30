@@ -62,6 +62,7 @@
 #include <openssl/asn1.h>
 #include <ev.h>
 
+#include "vqueue.h"
 #include "ringbuffer.h"
 #include "miniobj.h"
 #include "shctx.h"
@@ -95,12 +96,25 @@
 static struct ev_loop *loop;
 static struct addrinfo *backaddr;
 static pid_t master_pid;
-static ev_io listener;
-static int listener_socket;
 static int child_num;
 static pid_t *child_pids;
 static SSL_CTX *default_ctx;
 static SSL_SESSION *client_session;
+
+struct listen_sock {
+	unsigned			magic;
+#define LISTEN_SOCK_MAGIC 		0x5b04e577
+	VTAILQ_ENTRY(listen_sock)	list;
+	ev_io				listener;
+	int				sock;
+	const char			*name;
+	struct sockaddr_storage		addr;
+};
+
+VTAILQ_HEAD(listen_sock_head, listen_sock);
+
+static struct listen_sock_head listen_socks;
+static unsigned nlisten_socks;
 
 #define LOG_REOPEN_INTERVAL 60
 static FILE* logf;
@@ -926,52 +940,88 @@ void init_openssl() {
 }
 
 /* Create the bound socket in the parent process */
-static int create_main_socket() {
-    struct addrinfo *ai, hints;
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
-    const int gai_err = getaddrinfo(CONFIG->FRONT_IP, CONFIG->FRONT_PORT,
-                                    &hints, &ai);
-    if (gai_err != 0) {
-        ERR("{getaddrinfo}: [%s]\n", gai_strerror(gai_err));
-        exit(1);
-    }
+static int
+create_listen_sock(void)
+{
+	struct addrinfo *ai, hints, *it;
+	struct listen_sock *ls;
+	char buf[INET6_ADDRSTRLEN+20];
+	char abuf[INET6_ADDRSTRLEN];
+	char pbuf[8];
+	int n;
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
+	const int gai_err = getaddrinfo(CONFIG->FRONT_IP, CONFIG->FRONT_PORT,
+	    &hints, &ai);
+	if (gai_err != 0) {
+		ERR("{getaddrinfo}: [%s]\n", gai_strerror(gai_err));
+		exit(1);
+	}
 
-    int s = socket(ai->ai_family, SOCK_STREAM, IPPROTO_TCP);
+	for (it = ai; it != NULL; it = it->ai_next) {
+		ALLOC_OBJ(ls, LISTEN_SOCK_MAGIC);
+		int s = socket(it->ai_family, SOCK_STREAM, IPPROTO_TCP);
+		if (s == -1)
+			fail("{socket: main}");
 
-    if (s == -1)
-      fail("{socket: main}");
-
-    int t = 1;
-    setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(int));
+		int t = 1;
+		setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(int));
 #ifdef SO_REUSEPORT
-    setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &t, sizeof(int));
+		setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &t, sizeof(int));
 #endif
-    setnonblocking(s);
-    if (CONFIG->RECV_BUFSIZE > 0) {
-	setsockopt(s, SOL_SOCKET, SO_RCVBUF, &CONFIG->RECV_BUFSIZE, sizeof(CONFIG->RECV_BUFSIZE));
-    }
-    if (CONFIG->SEND_BUFSIZE > 0) {
-	setsockopt(s, SOL_SOCKET, SO_SNDBUF, &CONFIG->SEND_BUFSIZE, sizeof(CONFIG->SEND_BUFSIZE));
-    }
+		setnonblocking(s);
+		if (CONFIG->RECV_BUFSIZE > 0) {
+			setsockopt(s, SOL_SOCKET, SO_RCVBUF,
+			    &CONFIG->RECV_BUFSIZE,
+			    sizeof(CONFIG->RECV_BUFSIZE));
+		}
+		if (CONFIG->SEND_BUFSIZE > 0) {
+			setsockopt(s, SOL_SOCKET, SO_SNDBUF,
+			    &CONFIG->SEND_BUFSIZE,
+			    sizeof(CONFIG->SEND_BUFSIZE));
+		}
 
-    if (bind(s, ai->ai_addr, ai->ai_addrlen)) {
-        fail("{bind-socket}");
-    }
+		if (bind(s, it->ai_addr, it->ai_addrlen)) {
+			fail("{bind-socket}");
+		}
 
 #ifndef NO_DEFER_ACCEPT
 #if TCP_DEFER_ACCEPT
-    int timeout = 1;
-    setsockopt(s, IPPROTO_TCP, TCP_DEFER_ACCEPT, &timeout, sizeof(int) );
+		int timeout = 1;
+		setsockopt(s, IPPROTO_TCP, TCP_DEFER_ACCEPT,
+		    &timeout, sizeof(int));
 #endif /* TCP_DEFER_ACCEPT */
 #endif
+		if (listen(s, CONFIG->BACKLOG) != 0) {
+			/* XXX */
+		}
 
-    freeaddrinfo(ai);
-    listen(s, CONFIG->BACKLOG);
+		ls->sock = s;
+		memcpy(&ls->addr, it->ai_addr, it->ai_addrlen);
 
-    return s;
+		n = getnameinfo(it->ai_addr, it->ai_addrlen, abuf,
+		    sizeof abuf, pbuf, sizeof pbuf,
+		    NI_NUMERICHOST | NI_NUMERICSERV);
+		if (n == 0) {
+			/* XXX */
+		}
+
+		if (it->ai_addr->sa_family == AF_INET6) {
+			sprintf(buf, "[%s]:%s", abuf, pbuf);
+		} else {
+			sprintf(buf, "%s:%s", abuf, pbuf);
+		}
+		ls->name = strdup(buf);
+		AN(ls->name);
+
+		VTAILQ_INSERT_TAIL(&listen_socks, ls, list);
+		nlisten_socks++;
+	}
+
+	freeaddrinfo(ai);
+	return (0);
 }
 
 /* Initiate a clear-text nonblocking connect() to the backend IP on behalf
@@ -1612,7 +1662,7 @@ static void ssl_write(struct ev_loop *loop, ev_io *w, int revents) {
     }
 }
 
-/* libev read handler for the bound socket.  Socket is accepted,
+/* libev read handler for the bound sockets.  Socket is accepted,
  * the proxystate is allocated and initalized, and we're off the races
  * connecting to the backend */
 static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
@@ -1730,15 +1780,19 @@ static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
 
 
 static void check_ppid(struct ev_loop *loop, ev_timer *w, int revents) {
-    (void) revents;
-    pid_t ppid = getppid();
-    if (ppid != master_pid) {
-        ERR("{core} Process %d detected parent death, closing listener socket.\n", child_num);
-        ev_timer_stop(loop, w);
-        ev_io_stop(loop, &listener);
-        close(listener_socket);
-    }
-
+	struct listen_sock *ls;
+	(void) revents;
+	pid_t ppid = getppid();
+	if (ppid != master_pid) {
+		ERR("{core} Process %d detected parent death, "
+		    "closing listener sockets.\n", child_num);
+		ev_timer_stop(loop, w);
+		VTAILQ_FOREACH(ls, &listen_socks, list) {
+			CHECK_OBJ_NOTNULL(ls, LISTEN_SOCK_MAGIC);
+			ev_io_stop(loop, &ls->listener);
+			close(ls->sock);
+		}
+	}
 }
 
 static void handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents) {
@@ -1848,39 +1902,48 @@ static void handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents) {
 }
 
 /* Set up the child (worker) process including libev event loop, read event
- * on the bound socket, etc */
-static void handle_connections() {
-    LOG("{core} Process %d online\n", child_num);
+ * on the bound sockets, etc */
+static void
+handle_connections(void)
+{
+	struct listen_sock *ls;
+	LOG("{core} Process %d online\n", child_num);
 
-    /* child cannot create new children... */
-    create_workers = 0;
+	/* child cannot create new children... */
+	create_workers = 0;
 
 #if defined(CPU_ZERO) && defined(CPU_SET)
-    cpu_set_t cpus;
+	cpu_set_t cpus;
 
-    CPU_ZERO(&cpus);
-    CPU_SET(child_num, &cpus);
+	CPU_ZERO(&cpus);
+	CPU_SET(child_num, &cpus);
 
-    int res = sched_setaffinity(0, sizeof(cpus), &cpus);
-    if (!res)
-        LOG("{core} Successfully attached to CPU #%d\n", child_num);
-    else
-        ERR("{core-warning} Unable to attach to CPU #%d; do you have that many cores?\n", child_num);
+	int res = sched_setaffinity(0, sizeof(cpus), &cpus);
+	if (!res)
+		LOG("{core} Successfully attached to CPU #%d\n", child_num);
+	else
+		ERR("{core-warning} Unable to attach to CPU #%d; "
+		    "do you have that many cores?\n", child_num);
 #endif
 
-    loop = ev_default_loop(EVFLAG_AUTO);
+	loop = ev_default_loop(EVFLAG_AUTO);
 
-    ev_timer timer_ppid_check;
-    ev_timer_init(&timer_ppid_check, check_ppid, 1.0, 1.0);
-    ev_timer_start(loop, &timer_ppid_check);
+	ev_timer timer_ppid_check;
+	ev_timer_init(&timer_ppid_check, check_ppid, 1.0, 1.0);
+	ev_timer_start(loop, &timer_ppid_check);
 
-    ev_io_init(&listener, (CONFIG->PMODE == SSL_CLIENT) ? handle_clear_accept : handle_accept, listener_socket, EV_READ);
-    listener.data = default_ctx;
-    ev_io_start(loop, &listener);
+	VTAILQ_FOREACH(ls, &listen_socks, list) {
+		ev_io_init(&ls->listener,
+		    (CONFIG->PMODE == SSL_CLIENT) ?
+		    handle_clear_accept : handle_accept,
+		    ls->sock, EV_READ);
+		ls->listener.data = default_ctx;
+		ev_io_start(loop, &ls->listener);
+	}
 
-    ev_loop(loop, 0);
-    ERR("{core} Child %d exiting.\n", child_num);
-    exit(1);
+	ev_loop(loop, 0);
+	ERR("{core} Child %d exiting.\n", child_num);
+	exit(1);
 }
 
 void change_root() {
@@ -1901,6 +1964,9 @@ void drop_privileges() {
 void init_globals() {
     /* backaddr */
     struct addrinfo hints;
+
+    VTAILQ_INIT(&listen_socks);
+
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -2175,7 +2241,7 @@ int main(int argc, char **argv) {
 
     init_globals();
 
-    listener_socket = create_main_socket();
+    create_listen_sock();
 
 #ifdef USE_SHARED_CACHE
     if (CONFIG->SHCUPD_PORT) {
