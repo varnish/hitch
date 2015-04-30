@@ -1272,7 +1272,7 @@ static void
 write_proxy_v1(proxystate *ps, const struct sockaddr *local, socklen_t slen)
 {
 	char *p;
-	char src_addr[INET6_ADDRSTRLEN], dst_addr[INET6_ADDRSTRLEN];
+	char src_addr[INET6_ADDRSTRLEN+1], dst_addr[INET6_ADDRSTRLEN+1];
 	char src_port[8], dst_port[8];
 	size_t len;
 	int n;
