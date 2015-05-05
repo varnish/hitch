@@ -369,16 +369,8 @@ int config_param_host_port_wildcard (char *str, char **addr, char **port, int wi
   }
   // OLD FORMAT: address,port
   else {
-    char *x = strrchr(str, ',');
-    if (x == NULL) {
-      config_error_set("Invalid address string '%s'", str);
-      return 0;
-    }
-    // addr
-    int addr_len = x - str;
-    memcpy(addr_buf, str, addr_len);
-    // port
-    memcpy(port_buf, (++x), sizeof(port_buf));
+    config_error_set("Invalid address string '%s'", str);
+    return 0;
   }
 
   // printf("PARSED ADDR '%s', PORT '%s'\n", addr_buf, port_buf);
