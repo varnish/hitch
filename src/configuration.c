@@ -190,6 +190,7 @@ void config_destroy (stud_config *cfg) {
 	  VTAILQ_REMOVE(&cfg->LISTEN_ARGS, fa, list);
 	  free(fa->ip);
 	  free(fa->port);
+	  free(fa->cert);
 	  FREE_OBJ(fa);
   }
   if (cfg->BACK_IP != NULL) free(cfg->BACK_IP);
@@ -350,7 +351,8 @@ char * config_param_val_str (char *val) {
   return strdup(val);
 }
 
-int config_param_host_port_wildcard (char *str, char **addr, char **port, int wildcard_okay) {
+int config_param_host_port_wildcard (char *str, char **addr, char **port,
+    char **cert, int wildcard_okay) {
   int len = (str != NULL) ? strlen(str) : 0;
   if (str == NULL || ! len) {
     config_error_set("Invalid/unset host/port string.");
@@ -377,8 +379,21 @@ int config_param_host_port_wildcard (char *str, char **addr, char **port, int wi
     memcpy(addr_buf, ptr, (x - ptr));
 
     // port
-    x += 2;
-    memcpy(port_buf, x, sizeof(port_buf) - 1);
+    if (x[1] != ':' || x[2] == '\0') {
+      config_error_set("Invalid port specifier in string '%s'.", str);
+      return 0;
+    }
+    ptr = x + 2;
+    x = strchr(ptr, '+');
+    if (x == NULL)
+      memcpy(port_buf, ptr, sizeof(port_buf) - 1);
+    else
+      memcpy(port_buf, ptr, (x - ptr));
+
+    // cert
+    if (cert && x) {
+	    *cert = strdup(x + 1);
+    }
   }
   // OLD FORMAT: address,port
   else {
@@ -410,13 +425,14 @@ int config_param_host_port_wildcard (char *str, char **addr, char **port, int wi
   // if (**port != NULL) free(*port);
   *port = strdup(port_buf);
 
-  // printf("ADDR FINAL: '%s', '%s'\n", *addr, *port);
+  /* printf("ADDR FINAL: '%s', '%s', '%s'\n", *addr, *port, */
+  /*     cert ? *cert : ""); */
 
   return 1;
 }
 
 int config_param_host_port (char *str, char **addr, char **port) {
-  return config_param_host_port_wildcard(str, addr, port, 0);
+  return config_param_host_port_wildcard(str, addr, port, NULL, 0);
 }
 
 int config_param_val_int (char *str, int *dst) {
@@ -585,7 +601,7 @@ void config_param_validate (char *k, char *v, stud_config *cfg, char *file, int 
 	  struct front_arg *fa;
 	  ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
 	  r = config_param_host_port_wildcard(v,
-	      &fa->ip, &fa->port, 1);
+	      &fa->ip, &fa->port, &fa->cert, 1);
 	  if (r != 0) {
 		  if (VTAILQ_FIRST(&cfg->LISTEN_ARGS) == cfg->LISTEN_DEFAULT) {
 			  /* drop default listen arg. */
@@ -593,6 +609,7 @@ void config_param_validate (char *k, char *v, stud_config *cfg, char *file, int 
 			  VTAILQ_REMOVE(&cfg->LISTEN_ARGS, def, list);
 			  free(def->ip);
 			  free(def->port);
+			  free(def->cert);
 			  FREE_OBJ(def);
 		  }
 		  VTAILQ_INSERT_TAIL(&cfg->LISTEN_ARGS, fa, list);
@@ -617,7 +634,8 @@ void config_param_validate (char *k, char *v, stud_config *cfg, char *file, int 
   }
   else if (strcmp(k, CFG_SHARED_CACHE_LISTEN) == 0) {
     if (v != NULL && strlen(v) > 0)
-      r = config_param_host_port_wildcard(v, &cfg->SHCUPD_IP, &cfg->SHCUPD_PORT, 1);
+	    r = config_param_host_port_wildcard(v, &cfg->SHCUPD_IP,
+		&cfg->SHCUPD_PORT, NULL, 1);
   }
   else if (strcmp(k, CFG_SHARED_CACHE_PEER) == 0) {
     r = config_param_shcupd_peer(v, cfg);
@@ -940,7 +958,7 @@ void config_print_usage_fd (char *prog, stud_config *cfg, FILE *out) {
   fprintf(out, "\n");
   fprintf(out, "  --client                    Enable client proxy mode\n");
   fprintf(out, "  -b  --backend=HOST:PORT     Backend [connect] (default is \"%s\")\n", config_disp_hostport(cfg->BACK_IP, cfg->BACK_PORT));
-  fprintf(out, "  -f  --frontend=HOST:PORT    Frontend [bind] (default is \"%s\")\n", config_disp_hostport(VTAILQ_FIRST(&cfg->LISTEN_ARGS)->ip, VTAILQ_FIRST(&cfg->LISTEN_ARGS)->port));
+  fprintf(out, "  -f  --frontend=HOST:PORT[+CERT]    Frontend [bind] (default is \"%s\")\n", config_disp_hostport(VTAILQ_FIRST(&cfg->LISTEN_ARGS)->ip, VTAILQ_FIRST(&cfg->LISTEN_ARGS)->port));
 
 #ifdef USE_SHARED_CACHE
   fprintf(out, "\n");

@@ -42,6 +42,7 @@ struct front_arg {
 #define FRONT_ARG_MAGIC		0x07a16cb5
 	char			*ip;
 	char			*port;
+	char			*cert;
 	VTAILQ_ENTRY(front_arg)	list;
 };
 
