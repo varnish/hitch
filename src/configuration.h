@@ -6,6 +6,7 @@
  */
 
 #include <sys/types.h>
+#include "vqueue.h"
 
 #ifdef USE_SHARED_CACHE
   #include "shctx.h"
@@ -36,6 +37,16 @@ struct cert_files {
     struct cert_files *NEXT;
 };
 
+struct front_arg {
+	unsigned		magic;
+#define FRONT_ARG_MAGIC		0x07a16cb5
+	char			*ip;
+	char			*port;
+	VTAILQ_ENTRY(front_arg)	list;
+};
+
+VTAILQ_HEAD(front_arg_head, front_arg);
+
 /* configuration structure */
 struct __stud_config {
     ENC_TYPE ETYPE;
@@ -47,8 +58,7 @@ struct __stud_config {
     char *CHROOT;
     int UID;
     int GID;
-    char *FRONT_IP;
-    char *FRONT_PORT;
+    struct front_arg_head LISTEN_ARGS;
     char *BACK_IP;
     char *BACK_PORT;
     long NCORES;

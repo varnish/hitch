@@ -941,7 +941,7 @@ void init_openssl() {
 
 /* Create the bound socket in the parent process */
 static int
-create_listen_sock(void)
+create_listen_sock(const struct front_arg *fa)
 {
 	struct addrinfo *ai, hints, *it;
 	struct listen_sock *ls;
@@ -949,11 +949,14 @@ create_listen_sock(void)
 	char abuf[INET6_ADDRSTRLEN];
 	char pbuf[8];
 	int n;
+
+	CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
+
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
-	const int gai_err = getaddrinfo(CONFIG->FRONT_IP, CONFIG->FRONT_PORT,
+	const int gai_err = getaddrinfo(fa->ip, fa->port,
 	    &hints, &ai);
 	if (gai_err != 0) {
 		ERR("{getaddrinfo}: [%s]\n", gai_strerror(gai_err));
@@ -2213,6 +2216,7 @@ void openssl_check_version() {
  * spawn child (worker) processes, and respawn if any die */
 int main(int argc, char **argv) {
     // initialize configuration
+    struct front_arg *fa;
     CONFIG = config_new();
 
     if (CONFIG->LOG_FILENAME) {
@@ -2243,7 +2247,8 @@ int main(int argc, char **argv) {
 
     init_globals();
 
-    create_listen_sock();
+    VTAILQ_FOREACH(fa, &CONFIG->LISTEN_ARGS, list)
+	create_listen_sock(fa);
 
 #ifdef USE_SHARED_CACHE
     if (CONFIG->SHCUPD_PORT) {
