@@ -143,6 +143,7 @@ stud_config * config_new (void) {
   ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
   fa->port = strdup("8443");
   VTAILQ_INSERT_HEAD(&r->LISTEN_ARGS, fa, list);
+  r->LISTEN_DEFAULT = fa;
 
 #ifdef USE_SHARED_CACHE
   r->SHARED_CACHE       = 0;
@@ -586,11 +587,9 @@ void config_param_validate (char *k, char *v, stud_config *cfg, char *file, int 
 	  r = config_param_host_port_wildcard(v,
 	      &fa->ip, &fa->port, 1);
 	  if (r != 0) {
-		  if (VTAILQ_FIRST(&cfg->LISTEN_ARGS)
-		      == VTAILQ_LAST(&cfg->LISTEN_ARGS, front_arg_head)) {
+		  if (VTAILQ_FIRST(&cfg->LISTEN_ARGS) == cfg->LISTEN_DEFAULT) {
 			  /* drop default listen arg. */
-			  struct front_arg *def =
-			      VTAILQ_FIRST(&cfg->LISTEN_ARGS);
+			  struct front_arg *def = cfg->LISTEN_DEFAULT;
 			  VTAILQ_REMOVE(&cfg->LISTEN_ARGS, def, list);
 			  free(def->ip);
 			  free(def->port);

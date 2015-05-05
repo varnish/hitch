@@ -59,6 +59,7 @@ struct __stud_config {
     int UID;
     int GID;
     struct front_arg_head LISTEN_ARGS;
+    struct front_arg *LISTEN_DEFAULT;
     char *BACK_IP;
     char *BACK_PORT;
     long NCORES;
