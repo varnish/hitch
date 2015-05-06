@@ -842,50 +842,38 @@ SSL_CTX *make_ctx(const char *pemfile) {
     return ctx;
 }
 
-/* Init library and load specified certificate.
- * Establishes a SSL_ctx, to act as a template for
- * each connection */
-void init_openssl() {
-    SSL_library_init();
-    SSL_load_error_strings();
-
-    assert(CONFIG->CERT_FILES != NULL);
-
-    // The first file (i.e., the last file listed in config) is always the
-    // "default" cert
-    default_ctx = make_ctx(CONFIG->CERT_FILES->CERT_FILE);
-
 #ifndef OPENSSL_NO_TLSEXT
-    {
-    struct cert_files *cf;
-    int i;
-    SSL_CTX *ctx;
-    X509 *x509;
-    BIO *f;
+static int
+load_cert_ctx(const char *file)
+{
+	SSL_CTX *ctx;
+	X509 *x509;
+	X509_NAME *x509_name;
+	X509_NAME_ENTRY *x509_entry;
+	BIO *f;
+	STACK_OF(GENERAL_NAME) *names = NULL;
+	GENERAL_NAME *name;
+	int i;
 
-    STACK_OF(GENERAL_NAME) *names = NULL;
-    GENERAL_NAME *name;
+#define PUSH_CTX(asn1_str, ctx)						\
+	do {								\
+		struct ctx_list *cl;					\
+		ALLOC_OBJ(cl, CTX_LIST_MAGIC);				\
+		ASN1_STRING_to_UTF8(					\
+			(unsigned char **)&cl->servername, asn1_str);	\
+		cl->is_wildcard =					\
+		    (strstr(cl->servername, "*.") == cl->servername);	\
+		cl->ctx = ctx;						\
+		cl->next = sni_ctxs;					\
+		sni_ctxs = cl;						\
+	} while (0)
 
-#define PUSH_CTX(asn1_str, ctx)                                             \
-    do {                                                                    \
-        struct ctx_list *cl;                                                \
-        ALLOC_OBJ(cl, CTX_LIST_MAGIC);                                      \
-        ASN1_STRING_to_UTF8((unsigned char **)&cl->servername, asn1_str);   \
-        cl->is_wildcard = (strstr(cl->servername, "*.") == cl->servername); \
-        cl->ctx = ctx;                                                      \
-        cl->next = sni_ctxs;                                                \
-        sni_ctxs = cl;                                                      \
-    } while (0)
-
-    // Go through the list of PEMs and make some SSL contexts for them. We also
-    // keep track of the names associated with each cert so we can do SNI on
-    // them later
-    for (cf = CONFIG->CERT_FILES->NEXT; cf != NULL; cf = cf->NEXT) {
-        ctx = make_ctx(cf->CERT_FILE);
+        ctx = make_ctx(file);
         f = BIO_new(BIO_s_file());
         // TODO: error checking
-        if (!BIO_read_filename(f, cf->CERT_FILE)) {
-            ERR("Could not read cert '%s'\n", cf->CERT_FILE);
+        if (!BIO_read_filename(f, file)) {
+		ERR("Could not read cert '%s'\n", file);
+		return (1);
         }
         x509 = PEM_read_bio_X509_AUX(f, NULL, NULL, NULL);
         BIO_free(f);
@@ -893,50 +881,74 @@ void init_openssl() {
         // First, look for Subject Alternative Names
         names = X509_get_ext_d2i(x509, NID_subject_alt_name, NULL, NULL);
         for (i = 0; i < sk_GENERAL_NAME_num(names); i++) {
-            name = sk_GENERAL_NAME_value(names, i);
-            if (name->type == GEN_DNS) {
-                PUSH_CTX(name->d.dNSName, ctx);
-            }
+		name = sk_GENERAL_NAME_value(names, i);
+		if (name->type == GEN_DNS) {
+			PUSH_CTX(name->d.dNSName, ctx);
+		}
         }
         if (sk_GENERAL_NAME_num(names) > 0) {
-            sk_GENERAL_NAME_pop_free(names, GENERAL_NAME_free);
-            // If we actally found some, don't bother looking any further
-            continue;
+		sk_GENERAL_NAME_pop_free(names, GENERAL_NAME_free);
+		// If we actally found some, don't bother looking any further
+		return (0);
         } else if (names != NULL) {
-            sk_GENERAL_NAME_pop_free(names, GENERAL_NAME_free);
+		sk_GENERAL_NAME_pop_free(names, GENERAL_NAME_free);
         }
 
         // Now we're left looking at the CN on the cert
-        X509_NAME *x509_name = X509_get_subject_name(x509);
+	x509_name = X509_get_subject_name(x509);
         i = X509_NAME_get_index_by_NID(x509_name, NID_commonName, -1);
         if (i < 0) {
-            ERR("Could not find Subject Alternative Names or a CN on cert %s\n",
-                    cf->CERT_FILE);
+		ERR("Could not find Subject Alternative Names"
+		    " or a CN on cert %s\n", file);
         }
-        X509_NAME_ENTRY *x509_entry = X509_NAME_get_entry(x509_name, i);
+        x509_entry = X509_NAME_get_entry(x509_name, i);
         PUSH_CTX(x509_entry->value, ctx);
-    }
-    }
+	return (0);
+}
+#endif /* OPENSSL_NO_TLSEXT */
+
+/* Init library and load specified certificate.
+ * Establishes a SSL_ctx, to act as a template for
+ * each connection */
+void init_openssl() {
+	struct cert_files *cf;
+	SSL_library_init();
+	SSL_load_error_strings();
+
+	assert(CONFIG->CERT_FILES != NULL);
+
+	// The first file (i.e., the last file listed in config) is always the
+	// "default" cert
+	default_ctx = make_ctx(CONFIG->CERT_FILES->CERT_FILE);
+
+#ifndef OPENSSL_NO_TLSEXT
+	// Go through the list of PEMs and make some SSL contexts for
+	// them. We also keep track of the names associated with each
+	// cert so we can do SNI on them later
+	for (cf = CONFIG->CERT_FILES->NEXT; cf != NULL; cf = cf->NEXT) {
+		load_cert_ctx(cf->CERT_FILE);
+	}
 #undef APPEND_CTX
 #endif /* OPENSSL_NO_TLSEXT */
 
-    if (CONFIG->ENGINE) {
-        ENGINE *e = NULL;
-        ENGINE_load_builtin_engines();
-        if (!strcmp(CONFIG->ENGINE, "auto"))
-            ENGINE_register_all_complete();
-        else {
-            if ((e = ENGINE_by_id(CONFIG->ENGINE)) == NULL ||
-                !ENGINE_init(e) ||
-                !ENGINE_set_default(e, ENGINE_METHOD_ALL)) {
-                ERR_print_errors_fp(stderr);
-                exit(1);
-            }
-            LOG("{core} will use OpenSSL engine %s.\n", ENGINE_get_id(e));
-            ENGINE_finish(e);
-            ENGINE_free(e);
-        }
-    }
+	if (CONFIG->ENGINE) {
+		ENGINE *e = NULL;
+		ENGINE_load_builtin_engines();
+		if (!strcmp(CONFIG->ENGINE, "auto"))
+			ENGINE_register_all_complete();
+		else {
+			if ((e = ENGINE_by_id(CONFIG->ENGINE)) == NULL ||
+			    !ENGINE_init(e) ||
+			    !ENGINE_set_default(e, ENGINE_METHOD_ALL)) {
+				ERR_print_errors_fp(stderr);
+				exit(1);
+			}
+			LOG("{core} will use OpenSSL engine %s.\n",
+			    ENGINE_get_id(e));
+			ENGINE_finish(e);
+			ENGINE_free(e);
+		}
+	}
 }
 
 /* Create the bound socket in the parent process */
