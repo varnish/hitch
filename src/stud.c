@@ -153,16 +153,17 @@ typedef enum _SHUTDOWN_REQUESTOR {
  * doesn't matter.
  */
 typedef struct ctx_list {
-	unsigned	magic;
-#define CTX_LIST_MAGIC	0xc179597c
-	char		*servername;
-	int		is_wildcard;
-	SSL_CTX		*ctx;
-	struct ctx_list	*next;
+	unsigned		magic;
+#define CTX_LIST_MAGIC		0xc179597c
+	char			*servername;
+	int			is_wildcard;
+	SSL_CTX			*ctx;
+	VTAILQ_ENTRY(ctx_list)	list;
 } ctx_list;
 
-static ctx_list *sni_ctxs;
 
+VTAILQ_HEAD(ctx_list_head, ctx_list);
+static struct ctx_list_head sni_ctxs;
 #endif /* OPENSSL_NO_TLSEXT */
 
 
@@ -740,7 +741,7 @@ int sni_switch_ctx(SSL *ssl, int *al, void *data) {
     servername = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
     if (!servername) return SSL_TLSEXT_ERR_NOACK;
 
-    for (cl = sni_ctxs; cl != NULL; cl = cl->next) {
+    VTAILQ_FOREACH(cl, &sni_ctxs, list) {
         CHECK_OBJ_NOTNULL(cl, CTX_LIST_MAGIC);
         if (sni_match(cl, servername)) {
             SSL_set_SSL_CTX(ssl, cl->ctx);
@@ -864,8 +865,7 @@ load_cert_ctx(const char *file)
 		cl->is_wildcard =					\
 		    (strstr(cl->servername, "*.") == cl->servername);	\
 		cl->ctx = ctx;						\
-		cl->next = sni_ctxs;					\
-		sni_ctxs = cl;						\
+		VTAILQ_INSERT_TAIL(&sni_ctxs, cl, list);		\
 	} while (0)
 
         ctx = make_ctx(file);
@@ -1983,6 +1983,7 @@ void init_globals() {
     struct addrinfo hints;
 
     VTAILQ_INIT(&listen_socks);
+    VTAILQ_INIT(&sni_ctxs);
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
