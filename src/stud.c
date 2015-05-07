@@ -108,6 +108,7 @@ struct listen_sock {
 	ev_io				listener;
 	int				sock;
 	const char			*name;
+	SSL_CTX				*sctx;
 	struct sockaddr_storage		addr;
 };
 
@@ -157,6 +158,7 @@ typedef struct ctx_list {
 #define CTX_LIST_MAGIC		0xc179597c
 	char			*servername;
 	int			is_wildcard;
+	char			*filename;
 	SSL_CTX			*ctx;
 	VTAILQ_ENTRY(ctx_list)	list;
 } ctx_list;
@@ -845,9 +847,8 @@ SSL_CTX *make_ctx(const char *pemfile) {
 
 #ifndef OPENSSL_NO_TLSEXT
 static int
-load_cert_ctx(const char *file)
+load_cert_ctx(SSL_CTX *ctx, const char *file)
 {
-	SSL_CTX *ctx;
 	X509 *x509;
 	X509_NAME *x509_name;
 	X509_NAME_ENTRY *x509_entry;
@@ -864,54 +865,71 @@ load_cert_ctx(const char *file)
 			(unsigned char **)&cl->servername, asn1_str);	\
 		cl->is_wildcard =					\
 		    (strstr(cl->servername, "*.") == cl->servername);	\
+		cl->filename = strdup(file);				\
 		cl->ctx = ctx;						\
 		VTAILQ_INSERT_TAIL(&sni_ctxs, cl, list);		\
 	} while (0)
 
-        ctx = make_ctx(file);
-        f = BIO_new(BIO_s_file());
-        // TODO: error checking
-        if (!BIO_read_filename(f, file)) {
+	f = BIO_new(BIO_s_file());
+	// TODO: error checking
+	if (!BIO_read_filename(f, file)) {
 		ERR("Could not read cert '%s'\n", file);
 		return (1);
-        }
-        x509 = PEM_read_bio_X509_AUX(f, NULL, NULL, NULL);
-        BIO_free(f);
+	}
+	x509 = PEM_read_bio_X509_AUX(f, NULL, NULL, NULL);
+	BIO_free(f);
 
-        // First, look for Subject Alternative Names
-        names = X509_get_ext_d2i(x509, NID_subject_alt_name, NULL, NULL);
-        for (i = 0; i < sk_GENERAL_NAME_num(names); i++) {
+	// First, look for Subject Alternative Names
+	names = X509_get_ext_d2i(x509, NID_subject_alt_name, NULL, NULL);
+	for (i = 0; i < sk_GENERAL_NAME_num(names); i++) {
 		name = sk_GENERAL_NAME_value(names, i);
 		if (name->type == GEN_DNS) {
 			PUSH_CTX(name->d.dNSName, ctx);
 		}
-        }
-        if (sk_GENERAL_NAME_num(names) > 0) {
+	}
+	if (sk_GENERAL_NAME_num(names) > 0) {
 		sk_GENERAL_NAME_pop_free(names, GENERAL_NAME_free);
 		// If we actally found some, don't bother looking any further
 		return (0);
-        } else if (names != NULL) {
+	} else if (names != NULL) {
 		sk_GENERAL_NAME_pop_free(names, GENERAL_NAME_free);
-        }
+	}
 
-        // Now we're left looking at the CN on the cert
+	// Now we're left looking at the CN on the cert
 	x509_name = X509_get_subject_name(x509);
-        i = X509_NAME_get_index_by_NID(x509_name, NID_commonName, -1);
-        if (i < 0) {
+	i = X509_NAME_get_index_by_NID(x509_name, NID_commonName, -1);
+	if (i < 0) {
 		ERR("Could not find Subject Alternative Names"
 		    " or a CN on cert %s\n", file);
-        }
-        x509_entry = X509_NAME_get_entry(x509_name, i);
-        PUSH_CTX(x509_entry->value, ctx);
+		return (1);
+	}
+	x509_entry = X509_NAME_get_entry(x509_name, i);
+	AN(x509_entry);
+	PUSH_CTX(x509_entry->value, ctx);
 	return (0);
 }
 #endif /* OPENSSL_NO_TLSEXT */
+
+/* Check that we don't needlessly load a cert that's already loaded. */
+static SSL_CTX *
+find_ctx(const char *file) {
+	struct ctx_list *cl;
+	VTAILQ_FOREACH(cl, &sni_ctxs, list) {
+		if (strcmp(cl->filename, file) == 0)
+			return (cl->ctx);
+	}
+
+	return (NULL);
+}
 
 /* Init library and load specified certificate.
  * Establishes a SSL_ctx, to act as a template for
  * each connection */
 void init_openssl() {
 	struct cert_files *cf;
+	struct front_arg *fa;
+	struct listen_sock *ls;
+	SSL_CTX *ctx;
 	SSL_library_init();
 	SSL_load_error_strings();
 
@@ -920,14 +938,36 @@ void init_openssl() {
 	// The first file (i.e., the last file listed in config) is always the
 	// "default" cert
 	default_ctx = make_ctx(CONFIG->CERT_FILES->CERT_FILE);
+	AN(default_ctx);
 
 #ifndef OPENSSL_NO_TLSEXT
+	load_cert_ctx(default_ctx, CONFIG->CERT_FILES->CERT_FILE);
+
 	// Go through the list of PEMs and make some SSL contexts for
 	// them. We also keep track of the names associated with each
 	// cert so we can do SNI on them later
 	for (cf = CONFIG->CERT_FILES->NEXT; cf != NULL; cf = cf->NEXT) {
-		load_cert_ctx(cf->CERT_FILE);
+		if (find_ctx(cf->CERT_FILE) == NULL) {
+			ctx = make_ctx(cf->CERT_FILE);
+			AN(ctx);
+			load_cert_ctx(ctx, cf->CERT_FILE);
+		}
 	}
+
+	for (fa = VTAILQ_FIRST(&CONFIG->LISTEN_ARGS),
+		 ls = VTAILQ_FIRST(&listen_socks); fa != NULL;
+	     fa = VTAILQ_NEXT(fa, list), ls = VTAILQ_NEXT(ls, list)) {
+		if (fa->cert) {
+			ctx = find_ctx(fa->cert);
+			if (ctx == NULL) {
+				ctx = make_ctx(fa->cert);
+				AN(ctx);
+				load_cert_ctx(ctx, fa->cert);
+			}
+			ls->sctx = ctx;
+		}
+	}
+
 #undef APPEND_CTX
 #endif /* OPENSSL_NO_TLSEXT */
 
@@ -1954,7 +1994,10 @@ handle_connections(void)
 		    (CONFIG->PMODE == SSL_CLIENT) ?
 		    handle_clear_accept : handle_accept,
 		    ls->sock, EV_READ);
-		ls->listener.data = default_ctx;
+		if (ls->sctx)
+			ls->listener.data = ls->sctx;
+		else
+			ls->listener.data = default_ctx;
 		ev_io_start(loop, &ls->listener);
 	}
 
