@@ -890,6 +890,7 @@ load_cert_ctx(SSL_CTX *ctx, const char *file)
 	if (sk_GENERAL_NAME_num(names) > 0) {
 		sk_GENERAL_NAME_pop_free(names, GENERAL_NAME_free);
 		// If we actally found some, don't bother looking any further
+		X509_free(x509);
 		return (0);
 	} else if (names != NULL) {
 		sk_GENERAL_NAME_pop_free(names, GENERAL_NAME_free);
@@ -901,11 +902,13 @@ load_cert_ctx(SSL_CTX *ctx, const char *file)
 	if (i < 0) {
 		ERR("Could not find Subject Alternative Names"
 		    " or a CN on cert %s\n", file);
+		X509_free(x509);
 		return (1);
 	}
 	x509_entry = X509_NAME_get_entry(x509_name, i);
 	AN(x509_entry);
 	PUSH_CTX(x509_entry->value, ctx);
+	X509_free(x509);
 	return (0);
 }
 #endif /* OPENSSL_NO_TLSEXT */
