@@ -1,4 +1,5 @@
 /**
+  * Copyright 2015 Varnish Software AB
   * Copyright 2011 Bump Technologies, Inc. All rights reserved.
   *
   * Redistribution and use in source and binary forms, with or without modification, are
@@ -2069,7 +2070,7 @@ void init_globals() {
         fail("calloc");
 
     if (CONFIG->SYSLOG)
-        openlog("stud", LOG_CONS | LOG_PID | LOG_NDELAY, CONFIG->SYSLOG_FACILITY);
+        openlog("hitch", LOG_CONS | LOG_PID | LOG_NDELAY, CONFIG->SYSLOG_FACILITY);
 }
 
 /* Forks COUNT children starting with START_INDEX.
@@ -2260,7 +2261,7 @@ void openssl_check_version() {
     /* compiled with */
     if ((openssl_version ^ OPENSSL_VERSION_NUMBER) & ~0xff0L) {
         ERR(
-            "WARNING: {core} OpenSSL version mismatch; stud was compiled with %lx, now using %lx.\n",
+            "WARNING: {core} OpenSSL version mismatch; hitch was compiled with %lx, now using %lx.\n",
             (unsigned long int) OPENSSL_VERSION_NUMBER,
             (unsigned long int) openssl_version
         );
