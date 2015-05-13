@@ -1270,6 +1270,11 @@ void config_parse_cli(int argc, char **argv, stud_config *cfg) {
     { 0, 0, 0, 0 }
   };
 
+  if (argc == 1) {
+    config_print_usage(argv[0], cfg);
+    exit(0);
+  }
+
   while (1) {
     int option_index = 0;
     c = getopt_long(
