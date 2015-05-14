@@ -13,7 +13,7 @@ connections using `libev` and `OpenSSL`'s nonblocking API.  By default,
 some buffer space for data in flight between frontend and backend.
 
 `hitch` has very few features--it's designed to be paired with an intelligent
-backend like haproxy or nginx.  It maintains a strict 1:1 connection pattern
+backend like varnish.  It maintains a strict 1:1 connection pattern
 with this backend handler so that the backend can dictate throttling behavior,
 maxmium connection behavior, availability of service, etc.
 
