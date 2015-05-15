@@ -2,7 +2,7 @@ hitch TLS proxy
 ===============
 
 `hitch` is a network proxy that terminates TLS/SSL connections and forwards the
-unencrypted traffic to some backend.  It's designed to handle 10s of thousands of
+unencrypted traffic to some backend. It's designed to handle 10s of thousands of
 connections efficiently on multicore machines.
 
 It follows a process-per-core model; a parent process spawns N children who
@@ -28,7 +28,7 @@ though `hitch` itself appears to be the connected client.
 Thanks to a contribution from Emeric at Exceliance (the folks behind HAProxy),
 a special build of `hitch` can be made that utilitizes shared memory to
 use a common session cache between all child processes.  This can speed up
-large `hitch` deployments by avoiding client renegotiation.
+large `hitch` deployments by utilizing session resumption.
 
 Releases
 ---------
@@ -174,8 +174,8 @@ Be sure to set your cipher suite appropriately: -c DHE-RSA-AES256-SHA
 Authors
 -------
 
-hitch is maintained by Dag Haavi Findstad <daghf@varnish-software.com>.
+hitch is maintained by Dag Haavi Finstad <daghf@varnish-software.com>.
 
-`hitch`  was originally forked from stud, that was originally written by Jamie
-Turner (@jamwt) and maintained by the Bump (http://bu.mp) server team.
+`hitch`  was originally called stud and written by Jamie Turner (@jamwt) at
+Bump (http://bu.mp).
 
