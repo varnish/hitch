@@ -1,7 +1,7 @@
 
 sbin_PROGRAMS = hitch-openssl
 
-AM_CPPFLAGS = -O2 -g -std=c99 -fno-strict-aliasing -Wall -W -D_GNU_SOURCE
+AM_CPPFLAGS = -I/usr/include/libev -O2 -g -std=c99 -fno-strict-aliasing -Wall -W -D_GNU_SOURCE
 
 nobase_noinst_HEADERS = ringbuffer.h configuration.h version.h shctx.h miniobj.h vqueue.h
 hitch_openssl_SOURCES = configuration.c ringbuffer.c hitch.c
