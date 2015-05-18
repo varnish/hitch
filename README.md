@@ -81,6 +81,19 @@ To install `hitch`:
     $ make
     $ sudo make install
 
+Installing from Packages
+------------------------
+
+``FreeBSD``
+
+From packages:
+
+    $ pkg install hitch
+
+From ports:
+
+    $ cd /usr/ports/security/hitch && make install clean
+
 Usage
 -----
 
