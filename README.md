@@ -170,12 +170,6 @@ command-line arguments. You can use `hitch --default-config` to
 generate the default configuration on stdout; then, customize your configuration and
 pass it to `hitch --config=FILE`.
 
-Serving HTTPS
--------------
-
-If you're using `hitch` for HTTPS, please make sure to use the `--ssl` option!
-
-
 Diffie–Hellman
 --------------
 
