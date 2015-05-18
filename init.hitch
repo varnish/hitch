@@ -27,7 +27,7 @@ RUNTIME_DIR="/var/run/hitch"
 
 hitch_single_instance_config_reset() {
 #######################################################
-#            hitch instance configuration              #
+#            hitch instance configuration             #
 #######################################################
 
 # hitch listening address
