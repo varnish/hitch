@@ -158,6 +158,7 @@ Detail about the entire set of options can be found by invoking `hitch -h`:
                                  (Default: off)
 
       -t  --test                 Test configuration and exit
+      -p  --pidfile=FILE         PID file
       -V  --version              Print program version and exit
       -h  --help                 This help message
 

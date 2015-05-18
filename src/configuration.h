@@ -89,6 +89,7 @@ struct __hitch_config {
     char* LOG_FILENAME;
     int RING_SLOTS;
     int RING_DATA_LEN;
+    char *PIDFILE;
 };
 
 typedef struct __hitch_config hitch_config;

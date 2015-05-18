@@ -67,6 +67,7 @@
 #include "ringbuffer.h"
 #include "miniobj.h"
 #include "shctx.h"
+#include "vpf.h"
 #include "configuration.h"
 
 #ifndef MSG_NOSIGNAL
@@ -136,6 +137,7 @@ static unsigned char shared_secret[SHA_DIGEST_LENGTH];
 long openssl_version;
 int create_workers;
 hitch_config *CONFIG;
+static struct vpf_fh *pfh = NULL;
 
 static char tcp_proxy_line[128] = "";
 
@@ -2272,6 +2274,14 @@ void openssl_check_version() {
     LOG("{core} Using OpenSSL version %lx.\n", (unsigned long int) openssl_version);
 }
 
+static void
+remove_pfh(void)
+{
+	if (pfh && master_pid == getpid()) {
+		VPF_Remove(pfh);
+	}
+}
+
 /* Process command line args, create the bound socket,
  * spawn child (worker) processes, and respawn if any die */
 int main(int argc, char **argv) {
@@ -2299,6 +2309,17 @@ int main(int argc, char **argv) {
     // parse command line
     config_parse_cli(argc, argv, CONFIG);
 
+    if (CONFIG->PIDFILE) {
+	    pfh = VPF_Open(CONFIG->PIDFILE, 0644, NULL);
+	    if (pfh == NULL) {
+		    ERR("FATAL: Could not open pid (-p) file (%s): %s\n",
+			CONFIG->PIDFILE, strerror(errno));
+		    exit(1);
+	    }
+
+	    AZ(VPF_Write(pfh));
+	    atexit(remove_pfh);
+    }
     create_workers = 1;
 
     openssl_check_version();

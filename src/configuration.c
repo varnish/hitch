@@ -57,6 +57,7 @@
 #define CFG_LOG_FILENAME "log-filename"
 #define CFG_RING_SLOTS "ring-slots"
 #define CFG_RING_DATA_LEN "ring-data-len"
+#define CFG_PIDFILE "pidfile"
 
 #ifdef USE_SHARED_CACHE
   #define CFG_SHARED_CACHE "shared-cache"
@@ -171,6 +172,7 @@ hitch_config * config_new (void) {
   r->SEND_BUFSIZE = -1;
 
   r->LOG_FILENAME = NULL;
+  r->PIDFILE = NULL;
 
   r->RING_SLOTS = 0;
   r->RING_DATA_LEN = 0;
@@ -781,6 +783,11 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
       config_assign_str(&cfg->LOG_FILENAME, v);
     }
   }
+  else if (strcmp(k, CFG_PIDFILE) == 0) {
+    if (v != NULL && strlen(v) > 0) {
+      config_assign_str(&cfg->PIDFILE, v);
+    }
+  }
   else if (strcmp(k, CFG_RING_SLOTS) == 0) {
       r = config_param_val_int_pos(v, &cfg->RING_SLOTS);
   }
@@ -1013,6 +1020,7 @@ void config_print_usage_fd (char *prog, hitch_config *cfg, FILE *out) {
   fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->PROXY_PROXY_LINE));
   fprintf(out, "\n");
   fprintf(out, "  -t  --test                 Test configuration and exit\n");
+  fprintf(out, "  -p  --pidfile=FILE         PID file\n");
   fprintf(out, "  -V  --version              Print program version and exit\n");
   fprintf(out, "  -h  --help                 This help message\n");
 }
@@ -1251,6 +1259,7 @@ void config_parse_cli(int argc, char **argv, hitch_config *cfg) {
     { CFG_SHARED_CACHE_PEER, 1, NULL, 'P' },
     { CFG_SHARED_CACHE_MCASTIF, 1, NULL, 'M' },
 #endif
+    { CFG_PIDFILE, 1, NULL, 'p' },
     { CFG_KEEPALIVE, 1, NULL, 'k' },
     { CFG_CHROOT, 1, NULL, 'r' },
     { CFG_USER, 1, NULL, 'u' },
@@ -1279,7 +1288,7 @@ void config_parse_cli(int argc, char **argv, hitch_config *cfg) {
     int option_index = 0;
     c = getopt_long(
       argc, argv,
-      "c:e:Ob:f:n:B:C:U:P:M:k:r:u:g:qstVh",
+      "c:e:Ob:f:n:B:C:U:p:P:M:k:r:u:g:qstVh",
       long_options, &option_index
     );
 
@@ -1337,6 +1346,9 @@ void config_parse_cli(int argc, char **argv, hitch_config *cfg) {
         config_param_validate(CFG_SHARED_CACHE_MCASTIF, optarg, cfg, NULL, 0);
         break;
 #endif
+      case 'p':
+        config_param_validate(CFG_PIDFILE, optarg, cfg, NULL, 0);
+        break;
       case 'k':
         config_param_validate(CFG_KEEPALIVE, optarg, cfg, NULL, 0);
         break;
