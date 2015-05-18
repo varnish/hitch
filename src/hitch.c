@@ -135,7 +135,7 @@ static unsigned char shared_secret[SHA_DIGEST_LENGTH];
 
 long openssl_version;
 int create_workers;
-stud_config *CONFIG;
+hitch_config *CONFIG;
 
 static char tcp_proxy_line[128] = "";
 
@@ -1473,7 +1473,7 @@ static void end_handshake(proxystate *ps) {
 		}
 	}
 	else {
-		/* stud used in client mode, keep client session ) */
+		/* hitch used in client mode, keep client session ) */
 		if (!SSL_session_reused(ps->ssl)) {
 			if (client_session)
 				SSL_SESSION_free(client_session);

@@ -111,10 +111,10 @@ void config_die (char *fmt, ...) {
   exit(1);
 }
 
-stud_config * config_new (void) {
-  stud_config *r = NULL;
+hitch_config * config_new (void) {
+  hitch_config *r = NULL;
   struct front_arg *fa;
-  r = malloc(sizeof(stud_config));
+  r = malloc(sizeof(hitch_config));
   if (r == NULL) {
     config_error_set("Unable to allocate memory for configuration structure: %s", strerror(errno));
     return NULL;
@@ -178,7 +178,7 @@ stud_config * config_new (void) {
   return r;
 }
 
-void config_destroy (stud_config *cfg) {
+void config_destroy (hitch_config *cfg) {
   // printf("config_destroy() in pid %d: %p\n", getpid(), cfg);
   struct front_arg *fa, *ftmp;
   if (cfg == NULL) return;
@@ -505,7 +505,7 @@ int config_param_shcupd_mcastif (char *str, char **iface, char **ttl) {
     return 1;
 }
 
-int config_param_shcupd_peer (char *str, stud_config *cfg) {
+int config_param_shcupd_peer (char *str, hitch_config *cfg) {
   if (cfg == NULL) {
     config_error_set("Configuration pointer is NULL.");
     return 0;
@@ -574,7 +574,7 @@ int config_param_shcupd_peer (char *str, stud_config *cfg) {
 
 #endif /* USE_SHARED_CACHE */
 
-void config_param_validate (char *k, char *v, stud_config *cfg, char *file, int line) {
+void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int line) {
   int r = 1;
   struct stat st;
 
@@ -804,9 +804,9 @@ void config_param_validate (char *k, char *v, stud_config *cfg, char *file, int 
 }
 
 #ifndef NO_CONFIG_FILE
-int config_file_parse (char *file, stud_config *cfg) {
+int config_file_parse (char *file, hitch_config *cfg) {
   if (cfg == NULL)
-    config_die("Undefined stud options; THIS IS A BUG!\n");
+    config_die("Undefined hitch options; THIS IS A BUG!\n");
 
   char line[CONFIG_BUF_SIZE];
   FILE *fd = NULL;
@@ -935,10 +935,10 @@ const char * config_disp_log_facility (int facility) {
   }
 }
 
-void config_print_usage_fd (char *prog, stud_config *cfg, FILE *out) {
+void config_print_usage_fd (char *prog, hitch_config *cfg, FILE *out) {
   if (out == NULL) out = stderr;
   fprintf(out, "Usage: %s [OPTIONS] PEM\n\n", basename(prog));
-  fprintf(out, "This is stud, The Scalable TLS Unwrapping Daemon.\n\n");
+  fprintf(out, "This is hitch, The Scalable TLS Unwrapping Daemon.\n\n");
 #ifndef NO_CONFIG_FILE
   fprintf(out, "CONFIGURATION:\n");
   fprintf(out, "\n");
@@ -1018,10 +1018,10 @@ void config_print_usage_fd (char *prog, stud_config *cfg, FILE *out) {
 }
 
 #ifndef NO_CONFIG_FILE
-void config_print_default (FILE *fd, stud_config *cfg) {
+void config_print_default (FILE *fd, hitch_config *cfg) {
   if (fd == NULL) return;
   fprintf(fd, "#\n");
-  fprintf(fd, "# stud(8), The Scalable TLS Unwrapping Daemon's configuration\n");
+  fprintf(fd, "# hitch(8), The Scalable TLS Unwrapping Daemon's configuration\n");
   fprintf(fd, "#\n");
   fprintf(fd, "\n");
   fprintf(fd, "# NOTE: all config file parameters can be overriden\n");
@@ -1110,7 +1110,7 @@ void config_print_default (FILE *fd, stud_config *cfg) {
   fprintf(fd, "\n");
 
   fprintf(fd, "# Shared cache peer address.\n");
-  fprintf(fd, "# Multiple stud processes on multiple hosts (host limit: %d)\n", MAX_SHCUPD_PEERS);
+  fprintf(fd, "# Multiple hitch processes on multiple hosts (host limit: %d)\n", MAX_SHCUPD_PEERS);
   fprintf(fd, "# can share SSL session cache by sending updates to peers.\n");
   fprintf(fd, "#\n");
   fprintf(fd, "# NOTE: This parameter can be specified multiple times in order\n");
@@ -1219,11 +1219,11 @@ void config_print_default (FILE *fd, stud_config *cfg) {
 }
 #endif /* NO_CONFIG_FILE */
 
-void config_print_usage (char *prog, stud_config *cfg) {
+void config_print_usage (char *prog, hitch_config *cfg) {
   config_print_usage_fd(prog, cfg, stdout);
 }
 
-void config_parse_cli(int argc, char **argv, stud_config *cfg) {
+void config_parse_cli(int argc, char **argv, hitch_config *cfg) {
   static int tls = 0, ssl = 0;
   static int client = 0;
   int c, i;
