@@ -955,8 +955,8 @@ void config_print_usage_fd (char *prog, hitch_config *cfg, FILE *out) {
 #endif
   fprintf(out, "ENCRYPTION METHODS:\n");
   fprintf(out, "\n");
-  fprintf(out, "      --tls                   TLSv1 (default)\n");
-  fprintf(out, "      --ssl                   SSLv3 (implies no TLSv1)\n");
+  fprintf(out, "      --tls                   TLSv1 (default. No SSLv3)\n");
+  fprintf(out, "      --ssl                   SSLv3 (enables SSLv3)\n");
   fprintf(out, "  -c  --ciphers=SUITE         Sets allowed ciphers (Default: \"%s\")\n", config_disp_str(cfg->CIPHER_SUITE));
   fprintf(out, "  -e  --ssl-engine=NAME       Sets OpenSSL engine (Default: \"%s\")\n", config_disp_str(cfg->ENGINE));
   fprintf(out, "  -O  --prefer-server-ciphers Prefer server list order\n");

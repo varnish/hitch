@@ -113,8 +113,8 @@ Detail about the entire set of options can be found by invoking `hitch -h`:
 
     ENCRYPTION METHODS:
 
-          --tls                   TLSv1 (default)
-          --ssl                   SSLv3 (implies no TLSv1)
+          --tls                   TLSv1 (default. No SSLv3)
+          --ssl                   SSLv3 (enables SSLv3)
       -c  --ciphers=SUITE         Sets allowed ciphers (Default: "")
       -e  --ssl-engine=NAME       Sets OpenSSL engine (Default: "")
       -O  --prefer-server-ciphers Prefer server list order
