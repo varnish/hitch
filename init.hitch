@@ -1,14 +1,14 @@
 #!/bin/sh
 
 ### BEGIN INIT INFO                                                                                                                                                                                                                          
-# Provides:          stud                                                                                                                                                                                                                
+# Provides:          hitch                                                                                                                                                                                                                
 # Required-Start:    $local_fs $remote_fs                                                                                                                                                                                                    
 # Required-Stop:     $local_fs $remote_fs                                                                                                                                                                                                    
 # Should-Start:      $syslog                                                                                                                                                                                                                 
 # Should-Stop:       $syslog                                                                                                                                                                                                                 
 # Default-Start:     2 3 4 5                                                                                                                                                                                                                 
 # Default-Stop:      0 1 6                                                                                                                                                                                                                   
-# Short-Description: Start or stop stud (SSL offloader)                                                                                                                                                              
+# Short-Description: Start or stop hitch (SSL offloader)                                                                                                                                                              
 ### END INIT INFO  
 
 #######################################################
@@ -16,21 +16,21 @@
 #######################################################
 
 # instance configuration directory
-CONFIG_DIR="/etc/stud"
+CONFIG_DIR="/etc/hitch"
 
 # Runtime directory data
-RUNTIME_DIR="/var/run/stud"
+RUNTIME_DIR="/var/run/hitch"
 
 #######################################################
 
 #######################################################
 
-stud_single_instance_config_reset() {
+hitch_single_instance_config_reset() {
 #######################################################
-#            stud instance configuration              #
+#            hitch instance configuration              #
 #######################################################
 
-# stud listening address
+# hitch listening address
 FRONTEND_ADDRESS="*,8443"
 
 # upstream service address
@@ -63,14 +63,14 @@ CHROOT_DIR=""
 SETUID_USER=""
 
 # use shared cache with specified number of sessions
-# WARNING: stud must be compiled with USE_SHARED_CACHE=1
+# WARNING: hitch must be compiled with USE_SHARED_CACHE=1
 SHARED_CACHE_SESSIONS="0"
 
 # Accept cache updates on specified address
 #
 # syntax: HOST,PORT
 #
-# WARNING: stud must be compiled with USE_SHARED_CACHE=1
+# WARNING: hitch must be compiled with USE_SHARED_CACHE=1
 #          SHARED_CACHE_SESSIONS must be >= 1
 CACHE_UPDATE_ACCEPT=""
 
@@ -78,7 +78,7 @@ CACHE_UPDATE_ACCEPT=""
 #
 # syntax: HOST1,PORT HOST2,PORT
 #
-# WARNING: stud must be compiled with USE_SHARED_CACHE=1
+# WARNING: hitch must be compiled with USE_SHARED_CACHE=1
 #          and CACHE_UPDATE_ACCEPT must be defined
 CACHE_UPDATE_SEND=""
 
@@ -87,7 +87,7 @@ CACHE_UPDATE_SEND=""
 #
 # syntax: IFACE[,TTL]
 #
-# WARNING: stud must be compiled with USE_SHARED_CACHE=1
+# WARNING: hitch must be compiled with USE_SHARED_CACHE=1
 #          and CACHE_UPDATE_ACCEPT must be defined
 CACHE_UPDATE_IFACE=""
 
@@ -106,7 +106,7 @@ WRITE_IP="0"
 WRITE_PROXY="0"
 
 # Alternative OpenSSL library dir
-# Use this if you'd like to run stud with different
+# Use this if you'd like to run hitch with different
 # version of OpenSSL library
 OPENSSL_LIB_DIR=""
 
@@ -116,7 +116,7 @@ OPENSSL_LIB_DIR=""
 # SYNTAX:
 #   "<process_number>:<affinity>;<process_number2>:<affinity2>;..."
 #
-# <process_number>:      stud worker process number, starting with 1
+# <process_number>:      hitch worker process number, starting with 1
 # <affinity>:            process affinity, see taskset(8) for details
 #
 # EXAMPLES:
@@ -134,14 +134,14 @@ PROCESS_AFFINITY=""
 #
 PROCESS_PRIORITY=""
 
-# ulimit -n value before starting single stud instance
+# ulimit -n value before starting single hitch instance
 #
 # Comment out or set to 0 to disable ulimit -n
 # setup.
 #
 ULIMIT_N=""
 
-# Additional stud command line options
+# Additional hitch command line options
 #
 # NOTE: set this only if you really know what your're
 #       doing
@@ -153,7 +153,7 @@ ULIMIT_N=""
 
 PATH="${PATH}:."
 INSTANCE_NAME=""
-STUD=`which stud 2>/dev/null`
+STUD=`which hitch 2>/dev/null`
 
 die() {
   msg_log "FATAL: $@"
@@ -162,7 +162,7 @@ die() {
 }
 
 msg_log() {
-  ident="stud"
+  ident="hitch"
   test ! -z "${INSTANCE_NAME}" && ident="${ident}/${INSTANCE_NAME}"
   logger -i -t "${ident}" "$@" >/dev/null 2>&1
 }
@@ -173,12 +173,12 @@ msg_err() {
 
 
 _real_single_instance_start() {
-  # check stud binary
+  # check hitch binary
   if [ -z "${STUD}" ] || [ ! -f "${STUD}" ] || [ ! -x "${STUD}" ]; then
-    die "Invalid stud binary: '${STUD}'"
+    die "Invalid hitch binary: '${STUD}'"
   fi
 
-  # generate stud command line options
+  # generate hitch command line options
   opts="-f ${FRONTEND_ADDRESS}"
   opts="${opts} -b ${BACKEND_ADDRESS}"
   
@@ -255,11 +255,11 @@ _real_single_instance_start() {
     prefix="nice -n ${PROCESS_PRIORITY}"
   fi
 
-  # we want to start stud in a daemon mode...
+  # we want to start hitch in a daemon mode...
   opts="${opts} --daemon"
 
   # set ulimits!
-  ulimit_set || die "Unable to set stud runtime limits."
+  ulimit_set || die "Unable to set hitch runtime limits."
 
   # disable linker stuff
   unset LD_LIBRARY_PATH
@@ -270,7 +270,7 @@ _real_single_instance_start() {
     export LD_LIBRARY_PATH
   fi
 
-  # start stud!
+  # start hitch!
   msg_log "Starting instance '${INSTANCE_NAME}': ${STUD} ${opts}"
   out=`${prefix} ${STUD} ${opts} 2>&1`
 
@@ -278,33 +278,33 @@ _real_single_instance_start() {
   unset LD_LIBRARY_PATH
 
   # check invocation
-  stud_pid=`echo "${out}" | tail -n 1 | cut -d " " -f5 | tr -d '.'`
-  if [ -z "${stud_pid}" ]; then
-     die "Empty stud pid. This is extremely weird."
+  hitch_pid=`echo "${out}" | tail -n 1 | cut -d " " -f5 | tr -d '.'`
+  if [ -z "${hitch_pid}" ]; then
+     die "Empty hitch pid. This is extremely weird."
   fi
 
   # wait a little bit, check if pid is still alive
   sleep 0.2 >/dev/null 2>&1
-  if ! kill -0 "${stud_pid}" >/dev/null 2>&1; then
-    die "Stud started successfully as pid ${stud_pid} but died shortly after startup.";
+  if ! kill -0 "${hitch_pid}" >/dev/null 2>&1; then
+    die "Stud started successfully as pid ${hitch_pid} but died shortly after startup.";
   fi
 
   # write pid file!
-  pid_file_write "${INSTANCE_NAME}" "${stud_pid}" || msg_warn "${Error}"
+  pid_file_write "${INSTANCE_NAME}" "${hitch_pid}" || msg_warn "${Error}"
 
   # set affinity!
-  stud_affinity_set "${stud_pid}" || die "${Error}"
+  hitch_affinity_set "${hitch_pid}" || die "${Error}"
 }
 
-stud_single_instance_start() {
+hitch_single_instance_start() {
   name="${1}"
   if [ -z "${name}" ]; then
-    Error="Unable to stop undefined stud instance."
+    Error="Unable to stop undefined hitch instance."
     return 1
   fi
 
   # check if it is running
-  if stud_single_instance_status "${name}"; then
+  if hitch_single_instance_status "${name}"; then
     Error="Instance ${name} is already running as pid ${Error}."
     return 1
   fi
@@ -322,19 +322,19 @@ stud_single_instance_start() {
   return $rv
 }
 
-stud_single_instance_stop() {
+hitch_single_instance_stop() {
   name="${1}"
   if [ -z "${name}" ]; then
-    Error="Unable to stop undefined stud instance."
+    Error="Unable to stop undefined hitch instance."
     return 1
   fi
 
   # check if it is running
-  stud_single_instance_status "${name}" || return 1
+  hitch_single_instance_status "${name}" || return 1
 
   # time to stop instance
   pid="${Error}"
-  msg_log "Stopping stud instance '${name}', pid ${pid}."
+  msg_log "Stopping hitch instance '${name}', pid ${pid}."
 
   ok=0
   if ! kill "${pid}" >/dev/null 2>&1; then
@@ -366,24 +366,24 @@ stud_single_instance_stop() {
   return 0
 }
 
-stud_single_instance_restart() {
+hitch_single_instance_restart() {
   name="${1}"
   if [ -z "${name}" ]; then
-    Error="Unable to stop undefined stud instance."
+    Error="Unable to stop undefined hitch instance."
     return 1
   fi
   
   # maybe we need to stop it first...
-  if stud_single_instance_status "${name}"; then
-    stud_single_instance_stop "${name}" || return 1
+  if hitch_single_instance_status "${name}"; then
+    hitch_single_instance_stop "${name}" || return 1
   fi
 
   # start it back...
   Error=""
-  stud_single_instance_start "${name}"
+  hitch_single_instance_start "${name}"
 }
 
-stud_single_instance_status() {
+hitch_single_instance_status() {
   Error=""
   if [ -z "${1}" ]; then
     Error="Invalid instance name."
@@ -459,26 +459,26 @@ running_instance_list() {
   echo ${list}
 }
 
-stud_instances_start() {
+hitch_instances_start() {
   list="$@"
   if [ -z "${list}" ]; then
-    list=`stud_config_instances_list`
+    list=`hitch_config_instances_list`
   fi
   if [ -z "${list}" ]; then
-    die "No stud instances configured in directory '${CONFIG_DIR}'."
+    die "No hitch instances configured in directory '${CONFIG_DIR}'."
   fi
 
-  echo "Starting stud instances:"
+  echo "Starting hitch instances:"
   num_ok=0
   num_failed=0
   for instance in ${list}; do
     echo -n "  ${instance}: "
     # load configuration
-    if ! stud_single_instance_config_load "${instance}"; then
+    if ! hitch_single_instance_config_load "${instance}"; then
       echo "failed: ${Error}"
       return 1
     # start instance
-    elif stud_single_instance_start "${instance}"; then
+    elif hitch_single_instance_start "${instance}"; then
       echo "done."
       msg_log "Instance ${name} successfully started."
       num_ok=$((num_ok + 1))
@@ -496,21 +496,21 @@ stud_instances_start() {
   fi
 }
 
-stud_instances_stop() {
+hitch_instances_stop() {
   list="$@"
   if [ -z "${list}" ]; then
     list=`running_instance_list`
   fi
   if [ -z "${list}" ]; then
-    die "No stud instances are running."
+    die "No hitch instances are running."
   fi
 
-  echo "Stopping stud instances:"
+  echo "Stopping hitch instances:"
   num_ok=0
   num_failed=0
   for instance in ${list}; do
     echo -n "  ${instance}: "
-    if stud_single_instance_stop "${instance}"; then
+    if hitch_single_instance_stop "${instance}"; then
       echo "done."
       num_ok=$((num_ok + 1))
       msg_log "Instance ${instance} successfully stopped."
@@ -528,24 +528,24 @@ stud_instances_stop() {
   fi
 }
 
-stud_instances_restart() {
+hitch_instances_restart() {
   list="$@"
   if [ -z "${list}" ]; then
-    list=`(running_instance_list ; stud_config_instances_list) | tr ' ' '\n' | sort -u | xargs echo`
+    list=`(running_instance_list ; hitch_config_instances_list) | tr ' ' '\n' | sort -u | xargs echo`
   fi
 
-  echo "Restarting stud instances: "
+  echo "Restarting hitch instances: "
   num_ok=0
   num_failed=0
   for instance in ${list}; do
     echo -n "  ${instance}: ";
 
     # load configuration
-    if ! stud_single_instance_config_load "${instance}"; then
+    if ! hitch_single_instance_config_load "${instance}"; then
       echo "failed: ${Error}"
       return 1
     # restart instance
-    elif stud_single_instance_restart "${instance}"; then
+    elif hitch_single_instance_restart "${instance}"; then
       echo "done."
       num_ok=$((num_ok + 1))
       msg_log "Instance ${instance} successfully restarted."
@@ -563,8 +563,8 @@ stud_instances_restart() {
   fi
 }
 
-stud_instances_status() {
-  list_config=`stud_config_instances_list`
+hitch_instances_status() {
+  list_config=`hitch_config_instances_list`
   list_running=`running_instance_list`
 
   list_all=`echo ${list_config} ${list_running} | tr ' ' '\n' | sort -u | xargs echo`
@@ -579,7 +579,7 @@ stud_instances_status() {
 
   for instance in ${list_all}; do
     echo -n "  ${instance}: "
-    if stud_single_instance_status "${instance}"; then
+    if hitch_single_instance_status "${instance}"; then
       echo "running as pid $Error"
       i=$((i + 1))
     else
@@ -594,7 +594,7 @@ stud_instances_status() {
   fi
 }
 
-stud_config_instances_list() {
+hitch_config_instances_list() {
   list=""
   for file in ${CONFIG_DIR}/*.conf; do
     test -f "${file}" -a -r "${file}" || continue
@@ -607,16 +607,16 @@ stud_config_instances_list() {
   echo ${list}
 }
 
-stud_single_instance_config_print() {
+hitch_single_instance_config_print() {
   head -n 151 "$0" | tail -n 123
 }
 
-stud_single_instance_config_load() {
+hitch_single_instance_config_load() {
   file="${CONFIG_DIR}/${1}.conf"
   INSTANCE_NAME=""
 
   # reset configuration
-  stud_single_instance_config_reset
+  hitch_single_instance_config_reset
   Error=''
 
   if [ -f "${file}" -a -r "${file}" ]; then
@@ -632,7 +632,7 @@ stud_single_instance_config_load() {
   return 0
 }
 
-stud_instance_worker_pids() {
+hitch_instance_worker_pids() {
   test -z "${1}" && return 1
   ps -ef | grep  " ${1}  " | grep -v ' 1  ' | grep -v ' grep ' | awk '{print $2}' | xargs echo
 }
@@ -641,7 +641,7 @@ stud_instance_worker_pids() {
 # arguments:
 #       $1:     list of worker pids (string)
 #       $2:     worker number
-stud_instance_worker_pid_by_num() {
+hitch_instance_worker_pid_by_num() {
   i=0
   local IFS=" "
   for e in ${1}; do
@@ -654,7 +654,7 @@ stud_instance_worker_pid_by_num() {
   return 1
 }
 
-stud_affinity_set() {
+hitch_affinity_set() {
   # nothing to set?
   test -z "$PROCESS_AFFINITY" && return 0
 
@@ -666,7 +666,7 @@ stud_affinity_set() {
 #                        process to CPU7
 
 
-  worker_pids=`stud_instance_worker_pids "${1}"`
+  worker_pids=`hitch_instance_worker_pids "${1}"`
 
   local IFS=";"
   item=""
@@ -689,7 +689,7 @@ stud_affinity_set() {
     echo "${affinity}" | grep -qE '^0x' && raw_affinity=1
 
     # get pid for process id $num
-    pid=`stud_instance_worker_pid_by_num "${worker_pids}" "$num"`
+    pid=`hitch_instance_worker_pid_by_num "${worker_pids}" "$num"`
     test -z "$pid" && continue
 
     #echo "item: $item; process num: $num; pid: $pid;  affinity: $affinity; raw: $raw_affinity"
@@ -699,7 +699,7 @@ stud_affinity_set() {
     opt="${opt} ${affinity}"
     opt="${opt} ${pid}"
     # echo "WILL RUN: 'taskset $opt'"
-    msg_log "Setting stud worker number ${num} (pid ${pid}) affinity using command: taskset ${opt}"
+    msg_log "Setting hitch worker number ${num} (pid ${pid}) affinity using command: taskset ${opt}"
     eval taskset ${opt} >/dev/null 2>&1 || msg_log "Error setting process affinity."
   done
 }
@@ -747,13 +747,13 @@ printhelp() {
   cat <<EOF
 Usage: ${MYNAME} {start|stop|restart|status|sample_instance_config} [name, name2, ...]
 
-This is stud SSL offloader multi-instance init script.
+This is hitch SSL offloader multi-instance init script.
 
 OPTIONS:
   -C  --config-dir        Instance configuration directory (Default: "${CONFIG_DIR}")
 
                           This directory is searched for files matching *.conf
-                          glob pattern; each file represents single stud instance
+                          glob pattern; each file represents single hitch instance
                           configuration file.
 
   -R  --runtime-dir       Runtime (pid file) directory (Default: "${RUNTIME_DIR}")
@@ -780,7 +780,7 @@ while true; do
       shift 2
       ;;
     --sample-config)
-      stud_single_instance_config_print
+      hitch_single_instance_config_print
       exit 0
       ;;
     -V|--version)
@@ -805,26 +805,26 @@ done
 case $1 in
   start)
     shift
-    stud_instances_start "$@"
+    hitch_instances_start "$@"
     ;;
 
   stop)
     shift
-    stud_instances_stop "$@"
+    hitch_instances_stop "$@"
     ;;
 
   force-reload|restart)
     shift
-    stud_instances_restart "$@"
+    hitch_instances_restart "$@"
     ;;
 
   status)
-    stud_instances_status
+    hitch_instances_status
     exit $?
     ;;
 
   sample_instance_config|instance_config)
-    stud_single_instance_config_print
+    hitch_single_instance_config_print
     exit 0
     ;;
 
