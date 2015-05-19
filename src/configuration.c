@@ -963,9 +963,10 @@ void config_print_usage_fd (char *prog, hitch_config *cfg, FILE *out) {
   fprintf(out, "\n");
   fprintf(out, "SOCKET:\n");
   fprintf(out, "\n");
-  fprintf(out, "  --client                    Enable client proxy mode\n");
-  fprintf(out, "  -b  --backend=HOST:PORT     Backend [connect] (default is \"%s\")\n", config_disp_hostport(cfg->BACK_IP, cfg->BACK_PORT));
-  fprintf(out, "  -f  --frontend=HOST:PORT[+CERT]    Frontend [bind] (default is \"%s\")\n", config_disp_hostport(VTAILQ_FIRST(&cfg->LISTEN_ARGS)->ip, VTAILQ_FIRST(&cfg->LISTEN_ARGS)->port));
+  fprintf(out, "  --client                      Enable client proxy mode\n");
+  fprintf(out, "  -b  --backend=[HOST]:PORT     Backend [connect] (default is \"%s\")\n", config_disp_hostport(cfg->BACK_IP, cfg->BACK_PORT));
+  fprintf(out, "  -f  --frontend=[HOST]:PORT[+CERT]    Frontend [bind] (default is \"%s\")\n", config_disp_hostport(VTAILQ_FIRST(&cfg->LISTEN_ARGS)->ip, VTAILQ_FIRST(&cfg->LISTEN_ARGS)->port));
+  fprintf(out, "                                (Note: brackets are mandatory in endpoint specifiers.)");
 
 #ifdef USE_SHARED_CACHE
   fprintf(out, "\n");
