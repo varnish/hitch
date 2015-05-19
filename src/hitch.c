@@ -2309,17 +2309,6 @@ int main(int argc, char **argv) {
     // parse command line
     config_parse_cli(argc, argv, CONFIG);
 
-    if (CONFIG->PIDFILE) {
-	    pfh = VPF_Open(CONFIG->PIDFILE, 0644, NULL);
-	    if (pfh == NULL) {
-		    ERR("FATAL: Could not open pid (-p) file (%s): %s\n",
-			CONFIG->PIDFILE, strerror(errno));
-		    exit(1);
-	    }
-
-	    AZ(VPF_Write(pfh));
-	    atexit(remove_pfh);
-    }
     create_workers = 1;
 
     openssl_check_version();
@@ -2355,6 +2344,18 @@ int main(int argc, char **argv) {
     }
 
     master_pid = getpid();
+
+    if (CONFIG->PIDFILE) {
+	    pfh = VPF_Open(CONFIG->PIDFILE, 0644, NULL);
+	    if (pfh == NULL) {
+		    ERR("FATAL: Could not open pid (-p) file (%s): %s\n",
+			CONFIG->PIDFILE, strerror(errno));
+		    exit(1);
+	    }
+
+	    AZ(VPF_Write(pfh));
+	    atexit(remove_pfh);
+    }
 
     start_children(0, CONFIG->NCORES);
 
