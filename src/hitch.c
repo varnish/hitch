@@ -110,6 +110,7 @@ struct listen_sock {
 	ev_io				listener;
 	int				sock;
 	const char			*name;
+	const char			*cert;
 	SSL_CTX				*sctx;
 	struct sockaddr_storage		addr;
 };
@@ -933,7 +934,6 @@ find_ctx(const char *file) {
  * each connection */
 void init_openssl() {
 	struct cert_files *cf;
-	struct front_arg *fa;
 	struct listen_sock *ls;
 	SSL_CTX *ctx;
 	SSL_library_init();
@@ -960,15 +960,15 @@ void init_openssl() {
 		}
 	}
 
-	for (fa = VTAILQ_FIRST(&CONFIG->LISTEN_ARGS),
-		 ls = VTAILQ_FIRST(&listen_socks); fa != NULL;
-	     fa = VTAILQ_NEXT(fa, list), ls = VTAILQ_NEXT(ls, list)) {
-		if (fa->cert) {
-			ctx = find_ctx(fa->cert);
+	for (ls = VTAILQ_FIRST(&listen_socks); ls != NULL;
+	     ls = VTAILQ_NEXT(ls, list)) {
+		if (ls->cert) {
+			fprintf(stderr, "%s: %s\n", ls->cert, ls->name);
+			ctx = find_ctx(ls->cert);
 			if (ctx == NULL) {
-				ctx = make_ctx(fa->cert);
+				ctx = make_ctx(ls->cert);
 				AN(ctx);
-				load_cert_ctx(ctx, fa->cert);
+				load_cert_ctx(ctx, ls->cert);
 			}
 			ls->sctx = ctx;
 		}
@@ -1076,6 +1076,7 @@ create_listen_sock(const struct front_arg *fa)
 		}
 		ls->name = strdup(buf);
 		AN(ls->name);
+		ls->cert = fa->cert;
 
 		VTAILQ_INSERT_TAIL(&listen_socks, ls, list);
 		nlisten_socks++;
