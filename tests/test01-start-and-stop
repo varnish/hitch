@@ -1,0 +1,14 @@
+#/bin/bash
+# Test basic argument handling.
+. common.sh
+set +o errexit
+
+$HITCH --help 1>/dev/null
+test "$?" = "0"
+
+$HITCH --OBVIOUSLY_BROKEN_ARG 2>/dev/null
+test "$?" = "1"
+
+$HITCH --version 1>/dev/null
+test "$?" = "0"
+
