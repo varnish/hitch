@@ -2219,7 +2219,7 @@ void daemonize () {
 
     /* am i the parent? */
     if (pid != 0) {
-        printf("{core} Daemonized as pid %d.\n", pid);
+        LOG("{core} Daemonized as pid %d.\n", pid);
         exit(0);
     }
 
