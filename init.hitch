@@ -146,14 +146,14 @@ ULIMIT_N=""
 # NOTE: set this only if you really know what your're
 #       doing
 #
-# ADDITIONAL_STUD_OPT=""
+# ADDITIONAL_HITCH_OPT=""
 
 # EOF
 }
 
 PATH="${PATH}:."
 INSTANCE_NAME=""
-STUD=`which hitch-openssl 2>/dev/null`
+HITCH=`which hitch-openssl 2>/dev/null`
 
 die() {
   msg_log "FATAL: $@"
@@ -174,8 +174,8 @@ msg_err() {
 
 _real_single_instance_start() {
   # check hitch binary
-  if [ -z "${STUD}" ] || [ ! -f "${STUD}" ] || [ ! -x "${STUD}" ]; then
-    die "Invalid hitch binary: '${STUD}'"
+  if [ -z "${HITCH}" ] || [ ! -f "${HITCH}" ] || [ ! -x "${HITCH}" ]; then
+    die "Invalid hitch binary: '${HITCH}'"
   fi
 
   # generate hitch command line options
@@ -245,8 +245,8 @@ _real_single_instance_start() {
   fi
 
   # additional command line options?!
-  if [ ! -z "${ADDITIONAL_STUD_OPT}" ]; then
-    opts="${opts} ${ADDITIONAL_STUD_OPT}"
+  if [ ! -z "${ADDITIONAL_HITCH_OPT}" ]; then
+    opts="${opts} ${ADDITIONAL_HITCH_OPT}"
   fi
 
   # priority?!
@@ -271,8 +271,8 @@ _real_single_instance_start() {
   fi
 
   # start hitch!
-  msg_log "Starting instance '${INSTANCE_NAME}': ${STUD} ${opts}"
-  out=`${prefix} ${STUD} ${opts} 2>&1`
+  msg_log "Starting instance '${INSTANCE_NAME}': ${HITCH} ${opts}"
+  out=`${prefix} ${HITCH} ${opts} 2>&1`
 
   # remove lib path
   unset LD_LIBRARY_PATH
@@ -286,7 +286,7 @@ _real_single_instance_start() {
   # wait a little bit, check if pid is still alive
   sleep 0.2 >/dev/null 2>&1
   if ! kill -0 "${hitch_pid}" >/dev/null 2>&1; then
-    die "Stud started successfully as pid ${hitch_pid} but died shortly after startup.";
+    die "Hitch started successfully as pid ${hitch_pid} but died shortly after startup.";
   fi
 
   # write pid file!
@@ -571,7 +571,7 @@ hitch_instances_status() {
 
   i=0;
 
-  echo "Stud instance status: "
+  echo "Hitch instance status: "
 
   if [ -z "${list_all}" ]; then
     die "No instances are configured and/or running."

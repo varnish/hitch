@@ -1372,7 +1372,7 @@ void config_parse_cli(int argc, char **argv, hitch_config *cfg) {
         test_only = 1;
         break;
       case 'V':
-        printf("%s %s\n", basename(argv[0]), STUD_VERSION);
+        printf("%s %s\n", basename(argv[0]), HITCH_VERSION);
         exit(0);
         break;
       case 'h':
