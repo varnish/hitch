@@ -1,0 +1,26 @@
+Test certificates
+=================
+
+These are self-signed certificates (and keys) used for testing hitch.
+They are made to last until 2025. Plenty of time!
+
+
+Useful commands
+---------------
+
+Show certificate information:
+   openssl x509  -text -noout -in <foo.pem>
+
+
+How to generate
+---------------
+
+These files were generated on Debian jessie, using the following commands:
+
+    apt-get install ssl-cert
+    /usr/sbin/make-ssl-cert /usr/share/ssl-cert/ssleay.cnf OUTPUTFILE
+    openssl dhparam -rand - 1024 >> OUTPUTFILE
+
+(default|siteN).example.com are basic 2048bit RSA certificates with a
+single commonName set.
+

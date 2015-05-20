@@ -67,6 +67,7 @@
 #include "ringbuffer.h"
 #include "miniobj.h"
 #include "shctx.h"
+#include "vpf.h"
 #include "configuration.h"
 
 #ifndef MSG_NOSIGNAL
@@ -109,6 +110,7 @@ struct listen_sock {
 	ev_io				listener;
 	int				sock;
 	const char			*name;
+	const char			*cert;
 	SSL_CTX				*sctx;
 	struct sockaddr_storage		addr;
 };
@@ -135,7 +137,8 @@ static unsigned char shared_secret[SHA_DIGEST_LENGTH];
 
 long openssl_version;
 int create_workers;
-stud_config *CONFIG;
+hitch_config *CONFIG;
+static struct vpf_fh *pfh = NULL;
 
 static char tcp_proxy_line[128] = "";
 
@@ -931,7 +934,6 @@ find_ctx(const char *file) {
  * each connection */
 void init_openssl() {
 	struct cert_files *cf;
-	struct front_arg *fa;
 	struct listen_sock *ls;
 	SSL_CTX *ctx;
 	SSL_library_init();
@@ -958,15 +960,15 @@ void init_openssl() {
 		}
 	}
 
-	for (fa = VTAILQ_FIRST(&CONFIG->LISTEN_ARGS),
-		 ls = VTAILQ_FIRST(&listen_socks); fa != NULL;
-	     fa = VTAILQ_NEXT(fa, list), ls = VTAILQ_NEXT(ls, list)) {
-		if (fa->cert) {
-			ctx = find_ctx(fa->cert);
+	for (ls = VTAILQ_FIRST(&listen_socks); ls != NULL;
+	     ls = VTAILQ_NEXT(ls, list)) {
+		if (ls->cert) {
+			fprintf(stderr, "%s: %s\n", ls->cert, ls->name);
+			ctx = find_ctx(ls->cert);
 			if (ctx == NULL) {
-				ctx = make_ctx(fa->cert);
+				ctx = make_ctx(ls->cert);
 				AN(ctx);
-				load_cert_ctx(ctx, fa->cert);
+				load_cert_ctx(ctx, ls->cert);
 			}
 			ls->sctx = ctx;
 		}
@@ -1074,6 +1076,7 @@ create_listen_sock(const struct front_arg *fa)
 		}
 		ls->name = strdup(buf);
 		AN(ls->name);
+		ls->cert = fa->cert;
 
 		VTAILQ_INSERT_TAIL(&listen_socks, ls, list);
 		nlisten_socks++;
@@ -1473,7 +1476,7 @@ static void end_handshake(proxystate *ps) {
 		}
 	}
 	else {
-		/* stud used in client mode, keep client session ) */
+		/* hitch used in client mode, keep client session ) */
 		if (!SSL_session_reused(ps->ssl)) {
 			if (client_session)
 				SSL_SESSION_free(client_session);
@@ -2217,7 +2220,7 @@ void daemonize () {
 
     /* am i the parent? */
     if (pid != 0) {
-        printf("{core} Daemonized as pid %d.\n", pid);
+        LOG("{core} Daemonized as pid %d.\n", pid);
         exit(0);
     }
 
@@ -2270,6 +2273,14 @@ void openssl_check_version() {
     }
 
     LOG("{core} Using OpenSSL version %lx.\n", (unsigned long int) openssl_version);
+}
+
+static void
+remove_pfh(void)
+{
+	if (pfh && master_pid == getpid()) {
+		VPF_Remove(pfh);
+	}
 }
 
 /* Process command line args, create the bound socket,
@@ -2334,6 +2345,18 @@ int main(int argc, char **argv) {
     }
 
     master_pid = getpid();
+
+    if (CONFIG->PIDFILE) {
+	    pfh = VPF_Open(CONFIG->PIDFILE, 0644, NULL);
+	    if (pfh == NULL) {
+		    ERR("FATAL: Could not open pid (-p) file (%s): %s\n",
+			CONFIG->PIDFILE, strerror(errno));
+		    exit(1);
+	    }
+
+	    AZ(VPF_Write(pfh));
+	    atexit(remove_pfh);
+    }
 
     start_children(0, CONFIG->NCORES);
 

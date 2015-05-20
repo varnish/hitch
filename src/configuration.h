@@ -49,7 +49,7 @@ struct front_arg {
 VTAILQ_HEAD(front_arg_head, front_arg);
 
 /* configuration structure */
-struct __stud_config {
+struct __hitch_config {
     ENC_TYPE ETYPE;
     PROXY_MODE PMODE;
     int WRITE_IP_OCTET;
@@ -89,12 +89,13 @@ struct __stud_config {
     char* LOG_FILENAME;
     int RING_SLOTS;
     int RING_DATA_LEN;
+    char *PIDFILE;
 };
 
-typedef struct __stud_config stud_config;
+typedef struct __hitch_config hitch_config;
 
 char * config_error_get (void);
-stud_config * config_new (void);
-void config_destroy (stud_config *cfg);
-int config_file_parse (char *file, stud_config *cfg);
-void config_parse_cli(int argc, char **argv, stud_config *cfg);
+hitch_config * config_new (void);
+void config_destroy (hitch_config *cfg);
+int config_file_parse (char *file, hitch_config *cfg);
+void config_parse_cli(int argc, char **argv, hitch_config *cfg);

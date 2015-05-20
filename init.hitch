@@ -1,6 +1,6 @@
 #!/bin/sh
 
-### BEGIN INIT INFO                                                                                                                                           
+### BEGIN INIT INFO
 # Provides:          hitch
 # Required-Start:    $local_fs $remote_fs
 # Required-Stop:     $local_fs $remote_fs
@@ -9,7 +9,7 @@
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: Start or stop hitch (SSL offloader)
-### END INIT INFO  
+### END INIT INFO
 
 #######################################################
 #                      GLOBALS                        #
@@ -27,7 +27,7 @@ RUNTIME_DIR="/var/run/hitch"
 
 hitch_single_instance_config_reset() {
 #######################################################
-#            hitch instance configuration              #
+#            hitch instance configuration             #
 #######################################################
 
 # hitch listening address
@@ -153,7 +153,7 @@ ULIMIT_N=""
 
 PATH="${PATH}:."
 INSTANCE_NAME=""
-HITCH=`which hitch-openssl 2>/dev/null`
+HITCH=`which hitch 2>/dev/null`
 
 die() {
   msg_log "FATAL: $@"
@@ -225,7 +225,7 @@ _real_single_instance_start() {
         opts="${opts} -M ${CACHE_UPDATE_IFACE}"
       fi
     fi
-    
+
   fi
 
   # chroot?
@@ -555,7 +555,7 @@ hitch_instances_restart() {
       num_failed=$((num_failed + 1))
     fi
   done
-    
+
   if [ "${num_failed}" != "0" ]; then
     return 1
   else

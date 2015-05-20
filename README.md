@@ -2,7 +2,7 @@ hitch TLS proxy
 ===============
 
 `hitch` is a network proxy that terminates TLS/SSL connections and forwards the
-unencrypted traffic to some backend.  It's designed to handle 10s of thousands of
+unencrypted traffic to some backend. It's designed to handle 10s of thousands of
 connections efficiently on multicore machines.
 
 It follows a process-per-core model; a parent process spawns N children who
@@ -13,7 +13,7 @@ connections using `libev` and `OpenSSL`'s nonblocking API.  By default,
 some buffer space for data in flight between frontend and backend.
 
 `hitch` has very few features--it's designed to be paired with an intelligent
-backend like haproxy or nginx.  It maintains a strict 1:1 connection pattern
+backend like varnish.  It maintains a strict 1:1 connection pattern
 with this backend handler so that the backend can dictate throttling behavior,
 maxmium connection behavior, availability of service, etc.
 
@@ -28,7 +28,7 @@ though `hitch` itself appears to be the connected client.
 Thanks to a contribution from Emeric at Exceliance (the folks behind HAProxy),
 a special build of `hitch` can be made that utilitizes shared memory to
 use a common session cache between all child processes.  This can speed up
-large `hitch` deployments by avoiding client renegotiation.
+large `hitch` deployments by utilizing session resumption.
 
 Releases
 ---------
@@ -81,6 +81,19 @@ To install `hitch`:
     $ make
     $ sudo make install
 
+Installing from Packages
+------------------------
+
+``FreeBSD``
+
+From packages:
+
+    $ pkg install hitch
+
+From ports:
+
+    $ cd /usr/ports/security/hitch && make install clean
+
 Usage
 -----
 
@@ -100,16 +113,17 @@ Detail about the entire set of options can be found by invoking `hitch -h`:
 
     ENCRYPTION METHODS:
 
-          --tls                   TLSv1 (default)
-          --ssl                   SSLv3 (implies no TLSv1)
+          --tls                   TLSv1 (default. No SSLv3)
+          --ssl                   SSLv3 (enables SSLv3)
       -c  --ciphers=SUITE         Sets allowed ciphers (Default: "")
       -e  --ssl-engine=NAME       Sets OpenSSL engine (Default: "")
       -O  --prefer-server-ciphers Prefer server list order
 
     SOCKET:
 
-      -b  --backend=HOST:PORT     Backend [connect] (default is "[127.0.0.1]:8000")
-      -f  --frontend=HOST:PORT    Frontend [bind] (default is "[*]:8443")
+      -b  --backend=[HOST]:PORT     Backend [connect] (default is "[127.0.0.1]:8000")
+      -f  --frontend=[HOST]:PORT    Frontend [bind] (default is "[*]:8443")
+                                    (Note: brackets are mandatory in endpoint specifiers.)
 
     PERFORMANCE:
 
@@ -145,6 +159,7 @@ Detail about the entire set of options can be found by invoking `hitch -h`:
                                  (Default: off)
 
       -t  --test                 Test configuration and exit
+      -p  --pidfile=FILE         PID file
       -V  --version              Print program version and exit
       -h  --help                 This help message
 
@@ -155,12 +170,6 @@ hitch can also use a configuration file that supports all the same options as th
 command-line arguments. You can use `hitch --default-config` to
 generate the default configuration on stdout; then, customize your configuration and
 pass it to `hitch --config=FILE`.
-
-Serving HTTPS
--------------
-
-If you're using `hitch` for HTTPS, please make sure to use the `--ssl` option!
-
 
 Diffie–Hellman
 --------------
@@ -174,8 +183,8 @@ Be sure to set your cipher suite appropriately: -c DHE-RSA-AES256-SHA
 Authors
 -------
 
-hitch is maintained by Dag Haavi Findstad <daghf@varnish-software.com>.
+hitch is maintained by Dag Haavi Finstad <daghf@varnish-software.com>.
 
-`hitch`  was originally forked from stud, that was originally written by Jamie
-Turner (@jamwt) and maintained by the Bump (http://bu.mp) server team.
+`hitch`  was originally called stud and written by Jamie Turner (@jamwt) at
+Bump (http://bu.mp).
 
