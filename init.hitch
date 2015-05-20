@@ -153,7 +153,7 @@ ULIMIT_N=""
 
 PATH="${PATH}:."
 INSTANCE_NAME=""
-HITCH=`which hitch 2>/dev/null`
+HITCH=`which hitch-openssl 2>/dev/null`
 
 die() {
   msg_log "FATAL: $@"
