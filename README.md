@@ -121,9 +121,9 @@ Detail about the entire set of options can be found by invoking `hitch -h`:
 
     SOCKET:
 
-      -b  --backend=[HOST]:PORT     Backend [connect] (default is "[127.0.0.1]:8000")
-      -f  --frontend=[HOST]:PORT    Frontend [bind] (default is "[*]:8443")
-                                    (Note: brackets are mandatory in endpoint specifiers.)
+      -b  --backend=[HOST]:PORT            Backend [connect] (default is "[127.0.0.1]:8000")
+      -f  --frontend=[HOST]:PORT[+CERT]    Frontend [bind] (default is "[*]:8443")
+                                           (Note: brackets are mandatory in endpoint specifiers.)
 
     PERFORMANCE:
 
