@@ -1,0 +1,15 @@
+#!/bin/bash
+# (until we get automake/autoconf configured right.)
+
+set -o errexit
+
+for t in test*; do
+	echo -n -e "$t\t"
+	./$t
+	if [ "$?" != "0" ]; then
+		echo "FAILED"
+	else
+		echo "OK"
+	fi
+done
+
