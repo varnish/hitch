@@ -151,7 +151,7 @@ ULIMIT_N=""
 # EOF
 }
 
-PATH="${PATH}:."
+PATH="${PATH}:/usr/local/sbin:."
 INSTANCE_NAME=""
 HITCH=`which hitch-openssl 2>/dev/null`
 
