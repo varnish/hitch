@@ -88,7 +88,8 @@ static char tmp_buf[150];
 
 // for testing configuration only
 #include <openssl/ssl.h>
-SSL_CTX * init_openssl();
+SSL_CTX * init_openssl(void);
+void init_globals(void);
 
 static void config_error_set (char *fmt, ...) {
   memset(error_buf, '\0', sizeof(error_buf));
@@ -1428,6 +1429,7 @@ void config_parse_cli(int argc, char **argv, hitch_config *cfg) {
   // was this only a test?
   if (test_only) {
     fprintf(stderr, "Trying to initialize SSL contexts with your certificates");
+    init_globals();
     if (!init_openssl()) {
       config_die("Error initializing OpenSSL.");
     }

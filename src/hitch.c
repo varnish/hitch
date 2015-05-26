@@ -932,7 +932,7 @@ find_ctx(const char *file) {
 /* Init library and load specified certificate.
  * Establishes a SSL_ctx, to act as a template for
  * each connection */
-void init_openssl() {
+void init_openssl(void) {
 	struct cert_files *cf;
 	struct listen_sock *ls;
 	SSL_CTX *ctx;
@@ -2028,7 +2028,7 @@ void drop_privileges() {
 }
 
 
-void init_globals() {
+void init_globals(void) {
     /* backaddr */
     struct addrinfo hints;
 
