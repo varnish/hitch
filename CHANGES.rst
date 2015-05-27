@@ -9,7 +9,7 @@ hitch 1.0.0-beta2 (2015-05-22)
 
 * New --pidfile argument.
 * Fixed bug in certificate ordering, avoiding wrong cert being provided when
-running on dualstack servers. (found by test framework!)
+  running on dualstack servers. (found by test framework!)
 * Rudimentary test framework implemented.
 * Init script updates provided by Denis Brækhus.
 * FreeBSD installation instructions added. (contributed by Ryan Steinmetz)
