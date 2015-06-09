@@ -1039,9 +1039,9 @@ void config_print_default (FILE *fd, hitch_config *cfg) {
   fprintf(fd, "\n");
 
   fprintf(fd, "# Listening address. REQUIRED.\n");
-  fprintf(fd, "#\n");
+  fprintf(fd, "# Can be specified multiple times for multiple listen endpoints.\n");
   fprintf(fd, "# type: string\n");
-  fprintf(fd, "# syntax: [HOST]:PORT\n");
+  fprintf(fd, "# syntax: [HOST]:PORT[+CERT]\n");
   fprintf(fd, FMT_QSTR, CFG_FRONTEND,
       config_disp_hostport(VTAILQ_FIRST(&cfg->LISTEN_ARGS)->ip,
 	  VTAILQ_FIRST(&cfg->LISTEN_ARGS)->port));
