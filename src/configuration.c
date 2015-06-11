@@ -1426,7 +1426,7 @@ void config_parse_cli(int argc, char **argv, hitch_config *cfg) {
 
   // was this only a test?
   if (test_only) {
-    fprintf(stderr, "Trying to initialize SSL contexts with your certificates");
+    fprintf(stderr, "Trying to initialize SSL contexts with your certificates\n");
     init_globals();
     if (!init_openssl()) {
       config_die("Error initializing OpenSSL.");
