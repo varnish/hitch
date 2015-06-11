@@ -90,6 +90,7 @@ struct __hitch_config {
     int RING_SLOTS;
     int RING_DATA_LEN;
     char *PIDFILE;
+    int SNI_NOMATCH_ABORT;
 };
 
 typedef struct __hitch_config hitch_config;

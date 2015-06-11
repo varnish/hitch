@@ -58,6 +58,7 @@
 #define CFG_RING_SLOTS "ring-slots"
 #define CFG_RING_DATA_LEN "ring-data-len"
 #define CFG_PIDFILE "pidfile"
+#define CFG_SNI_NOMATCH_ABORT "sni-nomatch-abort"
 
 #ifdef USE_SHARED_CACHE
   #define CFG_SHARED_CACHE "shared-cache"
@@ -140,6 +141,7 @@ hitch_config * config_new (void) {
   r->CIPHER_SUITE       = NULL;
   r->ENGINE             = NULL;
   r->BACKLOG            = 100;
+  r->SNI_NOMATCH_ABORT  = 0;
 
   VTAILQ_INIT(&r->LISTEN_ARGS);
   ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
@@ -793,6 +795,9 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
   else if (strcmp(k, CFG_RING_DATA_LEN) == 0) {
       r = config_param_val_int_pos(v, &cfg->RING_DATA_LEN);
   }
+  else if (strcmp(k, CFG_SNI_NOMATCH_ABORT) == 0) {
+      r = config_param_val_bool(v, &cfg->SNI_NOMATCH_ABORT);
+  }
   else {
     fprintf(
       stderr,
@@ -1018,6 +1023,10 @@ void config_print_usage_fd (char *prog, hitch_config *cfg, FILE *out) {
   fprintf(out, "      --proxy-proxy          Proxy HaProxy's PROXY (IPv4 or IPv6) protocol line\n" );
   fprintf(out, "                             before actual data\n");
   fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->PROXY_PROXY_LINE));
+  fprintf(out, "      --sni-nomatch-abort    Abort handshake when client "
+      "submits an unrecognized SNI server name\n" );
+  fprintf(out, "                             (Default: %s)\n",
+      config_disp_bool(cfg->SNI_NOMATCH_ABORT));
   fprintf(out, "\n");
   fprintf(out, "  -t  --test                 Test configuration and exit\n");
   fprintf(out, "  -p  --pidfile=FILE         PID file\n");
@@ -1223,6 +1232,13 @@ void config_print_default (FILE *fd, hitch_config *cfg) {
   fprintf(fd, FMT_STR, CFG_PROXY_PROXY, config_disp_bool(cfg->PROXY_PROXY_LINE));
   fprintf(fd, "\n");
 
+  fprintf(fd, "# Abort handshake when the client submits an unrecognized SNI"
+      " server name.\n");
+  fprintf(fd, "#\n");
+  fprintf(fd, "# type: boolean\n");
+  fprintf(fd, FMT_STR, CFG_SNI_NOMATCH_ABORT, config_disp_bool(cfg->SNI_NOMATCH_ABORT));
+  fprintf(fd, "\n");
+
   fprintf(fd, "# EOF\n");
 }
 #endif /* NO_CONFIG_FILE */
@@ -1272,7 +1288,7 @@ void config_parse_cli(int argc, char **argv, hitch_config *cfg) {
     { CFG_WRITE_PROXY, 0, &cfg->WRITE_PROXY_LINE, 1 },
     { CFG_WRITE_PROXY_V2, 0, &cfg->WRITE_PROXY_LINE_V2, 1 },
     { CFG_PROXY_PROXY, 0, &cfg->PROXY_PROXY_LINE, 1 },
-
+    { CFG_SNI_NOMATCH_ABORT, 0, &cfg->SNI_NOMATCH_ABORT, 1 },
     { "test", 0, NULL, 't' },
     { "version", 0, NULL, 'V' },
     { "help", 0, NULL, 'h' },

@@ -157,6 +157,8 @@ Detail about the entire set of options can be found by invoking `hitch -h`:
           --proxy-proxy          Proxy HaProxy's PROXY (IPv4 or IPv6) protocol line
                                  before actual data
                                  (Default: off)
+          --sni-nomatch-abort    Abort handshake when client submits an unrecognized SNI server name
+                                 (Default: off)
 
       -t  --test                 Test configuration and exit
       -p  --pidfile=FILE         PID file

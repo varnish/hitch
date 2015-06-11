@@ -739,23 +739,28 @@ sni_match(const struct ctx_list *cl, const char *srvname)
  * based on the SNI header
  */
 int sni_switch_ctx(SSL *ssl, int *al, void *data) {
-    (void)data;
-    (void)al;
-    const char *servername;
-    const ctx_list *cl;
+	(void)data;
+	(void)al;
+	const char *servername;
+	const ctx_list *cl;
 
-    servername = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
-    if (!servername) return SSL_TLSEXT_ERR_NOACK;
+	servername = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
+	if (!servername)
+		return SSL_TLSEXT_ERR_NOACK;
 
-    VTAILQ_FOREACH(cl, &sni_ctxs, list) {
-        CHECK_OBJ_NOTNULL(cl, CTX_LIST_MAGIC);
-        if (sni_match(cl, servername)) {
-            SSL_set_SSL_CTX(ssl, cl->ctx);
-            return SSL_TLSEXT_ERR_NOACK;
-        }
-    }
+	VTAILQ_FOREACH(cl, &sni_ctxs, list) {
+		CHECK_OBJ_NOTNULL(cl, CTX_LIST_MAGIC);
+		if (sni_match(cl, servername)) {
+			SSL_set_SSL_CTX(ssl, cl->ctx);
+			return SSL_TLSEXT_ERR_OK;
+		}
+	}
 
-    return SSL_TLSEXT_ERR_NOACK;
+	/* No matching certs */
+	if (CONFIG->SNI_NOMATCH_ABORT)
+		return SSL_TLSEXT_ERR_ALERT_FATAL;
+	else
+		return SSL_TLSEXT_ERR_NOACK;
 }
 #endif /* OPENSSL_NO_TLSEXT */
 

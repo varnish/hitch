@@ -27,6 +27,6 @@ die() {
 
 runcurl() {
 	# Verify that we got a HTTP reply.
-	BUF=$(curl --silent --insecure https://$1:$2/ 2>&1)
+	BUF=$(curl $CURL_EXTRA --silent --insecure https://$1:$2/ 2>&1)
 	test "$?" = "0" || die "Incorrect HTTP response code."
 }
