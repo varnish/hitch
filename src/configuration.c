@@ -187,17 +187,17 @@ void config_destroy (hitch_config *cfg) {
   if (cfg == NULL) return;
 
   // free all members!
-  if (cfg->CHROOT != NULL) free(cfg->CHROOT);
+  free(cfg->CHROOT);
   VTAILQ_FOREACH_SAFE(fa, &cfg->LISTEN_ARGS, list, ftmp) {
-	  CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
-	  VTAILQ_REMOVE(&cfg->LISTEN_ARGS, fa, list);
-	  free(fa->ip);
-	  free(fa->port);
-	  free(fa->cert);
-	  FREE_OBJ(fa);
+    CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
+    VTAILQ_REMOVE(&cfg->LISTEN_ARGS, fa, list);
+    free(fa->ip);
+    free(fa->port);
+    free(fa->cert);
+    FREE_OBJ(fa);
   }
-  if (cfg->BACK_IP != NULL) free(cfg->BACK_IP);
-  if (cfg->BACK_PORT != NULL) free(cfg->BACK_PORT);
+  free(cfg->BACK_IP);
+  free(cfg->BACK_PORT);
   if (cfg->CERT_FILES != NULL) {
     struct cert_files *curr = cfg->CERT_FILES, *next;
     while (cfg->CERT_FILES != NULL) {
@@ -206,22 +206,20 @@ void config_destroy (hitch_config *cfg) {
       curr = next;
     }
   }
-  if (cfg->CIPHER_SUITE != NULL) free(cfg->CIPHER_SUITE);
-  if (cfg->ENGINE != NULL) free(cfg->ENGINE);
+  free(cfg->CIPHER_SUITE);
+  free(cfg->ENGINE);
 
 #ifdef USE_SHARED_CACHE
-  if (cfg->SHCUPD_IP != NULL) free(cfg->SHCUPD_IP);
-  if (cfg->SHCUPD_PORT != NULL) free(cfg->SHCUPD_PORT);
+  free(cfg->SHCUPD_IP);
+  free(cfg->SHCUPD_PORT);
 
   for (int i = 0; i < MAX_SHCUPD_PEERS; i++) {
-    if (cfg->SHCUPD_PEERS[i].ip != NULL)
-      free(cfg->SHCUPD_PEERS[i].ip);
-    if (cfg->SHCUPD_PEERS[i].port != NULL)
-      free(cfg->SHCUPD_PEERS[i].port);
+    free(cfg->SHCUPD_PEERS[i].ip);
+    free(cfg->SHCUPD_PEERS[i].port);
   }
 
-  if (cfg->SHCUPD_MCASTIF != NULL) free(cfg->SHCUPD_MCASTIF);
-  if (cfg->SHCUPD_MCASTTTL != NULL) free(cfg->SHCUPD_MCASTTTL);
+  free(cfg->SHCUPD_MCASTIF);
+  free(cfg->SHCUPD_MCASTTTL);
 #endif
 
   free(cfg);
