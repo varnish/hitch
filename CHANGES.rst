@@ -4,6 +4,14 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch 1.0.0-beta3 (unreleased)
+------------------------------
+
+* Remove cosmetic NULL-check before free(). (github issue #26)
+* Avoid segfault when testing configuration with -t. (github issue #22)
+* Minor helptext changes.
+
+
 hitch 1.0.0-beta2 (2015-05-22)
 ------------------------------
 
