@@ -968,7 +968,6 @@ void init_openssl(void) {
 	for (ls = VTAILQ_FIRST(&listen_socks); ls != NULL;
 	     ls = VTAILQ_NEXT(ls, list)) {
 		if (ls->cert) {
-			fprintf(stderr, "%s: %s\n", ls->cert, ls->name);
 			ctx = find_ctx(ls->cert);
 			if (ctx == NULL) {
 				ctx = make_ctx(ls->cert);
