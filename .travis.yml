@@ -2,7 +2,7 @@ language: c
 
 before_install:
   - sudo apt-get update -q
-  - sudo apt-get install -qq procps libev-dev libssl-dev automake
+  - sudo apt-get install -qq libev-dev libssl-dev automake
 
 
 before_script:
