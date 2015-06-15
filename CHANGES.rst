@@ -7,6 +7,9 @@ version.
 hitch 1.0.0-beta3 (unreleased)
 ------------------------------
 
+* Add --sni-nomatch-abort which abort connections on unknown SNI server
+  name. (useful for avoiding certificate warnings in clients attempting
+  probabilistic TLS upgrades)
 * Remove cosmetic NULL-check before free(). (github issue #26)
 * Avoid segfault when testing configuration with -t. (github issue #22)
 * Minor helptext changes.
