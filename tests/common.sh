@@ -12,7 +12,7 @@ HITCH=../src/hitch-openssl
 HITCH_ARGS="--pidfile=$PIDFILE --daemon --quiet"
 
 cleanup() {
-        test -s $PIDFILE && pkill --pidfile "$PIDFILE"
+        test -s $PIDFILE && pkill --signal=SIGTERM --pidfile "$PIDFILE"
         rm -f "$PIDFILE" "$CONFFILE" "$DUMPFILE" 2>/dev/null
 }
 trap cleanup EXIT

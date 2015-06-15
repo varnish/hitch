@@ -5,7 +5,7 @@ set -o errexit
 
 for t in test*; do
 	echo -n -e "$t\t"
-	./$t
+	bash $t
 	if [ "$?" != "0" ]; then
 		echo "FAILED"
 	else
