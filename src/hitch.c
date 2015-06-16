@@ -49,6 +49,7 @@
 #include <limits.h>
 #include <syslog.h>
 #include <stdarg.h>
+#include <grp.h>
 
 #include <ctype.h>
 #include <sched.h>
@@ -2025,9 +2026,9 @@ void change_root() {
 }
 
 void drop_privileges() {
-    if (CONFIG->GID >= 0 && setgid(CONFIG->GID) < 0)
+    if (CONFIG->GID >= 0 && setgroups(0, NULL) && setgid(CONFIG->GID) < 0)
         fail("setgid failed");
-    if (CONFIG->UID >= 0 && setuid(CONFIG->UID) < 0)
+    if (CONFIG->UID >= 0 && setgroups(0, NULL) && setuid(CONFIG->UID) < 0)
         fail("setuid failed");
 }
 
