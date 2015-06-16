@@ -15,7 +15,7 @@ some buffer space for data in flight between frontend and backend.
 `hitch` has very few features--it's designed to be paired with an intelligent
 backend like varnish.  It maintains a strict 1:1 connection pattern
 with this backend handler so that the backend can dictate throttling behavior,
-maxmium connection behavior, availability of service, etc.
+maximum connection behavior, availability of service, etc.
 
 `hitch` will optionally write the client IP address as the first few octets
 (depending on IPv4 or IPv6) to the backend--or provide that information
