@@ -46,6 +46,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <pwd.h>
+#include <grp.h>
 #include <limits.h>
 #include <syslog.h>
 #include <stdarg.h>
@@ -2025,8 +2026,8 @@ void change_root() {
 }
 
 void drop_privileges() {
-    if (CONFIG->GID >= 0 && setgid(CONFIG->GID) < 0)
-        fail("setgid failed");
+    if (CONFIG->GID >= 0 && setgroups(0, NULL) < 0 && setgid(CONFIG->GID) < 0)
+        fail("setgroups or setgid failed");
     if (CONFIG->UID >= 0 && setuid(CONFIG->UID) < 0)
         fail("setuid failed");
 }
