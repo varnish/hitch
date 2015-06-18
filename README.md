@@ -25,7 +25,7 @@ is especially useful if a TCP proxy is used in front of `hitch`.  Using either o
 these techniques, backends who care about the client IP can still access it even
 though `hitch` itself appears to be the connected client.
 
-Thanks to a contribution from Emeric at Exceliance (the folks behind HAProxy),
+Thanks to a contribution from Emeric Brun at HAProxy Technologies,
 a special build of `hitch` can be made that utilitizes shared memory to
 use a common session cache between all child processes.  This can speed up
 large `hitch` deployments by utilizing session resumption.
