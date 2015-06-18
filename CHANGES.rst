@@ -4,9 +4,10 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
-hitch 1.0.0-beta3 (unreleased)
+hitch 1.0.0-beta3 (2015-06-18)
 ------------------------------
 
+* Drop supplementary groups when doing setgid(). (github issue #31)
 * Add --sni-nomatch-abort which abort connections on unknown SNI server
   name. (useful for avoiding certificate warnings in clients attempting
   probabilistic TLS upgrades)
