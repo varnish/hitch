@@ -36,8 +36,8 @@
 .Op Fl -ssl
 .Op Fl c Ar ciphers
 .Op Fl e Ar engine
-.Op Fl b Ar host,port
-.Op Fl f Ar host,port
+.Op Fl b Ar [host]:port
+.Op Fl f Ar [host]:port[+cert]
 .Op Fl n Ar cores
 .Op Fl B Ar backlog
 .Op Fl C Ar cache
@@ -57,7 +57,7 @@ connections efficiently on multicore machines.
 has very few features -- it's designed to be paired with an intelligent
 backend like haproxy or nginx.  It maintains a strict 1:1 connection pattern
 with this backend handler so that the backend can dictate throttling behavior,
-maxmium connection behavior, availability of service, etc.
+maximum connection behavior, availability of service, etc.
 .Pp
 The only required argument is a path to a PEM file that contains the certificate
 (or a chain of certificates) and private key. It should also contain
@@ -79,13 +79,13 @@ Specify an OpenSSL engine by its unique ID. The engine will be used by
 default for all algorithms.  The keyword
 .Ar auto
 can be used to load all available engines.
-.It Fl b Ar host,port
+.It Fl b Ar [host]:port
 Define backend. Default is
-.Ar 127.0.0.1,8000 .
+.Ar 127.0.0.1:8000 .
 Incoming connections will be unwrapped and sent to this IP and port.
-.It Fl f Ar host,port
+.It Fl f Ar [host]:port[+cert]
 Define frontend. Default is
-.Ar *,8443 .
+.Ar *:8443 .
 Incoming connections will be accepted to this IP and port and will be
 sent to the backend defined above.
 .It Fl n Ar cores
