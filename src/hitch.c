@@ -370,9 +370,9 @@ static void settcpkeepalive(int fd) {
         SOCKERR("Error activating SO_KEEPALIVE on client socket");
     }
 
+#ifdef TCP_KEEPIDLE
     optval = CONFIG->TCP_KEEPALIVE_TIME;
     optlen = sizeof(optval);
-#ifdef TCP_KEEPIDLE
     if(setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, &optval, optlen) < 0) {
         SOCKERR("Error setting TCP_KEEPIDLE on client socket");
     }
