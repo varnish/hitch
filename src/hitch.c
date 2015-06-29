@@ -257,11 +257,10 @@ static void VWLOG (int level, const char* fmt, va_list ap)
 		    || st.st_ino != logf_st.st_ino)
 	    {
 		fclose(logf);
-		if ((logf = fopen(CONFIG->LOG_FILENAME, "a")) != NULL) {
-		    fstat(fileno(logf), &logf_st);
-		} else {
+
+		logf = fopen(CONFIG->LOG_FILENAME, "a");
+		if (logf == NULL || fstat(fileno(logf), &logf_st) < 0)
 		    memset(&logf_st, 0, sizeof(logf_st));
-		}
 	    }
 	    logf_check_t = tv.tv_sec;
 	}
