@@ -320,18 +320,13 @@ char * str_trim(char *str) {
 }
 
 char * config_assign_str (char **dst, char *v) {
-  if (*dst == NULL) {
-    if (v != NULL && strlen(v) > 0)
-      *dst = strdup(v);
-  } else {
-    if (v != NULL && strlen(v) > 0) {
-      // we assume that there is enough room for v in *dst
-      memset(*dst, '\0', strlen(v) + 1);
-      memcpy(*dst, v, strlen(v));
-    }
-    else
-      free(*dst);
-  }
+  assert(v != NULL);
+
+  if (strlen(v) <= 0) return(NULL);
+  if (*dst != NULL)
+    free(*dst);
+
+  *dst = strdup(v);
   return *dst;
 }
 
