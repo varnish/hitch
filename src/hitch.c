@@ -2305,7 +2305,7 @@ int main(int argc, char **argv) {
 	if (CONFIG->UID >=0 || CONFIG->GID >= 0) {
 	    AZ(fchown(fileno(logf), CONFIG->UID, CONFIG->GID));
 	}
-	fstat(fileno(logf), &logf_st);
+	AZ(fstat(fileno(logf), &logf_st));
 	logf_check_t = time(NULL);
     } else {
 	logf = CONFIG->QUIET ? stderr : stdout;
