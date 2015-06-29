@@ -430,17 +430,14 @@ int config_param_host_port (char *str, char **addr, char **port) {
   return config_param_host_port_wildcard(str, addr, port, NULL, 0);
 }
 
-int config_param_val_int (char *str, int *dst) {
-  *dst = (str != NULL) ? atoi(str) : 0;
-  return 1;
-}
 
-int config_param_val_int_pos (char *str, int *dst) {
-  int num = 0;
-  if (str != NULL)
-    num = atoi(str);
+int config_param_val_int (char *str, int *dst, int positive_only) {
+  int num;
 
-  if (num < 1) {
+  assert(str != NULL);
+  num = atoi(str);
+
+  if (positive_only && num < 0) {
     config_error_set("Not a positive number.");
     return 0;
   }
@@ -449,17 +446,13 @@ int config_param_val_int_pos (char *str, int *dst) {
   return 1;
 }
 
-int config_param_val_intl (char *str, long int *dst) {
-  *dst = (str != NULL) ? atol(str) : 0;
-  return 1;
-}
+int config_param_val_long (char *str, long *dst, int positive_only) {
+  long num;
+  assert(str != NULL);
 
-int config_param_val_intl_pos (char *str, long int *dst) {
-  long int num = 0;
-  if (str != NULL)
-    num = atol(str);
+  num = atol(str);
 
-  if (num < 1) {
+  if (positive_only && num <= 0) {
     config_error_set("Not a positive number.");
     return 0;
   }
@@ -617,14 +610,13 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
     r = config_param_host_port(v, &cfg->BACK_IP, &cfg->BACK_PORT);
   }
   else if (strcmp(k, CFG_WORKERS) == 0) {
-    r = config_param_val_intl_pos(v, &cfg->NCORES);
+    r = config_param_val_long(v, &cfg->NCORES, 1);
   }
   else if (strcmp(k, CFG_BACKLOG) == 0) {
-    r = config_param_val_int(v, &cfg->BACKLOG);
-    if (r && cfg->BACKLOG < -1) cfg->BACKLOG = -1;
+    r = config_param_val_int(v, &cfg->BACKLOG, 0);
   }
   else if (strcmp(k, CFG_KEEPALIVE) == 0) {
-    r = config_param_val_int_pos(v, &cfg->TCP_KEEPALIVE_TIME);
+    r = config_param_val_int(v, &cfg->TCP_KEEPALIVE_TIME, 1);
   }
 #ifdef USE_SHARED_CACHE
   else if (strcmp(k, CFG_SHARED_CACHE) == 0) {
@@ -763,16 +755,16 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
     }
   }
   else if (strcmp(k, CFG_BACKEND_CONNECT_TIMEOUT) == 0) {
-      r = config_param_val_int_pos(v, &cfg->BACKEND_CONNECT_TIMEOUT);
+      r = config_param_val_int(v, &cfg->BACKEND_CONNECT_TIMEOUT, 1);
   }
   else if (strcmp(k, CFG_SSL_HANDSHAKE_TIMEOUT) == 0) {
-      r = config_param_val_int_pos(v, &cfg->SSL_HANDSHAKE_TIMEOUT);
+      r = config_param_val_int(v, &cfg->SSL_HANDSHAKE_TIMEOUT, 1);
   }
   else if (strcmp(k, CFG_RECV_BUFSIZE) == 0) {
-      r = config_param_val_int_pos(v, &cfg->RECV_BUFSIZE);
+      r = config_param_val_int(v, &cfg->RECV_BUFSIZE, 1);
   }
   else if (strcmp(k, CFG_SEND_BUFSIZE) == 0) {
-      r = config_param_val_int_pos(v, &cfg->SEND_BUFSIZE);
+      r = config_param_val_int(v, &cfg->SEND_BUFSIZE, 1);
   }
   else if (strcmp(k, CFG_LOG_FILENAME) == 0) {
     if (v != NULL && strlen(v) > 0) {
@@ -785,10 +777,10 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
     }
   }
   else if (strcmp(k, CFG_RING_SLOTS) == 0) {
-      r = config_param_val_int_pos(v, &cfg->RING_SLOTS);
+      r = config_param_val_int(v, &cfg->RING_SLOTS, 1);
   }
   else if (strcmp(k, CFG_RING_DATA_LEN) == 0) {
-      r = config_param_val_int_pos(v, &cfg->RING_DATA_LEN);
+      r = config_param_val_int(v, &cfg->RING_DATA_LEN, 1);
   }
   else if (strcmp(k, CFG_SNI_NOMATCH_ABORT) == 0) {
       r = config_param_val_bool(v, &cfg->SNI_NOMATCH_ABORT);
