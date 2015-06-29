@@ -350,10 +350,6 @@ int config_param_val_bool (char *val, int *res) {
   return 1;
 }
 
-char * config_param_val_str (char *val) {
-  return strdup(val);
-}
-
 int config_param_host_port_wildcard (char *str, char **addr, char **port,
     char **cert, int wildcard_okay) {
   int len = (str != NULL) ? strlen(str) : 0;
