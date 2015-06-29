@@ -331,7 +331,8 @@ char * config_assign_str (char **dst, char *v) {
 }
 
 int config_param_val_bool (char *val, int *res) {
-  if (val == NULL) return 0;
+  assert(val != NULL);
+
   if (
     strcasecmp(val, CFG_BOOL_ON) == 0 ||
     strcasecmp(val, "yes") == 0 ||
@@ -572,6 +573,9 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
   int r = 1;
   struct stat st;
 
+  assert(k != NULL);
+  assert(v != NULL);
+
   if (strcmp(k, "tls") == 0) {
     cfg->ETYPE = ENC_TLS;
   }
@@ -579,7 +583,7 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
     cfg->ETYPE = ENC_SSL;
   }
   else if (strcmp(k, CFG_CIPHERS) == 0) {
-    if (v != NULL && strlen(v) > 0) {
+    if (strlen(v) > 0) {
       config_assign_str(&cfg->CIPHER_SUITE, v);
     }
   }
