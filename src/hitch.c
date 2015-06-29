@@ -333,6 +333,7 @@ logproxy (int level, const proxystate* ps, const char* fmt, ...)
 	    snprintf(buf, sizeof(buf), "[%s]:%s :%d %d:%d %s",
 		hbuf, sbuf, ps->connect_port, ps->fd_up, ps->fd_down, fmt);
     VWLOG(level, buf, ap);
+    va_end(ap);
 }
 
 #define LOGPROXY(...)							\
