@@ -568,6 +568,7 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
 
   assert(k != NULL);
   assert(v != NULL);
+  assert(strlen(k) >= 2);
 
   if (strcmp(k, "tls") == 0) {
     cfg->ETYPE = ENC_TLS;
@@ -828,7 +829,7 @@ int config_file_parse (char *file, hitch_config *cfg) {
     i++;
 
     key = config_get_param(line);
-    if (key == NULL)
+    if (key == NULL || strlen(key) <= 2)
         continue;
 
     val = config_get_value(line);
