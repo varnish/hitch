@@ -271,6 +271,7 @@ static void VWLOG (int level, const char* fmt, va_list ap)
 	sprintf(buf+n, ".%06d [%5d] %s", (int)tv.tv_usec, getpid(), fmt);
 	va_copy(ap1, ap);
 	vfprintf(logf, buf, ap1);
+	va_end(ap1);
     }
     if (CONFIG->SYSLOG) {
 	vsyslog(level, fmt, ap);
