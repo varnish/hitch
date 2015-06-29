@@ -1034,9 +1034,11 @@ create_listen_sock(const struct front_arg *fa)
 			fail("{socket: main}");
 
 		int t = 1;
-		setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(int));
+		if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(int)) < 0)
+			fail("{setsockopt-reuseaddr}");
 #ifdef SO_REUSEPORT
-		setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &t, sizeof(int));
+		if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &t, sizeof(int)) < 0)
+			fail("{setsockopt-reuseport}");
 #endif
 		setnonblocking(s);
 		if (CONFIG->RECV_BUFSIZE > 0) {
@@ -1057,8 +1059,9 @@ create_listen_sock(const struct front_arg *fa)
 #ifndef NO_DEFER_ACCEPT
 #if TCP_DEFER_ACCEPT
 		int timeout = 1;
-		setsockopt(s, IPPROTO_TCP, TCP_DEFER_ACCEPT,
-		    &timeout, sizeof(int));
+		if (setsockopt(s, IPPROTO_TCP, TCP_DEFER_ACCEPT,
+		    &timeout, sizeof(int)) < 0)
+			fail("{setsockopt-defer_accept}");
 #endif /* TCP_DEFER_ACCEPT */
 #endif
 		if (listen(s, CONFIG->BACKLOG) != 0) {
