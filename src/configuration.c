@@ -828,27 +828,26 @@ int config_file_parse (char *file, hitch_config *cfg) {
 
   // read config
   int i = 0;
+  char *key, *val;
   while (i < CONFIG_MAX_LINES) {
     memset(line, '\0', sizeof(line));
-    if (fgets(line, (sizeof(line) - 1), fd) == NULL) break;
+    if (fgets(line, (sizeof(line) - 1), fd) == NULL)
+        break;
     i++;
 
-    // get configuration key
-    char *key, *val;
     key = config_get_param(line);
-    if (key == NULL) continue;
+    if (key == NULL)
+        continue;
 
-    // get configuration key value...
     val = config_get_value(line);
-    if (val == NULL) continue;
+    if (val == NULL)
+        continue;
     str_trim(val);
 
     // printf("File '%s', line %d, key: '%s', value: '%s'\n", file, i, key, val);
 
-    // validate configuration key => value
     config_param_validate(key, val, cfg, file, i);
   }
-
   fclose(fd);
 
   return 1;
