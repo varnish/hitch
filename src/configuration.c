@@ -82,8 +82,6 @@
 #endif
 // END: configuration parameters
 
-static char var_buf[CONFIG_BUF_SIZE];
-static char val_buf[CONFIG_BUF_SIZE];
 static char error_buf[CONFIG_BUF_SIZE];
 static char tmp_buf[150];
 
@@ -115,8 +113,9 @@ void config_die (char *fmt, ...) {
 }
 
 hitch_config * config_new (void) {
-  hitch_config *r = NULL;
+  hitch_config *r;
   struct front_arg *fa;
+
   r = malloc(sizeof(hitch_config));
   if (r == NULL) {
     config_error_set("Unable to allocate memory for configuration structure: %s", strerror(errno));
@@ -227,96 +226,42 @@ void config_destroy (hitch_config *cfg) {
   free(cfg);
 }
 
-char * config_get_param (char *str) {
-  char *ptr;
-  int i;
+int config_parse_content(char *line, char **key, char **value) {
+  assert(line != NULL);
 
-  if (str == NULL) return NULL;
-  /** empty string? */
-  if (strlen(str) < 1 || str[0] == '\n' || strcmp(str, "\r\n") == 0) return NULL;
+  if (line[0] == '#')
+    return 1;  // NOOP
 
-  ptr = str;
+  if (strlen(line) < 1 || line[0] == '\n' || strcmp(line, "\r\n") == 0)
+    return 1;
 
-  /** comments? */
-  if (str[0] == '#') return NULL;
-  /** first alpha character */
-  while (ptr != NULL && ! isalpha(*ptr))
-    ptr++;
+  while (*line != '\0' && isspace(*line)) line++;
+  *key = line;
+  while(*line != '\0' && (isalnum(*line) || *line == '-')) line++;
+  if (*line == '\0' || *(line+1) == '\0')
+    return -1;
+  *line = '\0'; // key end.
+  line++;
 
-  /** overwrite alpha chars */
-  memset(var_buf, '\0', sizeof(var_buf));
-  i = 0;
-  while(ptr != NULL && (isalnum(*ptr) || *ptr == '-')) {
-    var_buf[i] = *ptr;
-    i++;
-    ptr++;
-  }
+  while(*line != '\0' && (*line != '=')) line++;
+  if (*line != '=')
+    return -3;
 
-  if (strlen(var_buf) < 1) return NULL;
-  return var_buf;
-}
+  if (*line == '\0' || *(line+1) == '\0')
+    return -1;
+  line++;
 
-char * config_get_value (char *str) {
-  char *ptr;
-  int i = 0;
+  while(*line != '\0' && (isspace(*line) || *line == '"' || *line == '\'')) line++;
+  if (*line == '\0')
+    return -1;
+  *value = line;
 
-  if (str == NULL) return NULL;
-  if (strlen(str) < 1) return NULL;
+  while (*line != '\0' && *line != '"' && *line != '\'' && !isspace(*line)) line++;
+  *line = '\0';  // value end.
 
-  /** find '=' char */
-  ptr = str;
-  while (ptr != NULL && (*ptr) != '=')
-    ptr++;
-  ptr++;
-
-  /** skip whitespaces **/
-  while (ptr != NULL && ! isgraph(*ptr))
-    ptr++;
-
-  /** no value found? */
-  if (ptr == NULL) return NULL;
-
-  /** overwrite alpha chars */
-  memset(val_buf, '\0', sizeof(val_buf));
-  while(ptr != NULL && isgraph(*ptr)) {
-    val_buf[i++] = *ptr;
-    ptr++;
-  }
-
-  if (strlen(val_buf) < 1) return NULL;
-  return val_buf;
-}
-
-char * str_rtrim(char *str) {
-  char *ptr;
-  int   len;
-
-  len = strlen(str);
-  ptr = str + len - 1;
-  while (ptr >= str && (isspace((int)*ptr ) || (char) *ptr == '"' || (char) *ptr == '\'')) --ptr;
-
-  ptr[1] = '\0';
-
-  return str;
-}
-
-char * str_ltrim(char *str) {
-  char *ptr;
-  int  len;
-
-  for (ptr = str; (*ptr && (isspace((int)*ptr) || (char) *ptr == '"' || (char) *ptr == '\'')); ++ptr);
-
-  len = strlen(ptr);
-  memmove(str, ptr, len + 1);
-
-  return str;
-}
-
-char * str_trim(char *str) {
-  char *ptr;
-  ptr = str_rtrim(str);
-  str = str_ltrim(ptr);
-  return str;
+  assert(strlen(*key) >= 1);
+  assert(strlen(*value) >= 1);
+  return(0);
 }
 
 char * config_assign_str (char **dst, char *v) {
@@ -348,9 +293,14 @@ int config_param_val_bool (char *val, int *res) {
 
 int config_param_host_port_wildcard (char *str, char **addr, char **port,
     char **cert, int wildcard_okay) {
-  int len = (str != NULL) ? strlen(str) : 0;
-  if (str == NULL || ! len) {
+
+  if (str == NULL) {
     config_error_set("Invalid/unset host/port string.");
+    return 0;
+  }
+
+  if (strlen(str) > ADDR_LEN) {
+    config_error_set("Host address too long.");
     return 0;
   }
 
@@ -371,7 +321,11 @@ int config_param_host_port_wildcard (char *str, char **addr, char **port,
     }
 
     // address
-    memcpy(addr_buf, ptr, (x - ptr));
+    if ((unsigned)(x - ptr) >= sizeof(addr_buf)) {
+      config_error_set("Invalid address '%s'.", str);
+      return 0;
+    }
+    strncpy(addr_buf, ptr, (x - ptr));
 
     // port
     if (x[1] != ':' || x[2] == '\0') {
@@ -398,14 +352,12 @@ int config_param_host_port_wildcard (char *str, char **addr, char **port,
 
   // printf("PARSED ADDR '%s', PORT '%s'\n", addr_buf, port_buf);
 
-  // check port
   int p = atoi(port_buf);
   if (p < 1 || p > 65536) {
     config_error_set("Invalid port number '%s'", port_buf);
     return 0;
   }
 
-  // write
   if (strcmp(addr_buf, "*") == 0) {
     if (wildcard_okay)
       free(*addr);
@@ -582,7 +534,7 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
     }
   }
   else if (strcmp(k, CFG_SSL_ENGINE) == 0) {
-    if (v != NULL && strlen(v) > 0) {
+    if (strlen(v) > 0) {
       config_assign_str(&cfg->ENGINE, v);
     }
   }
@@ -624,7 +576,7 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
     r = config_param_val_int(v, &cfg->SHARED_CACHE);
   }
   else if (strcmp(k, CFG_SHARED_CACHE_LISTEN) == 0) {
-    if (v != NULL && strlen(v) > 0)
+    if (strlen(v) > 0)
 	    r = config_param_host_port_wildcard(v, &cfg->SHCUPD_IP,
 		&cfg->SHCUPD_PORT, NULL, 1);
   }
@@ -636,7 +588,7 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
   }
 #endif
   else if (strcmp(k, CFG_CHROOT) == 0) {
-    if (v != NULL && strlen(v) > 0) {
+    if (strlen(v) > 0) {
       // check directory
       if (stat(v, &st) != 0) {
         config_error_set("Unable to stat directory '%s': %s'.", v, strerror(errno));
@@ -652,7 +604,7 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
     }
   }
   else if (strcmp(k, CFG_USER) == 0) {
-    if (v != NULL && strlen(v) > 0) {
+    if (strlen(v) > 0) {
       struct passwd *passwd;
       passwd = getpwnam(v);
       if (!passwd) {
@@ -665,7 +617,7 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
     }
   }
   else if (strcmp(k, CFG_GROUP) == 0) {
-    if (v != NULL && strlen(v) > 0) {
+    if (strlen(v) > 0) {
       struct group *grp;
       grp = getgrnam(v);
       if (!grp) {
@@ -739,7 +691,7 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
     r = config_param_val_bool(v, &cfg->PROXY_PROXY_LINE);
   }
   else if (strcmp(k, CFG_PEM_FILE) == 0) {
-    if (v != NULL && strlen(v) > 0) {
+    if (strlen(v) > 0) {
       if (stat(v, &st) != 0) {
         config_error_set("Unable to stat x509 certificate PEM file '%s': ", v, strerror(errno));
         r = 0;
@@ -768,12 +720,12 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
       r = config_param_val_int(v, &cfg->SEND_BUFSIZE, 1);
   }
   else if (strcmp(k, CFG_LOG_FILENAME) == 0) {
-    if (v != NULL && strlen(v) > 0) {
+    if (strlen(v) > 0) {
       config_assign_str(&cfg->LOG_FILENAME, v);
     }
   }
   else if (strcmp(k, CFG_PIDFILE) == 0) {
-    if (v != NULL && strlen(v) > 0) {
+    if (strlen(v) > 0) {
       config_assign_str(&cfg->PIDFILE, v);
     }
   }
@@ -808,38 +760,37 @@ int config_file_parse (char *file, hitch_config *cfg) {
     config_die("Undefined hitch options; THIS IS A BUG!\n");
 
   char line[CONFIG_BUF_SIZE];
+  char *key, *value;
   FILE *fd = NULL;
 
+  int r;
+
   // should we read stdin?
-  if (file == NULL || strlen(file) < 1 || strcmp(file, "-") == 0) {
+  if (file == NULL || strlen(file) < 1 || strcmp(file, "-") == 0)
     fd = stdin;
-  } else {
+  else
     fd = fopen(file, "r");
-  }
+
   if (fd == NULL)
       config_die("Unable to open configuration file '%s': %s\n", file, strerror(errno));
 
-  // read config
   int i = 0;
-  char *key, *val;
   while (i < CONFIG_MAX_LINES) {
-    memset(line, '\0', sizeof(line));
-    if (fgets(line, (sizeof(line) - 1), fd) == NULL)
+    if (fgets(line, sizeof(line)-1, fd) == NULL)
         break;
     i++;
 
-    key = config_get_param(line);
-    if (key == NULL || strlen(key) <= 2)
-        continue;
+    r = config_parse_content((char*)&line, &key, &value);
+    if (r < 0)
+      config_error_set( "Invalid configuration line %i\n", i);
+    if (r != 0)
+      continue;
+    // printf("File '%s', line %d, key: '%s', value: '%s'\n", file, i, key, value);
+    //
+    if (strlen(key) < 2)
+      continue;
 
-    val = config_get_value(line);
-    if (val == NULL)
-        continue;
-    str_trim(val);
-
-    // printf("File '%s', line %d, key: '%s', value: '%s'\n", file, i, key, val);
-
-    config_param_validate(key, val, cfg, file, i);
+    config_param_validate(key, value, cfg, file, i);
   }
   fclose(fd);
 
@@ -1432,7 +1383,7 @@ void config_parse_cli(int argc, char **argv, hitch_config *cfg) {
     fprintf(stderr, "Trying to initialize SSL contexts with your certificates\n");
     init_globals();
     init_openssl();
-    printf("%s configuration looks ok.\n", basename(prog));
+    fprintf(stderr, "%s configuration looks ok.\n", basename(prog));
     exit(0);
   }
 }
