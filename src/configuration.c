@@ -259,8 +259,9 @@ int config_parse_content(char *line, char **key, char **value) {
   while (*line != '\0' && *line != '"' && *line != '\'' && !isspace(*line)) line++;
   *line = '\0';  // value end.
 
-  assert(strlen(*key) >= 1);
-  assert(strlen(*value) >= 1);
+  if (strlen(*key) <= 1 || strlen(*value) <= 1)
+    return -1;
+
   return(0);
 }
 
