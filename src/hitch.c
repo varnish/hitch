@@ -565,9 +565,9 @@ static int create_shcupd_socket() {
       fail("{socket: shared cache updates}");
 
     int t = 1;
-    setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(int));
+    (void)setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(int));
 #ifdef SO_REUSEPORT
-    setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &t, sizeof(int));
+    (void)setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &t, sizeof(int));
 #endif
 
     setnonblocking(s);
