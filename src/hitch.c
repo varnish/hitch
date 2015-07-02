@@ -775,7 +775,7 @@ SSL_CTX *make_ctx(const char *pemfile) {
     SSL_CTX *ctx;
     RSA *rsa;
 
-    long ssloptions = SSL_OP_NO_SSLv2 | SSL_OP_ALL |
+    long ssloptions = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 |
             SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION;
 
 #ifdef SSL_OP_NO_COMPRESSION
