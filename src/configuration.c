@@ -90,7 +90,9 @@ static char tmp_buf[150];
 SSL_CTX * init_openssl(void);
 void init_globals(void);
 
-static void config_error_set (char *fmt, ...) {
+static void
+config_error_set(char *fmt, ...)
+{
 	memset(error_buf, '\0', sizeof(error_buf));
 	va_list args;
 	va_start(args, fmt);
@@ -98,11 +100,15 @@ static void config_error_set (char *fmt, ...) {
 	va_end(args);
 }
 
-char * config_error_get (void) {
+char *
+config_error_get(void)
+{
 	return error_buf;
 }
 
-void config_die (char *fmt, ...) {
+void
+config_die(char *fmt, ...)
+{
 	va_list args;
 	va_start(args, fmt);
 	vfprintf(stderr, fmt, args);
@@ -112,7 +118,9 @@ void config_die (char *fmt, ...) {
 	exit(1);
 }
 
-hitch_config * config_new (void) {
+hitch_config *
+config_new(void)
+{
 	hitch_config *r;
 	struct front_arg *fa;
 
@@ -182,10 +190,13 @@ hitch_config * config_new (void) {
 	return r;
 }
 
-void config_destroy (hitch_config *cfg) {
+void
+config_destroy(hitch_config *cfg)
+{
 	// printf("config_destroy() in pid %d: %p\n", getpid(), cfg);
 	struct front_arg *fa, *ftmp;
-	if (cfg == NULL) return;
+	if (cfg == NULL)
+		return;
 
 	// free all members!
 	free(cfg->CHROOT);
@@ -222,11 +233,12 @@ void config_destroy (hitch_config *cfg) {
 	free(cfg->SHCUPD_MCASTIF);
 	free(cfg->SHCUPD_MCASTTTL);
 #endif
-
 	free(cfg);
 }
 
-int config_parse_content(char *line, char **key, char **value) {
+int
+config_parse_content(char *line, char **key, char **value)
+{
 	assert(line != NULL);
 
 	if (line[0] == '#')
@@ -265,7 +277,9 @@ int config_parse_content(char *line, char **key, char **value) {
 	return(0);
 }
 
-char * config_assign_str (char **dst, char *v) {
+char *
+config_assign_str(char **dst, char *v)
+{
 	assert(v != NULL);
 
 	if (strlen(v) <= 0) return(NULL);
@@ -276,24 +290,24 @@ char * config_assign_str (char **dst, char *v) {
 	return *dst;
 }
 
-int config_param_val_bool (char *val, int *res) {
+int
+config_param_val_bool(char *val, int *res)
+{
 	assert(val != NULL);
 
-	if (
-		strcasecmp(val, CFG_BOOL_ON) == 0 ||
-		strcasecmp(val, "yes") == 0 ||
-		strcasecmp(val, "y") == 0 ||
-		strcasecmp(val, "true") == 0 ||
-		strcasecmp(val, "t") == 0 ||
-		strcasecmp(val, "1") == 0) {
+	if (strcasecmp(val, CFG_BOOL_ON) == 0 || strcasecmp(val, "yes") == 0 ||
+	    strcasecmp(val, "y") == 0 || strcasecmp(val, "true") == 0 ||
+	    strcasecmp(val, "t") == 0 || strcasecmp(val, "1") == 0) {
 		*res = 1;
 	}
 
 	return 1;
 }
 
-int config_param_host_port_wildcard (char *str, char **addr, char **port,
-		char **cert, int wildcard_okay) {
+int
+config_param_host_port_wildcard(char *str, char **addr,
+    char **port, char **cert, int wildcard_okay)
+{
 
 	if (str == NULL) {
 		config_error_set("Invalid/unset host/port string.");
@@ -379,12 +393,16 @@ int config_param_host_port_wildcard (char *str, char **addr, char **port,
 	return 1;
 }
 
-int config_param_host_port (char *str, char **addr, char **port) {
+int
+config_param_host_port(char *str, char **addr, char **port)
+{
 	return config_param_host_port_wildcard(str, addr, port, NULL, 0);
 }
 
 
-int config_param_val_int (char *str, int *dst, int positive_only) {
+int
+config_param_val_int(char *str, int *dst, int positive_only)
+{
 	int num;
 
 	assert(str != NULL);
@@ -399,7 +417,9 @@ int config_param_val_int (char *str, int *dst, int positive_only) {
 	return 1;
 }
 
-int config_param_val_long (char *str, long *dst, int positive_only) {
+int
+config_param_val_long(char *str, long *dst, int positive_only)
+{
 	long num;
 	assert(str != NULL);
 
@@ -416,7 +436,9 @@ int config_param_val_long (char *str, long *dst, int positive_only) {
 
 #ifdef USE_SHARED_CACHE
 /* Parse mcast and ttl options */
-int config_param_shcupd_mcastif (char *str, char **iface, char **ttl) {
+int
+config_param_shcupd_mcastif(char *str, char **iface, char **ttl)
+{
 	char buf[150];
 	char *sp;
 
@@ -446,7 +468,9 @@ int config_param_shcupd_mcastif (char *str, char **iface, char **ttl) {
 	return 1;
 }
 
-int config_param_shcupd_peer (char *str, hitch_config *cfg) {
+int
+config_param_shcupd_peer(char *str, hitch_config *cfg)
+{
 	if (cfg == NULL) {
 		config_error_set("Configuration pointer is NULL.");
 		return 0;
@@ -459,7 +483,8 @@ int config_param_shcupd_peer (char *str, hitch_config *cfg) {
 	int offset = 0;
 	int i = 0;
 	for (i = 0; i < MAX_SHCUPD_PEERS; i++) {
-		if (cfg->SHCUPD_PEERS[i].ip == NULL && cfg->SHCUPD_PEERS[i].port == NULL) {
+		if (cfg->SHCUPD_PEERS[i].ip == NULL &&
+		    cfg->SHCUPD_PEERS[i].port == NULL) {
 			offset = i;
 			break;
 		}
@@ -515,7 +540,10 @@ int config_param_shcupd_peer (char *str, hitch_config *cfg) {
 
 #endif /* USE_SHARED_CACHE */
 
-void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int line) {
+void
+config_param_validate(char *k, char *v, hitch_config *cfg,
+    char *file, int line)
+{
 	int r = 1;
 	struct stat st;
 
@@ -525,24 +553,19 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
 
 	if (strcmp(k, "tls") == 0) {
 		cfg->ETYPE = ENC_TLS;
-	}
-	else if (strcmp(k, "ssl") == 0) {
+	} else if (strcmp(k, "ssl") == 0) {
 		cfg->ETYPE = ENC_SSL;
-	}
-	else if (strcmp(k, CFG_CIPHERS) == 0) {
+	} else if (strcmp(k, CFG_CIPHERS) == 0) {
 		if (strlen(v) > 0) {
 			config_assign_str(&cfg->CIPHER_SUITE, v);
 		}
-	}
-	else if (strcmp(k, CFG_SSL_ENGINE) == 0) {
+	} else if (strcmp(k, CFG_SSL_ENGINE) == 0) {
 		if (strlen(v) > 0) {
 			config_assign_str(&cfg->ENGINE, v);
 		}
-	}
-	else if (strcmp(k, CFG_PREFER_SERVER_CIPHERS) == 0) {
+	} else if (strcmp(k, CFG_PREFER_SERVER_CIPHERS) == 0) {
 		r = config_param_val_bool(v, &cfg->PREFER_SERVER_CIPHERS);
-	}
-	else if (strcmp(k, CFG_FRONTEND) == 0) {
+	} else if (strcmp(k, CFG_FRONTEND) == 0) {
 		struct front_arg *fa;
 		ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
 		r = config_param_host_port_wildcard(v,
@@ -559,32 +582,25 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
 			}
 			VTAILQ_INSERT_TAIL(&cfg->LISTEN_ARGS, fa, list);
 	  	}
-	}
-	else if (strcmp(k, CFG_BACKEND) == 0) {
+	} else if (strcmp(k, CFG_BACKEND) == 0) {
 		r = config_param_host_port(v, &cfg->BACK_IP, &cfg->BACK_PORT);
-	}
-	else if (strcmp(k, CFG_WORKERS) == 0) {
+	} else if (strcmp(k, CFG_WORKERS) == 0) {
 		r = config_param_val_long(v, &cfg->NCORES, 1);
-	}
-	else if (strcmp(k, CFG_BACKLOG) == 0) {
+	} else if (strcmp(k, CFG_BACKLOG) == 0) {
 		r = config_param_val_int(v, &cfg->BACKLOG, 0);
-	}
-	else if (strcmp(k, CFG_KEEPALIVE) == 0) {
+	} else if (strcmp(k, CFG_KEEPALIVE) == 0) {
 		r = config_param_val_int(v, &cfg->TCP_KEEPALIVE_TIME, 1);
 	}
 #ifdef USE_SHARED_CACHE
 	else if (strcmp(k, CFG_SHARED_CACHE) == 0) {
 		r = config_param_val_int(v, &cfg->SHARED_CACHE);
-	}
-	else if (strcmp(k, CFG_SHARED_CACHE_LISTEN) == 0) {
+	} else if (strcmp(k, CFG_SHARED_CACHE_LISTEN) == 0) {
 		if (strlen(v) > 0)
 			r = config_param_host_port_wildcard(v, &cfg->SHCUPD_IP,
 			    &cfg->SHCUPD_PORT, NULL, 1);
-	}
-	else if (strcmp(k, CFG_SHARED_CACHE_PEER) == 0) {
+	} else if (strcmp(k, CFG_SHARED_CACHE_PEER) == 0) {
 		r = config_param_shcupd_peer(v, cfg);
-	}
-	else if (strcmp(k, CFG_SHARED_CACHE_MCASTIF) == 0) {
+	} else if (strcmp(k, CFG_SHARED_CACHE_MCASTIF) == 0) {
 		r = config_param_shcupd_mcastif(v, &cfg->SHCUPD_MCASTIF,
 		    &cfg->SHCUPD_MCASTTTL);
 	}
@@ -604,8 +620,7 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
 				}
 			}
 		}
-	}
-	else if (strcmp(k, CFG_USER) == 0) {
+	} else if (strcmp(k, CFG_USER) == 0) {
 		if (strlen(v) > 0) {
 			struct passwd *passwd;
 			passwd = getpwnam(v);
@@ -617,8 +632,7 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
 				cfg->GID = passwd->pw_gid;
 			}
 		}
-	}
-	else if (strcmp(k, CFG_GROUP) == 0) {
+	} else if (strcmp(k, CFG_GROUP) == 0) {
 		if (strlen(v) > 0) {
 			struct group *grp;
 			grp = getgrnam(v);
@@ -629,14 +643,11 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
 				cfg->GID = grp->gr_gid;
 			}
 		}
-	}
-	else if (strcmp(k, CFG_QUIET) == 0) {
+	} else if (strcmp(k, CFG_QUIET) == 0) {
 		r = config_param_val_bool(v, &cfg->QUIET);
-	}
-	else if (strcmp(k, CFG_SYSLOG) == 0) {
+	} else if (strcmp(k, CFG_SYSLOG) == 0) {
 		r = config_param_val_bool(v, &cfg->SYSLOG);
-	}
-	else if (strcmp(k, CFG_SYSLOG_FACILITY) == 0) {
+	} else if (strcmp(k, CFG_SYSLOG_FACILITY) == 0) {
 		r = 1;
 		if (!strcmp(v, "auth") || !strcmp(v, "authpriv"))
 			cfg->SYSLOG_FACILITY = LOG_AUTHPRIV;
@@ -676,23 +687,17 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
 			config_error_set("Invalid facility '%s'.", v);
 			r = 0;
 		}
-	}
-	else if (strcmp(k, CFG_DAEMON) == 0) {
+	} else if (strcmp(k, CFG_DAEMON) == 0) {
 		r = config_param_val_bool(v, &cfg->DAEMONIZE);
-	}
-	else if (strcmp(k, CFG_WRITE_IP) == 0) {
+	} else if (strcmp(k, CFG_WRITE_IP) == 0) {
 		r = config_param_val_bool(v, &cfg->WRITE_IP_OCTET);
-	}
-	else if (strcmp(k, CFG_WRITE_PROXY) == 0) {
+	} else if (strcmp(k, CFG_WRITE_PROXY) == 0) {
 		r = config_param_val_bool(v, &cfg->WRITE_PROXY_LINE);
-	}
-	else if (strcmp(k, CFG_WRITE_PROXY_V2) == 0) {
+	} else if (strcmp(k, CFG_WRITE_PROXY_V2) == 0) {
 		r = config_param_val_bool(v, &cfg->WRITE_PROXY_LINE_V2);
-	}
-	else if (strcmp(k, CFG_PROXY_PROXY) == 0) {
+	} else if (strcmp(k, CFG_PROXY_PROXY) == 0) {
 		r = config_param_val_bool(v, &cfg->PROXY_PROXY_LINE);
-	}
-	else if (strcmp(k, CFG_PEM_FILE) == 0) {
+	} else if (strcmp(k, CFG_PEM_FILE) == 0) {
 		if (strlen(v) > 0) {
 			if (stat(v, &st) != 0) {
 				config_error_set("Unable to stat x509 certificate PEM file '%s': ", v, strerror(errno));
@@ -708,39 +713,29 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
 				cfg->CERT_FILES = cert;
 			}
 		}
-	}
-	else if (strcmp(k, CFG_BACKEND_CONNECT_TIMEOUT) == 0) {
+	} else if (strcmp(k, CFG_BACKEND_CONNECT_TIMEOUT) == 0) {
 		r = config_param_val_int(v, &cfg->BACKEND_CONNECT_TIMEOUT, 1);
-	}
-	else if (strcmp(k, CFG_SSL_HANDSHAKE_TIMEOUT) == 0) {
+	} else if (strcmp(k, CFG_SSL_HANDSHAKE_TIMEOUT) == 0) {
 		r = config_param_val_int(v, &cfg->SSL_HANDSHAKE_TIMEOUT, 1);
-	}
-	else if (strcmp(k, CFG_RECV_BUFSIZE) == 0) {
+	} else if (strcmp(k, CFG_RECV_BUFSIZE) == 0) {
 		r = config_param_val_int(v, &cfg->RECV_BUFSIZE, 1);
-	}
-	else if (strcmp(k, CFG_SEND_BUFSIZE) == 0) {
+	} else if (strcmp(k, CFG_SEND_BUFSIZE) == 0) {
 		r = config_param_val_int(v, &cfg->SEND_BUFSIZE, 1);
-	}
-	else if (strcmp(k, CFG_LOG_FILENAME) == 0) {
+	} else if (strcmp(k, CFG_LOG_FILENAME) == 0) {
 		if (strlen(v) > 0) {
 			config_assign_str(&cfg->LOG_FILENAME, v);
 		}
-	}
-	else if (strcmp(k, CFG_PIDFILE) == 0) {
+	} else if (strcmp(k, CFG_PIDFILE) == 0) {
 		if (strlen(v) > 0) {
 			config_assign_str(&cfg->PIDFILE, v);
 		}
-	}
-	else if (strcmp(k, CFG_RING_SLOTS) == 0) {
+	} else if (strcmp(k, CFG_RING_SLOTS) == 0) {
 		r = config_param_val_int(v, &cfg->RING_SLOTS, 1);
-	}
-	else if (strcmp(k, CFG_RING_DATA_LEN) == 0) {
+	} else if (strcmp(k, CFG_RING_DATA_LEN) == 0) {
 		r = config_param_val_int(v, &cfg->RING_DATA_LEN, 1);
-	}
-	else if (strcmp(k, CFG_SNI_NOMATCH_ABORT) == 0) {
+	} else if (strcmp(k, CFG_SNI_NOMATCH_ABORT) == 0) {
 		r = config_param_val_bool(v, &cfg->SNI_NOMATCH_ABORT);
-	}
-	else {
+	} else {
 		fprintf(
 			stderr,
 			"Ignoring unknown configuration key '%s' in configuration file '%s', line %d\n",
@@ -748,7 +743,7 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
 		);
 	}
 
-	if (! r) {
+	if (!r) {
 		if (file != NULL)
 			config_die("Error in configuration file '%s', line %d: %s\n", file, line, config_error_get());
 		else
@@ -757,7 +752,9 @@ void config_param_validate (char *k, char *v, hitch_config *cfg, char *file, int
 }
 
 #ifndef NO_CONFIG_FILE
-int config_file_parse (char *file, hitch_config *cfg) {
+int
+config_file_parse(char *file, hitch_config *cfg)
+{
 	if (cfg == NULL)
 		config_die("Undefined hitch options; THIS IS A BUG!\n");
 
@@ -774,7 +771,8 @@ int config_file_parse (char *file, hitch_config *cfg) {
 		fd = fopen(file, "r");
 
 	if (fd == NULL)
-		config_die("Unable to open configuration file '%s': %s\n", file, strerror(errno));
+		config_die("Unable to open configuration file '%s': %s\n",
+		    file, strerror(errno));
 
 	int i = 0;
 	while (i < CONFIG_MAX_LINES) {
@@ -800,15 +798,21 @@ int config_file_parse (char *file, hitch_config *cfg) {
 }
 #endif /* NO_CONFIG_FILE */
 
-char * config_disp_str (char *str) {
+char *
+config_disp_str(char *str)
+{
 	return (str == NULL) ? "" : str;
 }
 
-char * config_disp_bool (int v) {
+char *
+config_disp_bool(int v)
+{
 	return (v > 0) ? CFG_BOOL_ON : "off";
 }
 
-char * config_disp_uid (uid_t uid) {
+char *
+config_disp_uid(uid_t uid)
+{
 	memset(tmp_buf, '\0', sizeof(tmp_buf));
 	if (uid == 0 && geteuid() != 0) return tmp_buf;
 	struct passwd *pw = getpwuid(uid);
@@ -818,7 +822,9 @@ char * config_disp_uid (uid_t uid) {
 	return tmp_buf;
 }
 
-char * config_disp_gid (gid_t gid) {
+char *
+config_disp_gid (gid_t gid)
+{
 	memset(tmp_buf, '\0', sizeof(tmp_buf));
 	if (gid == 0 && geteuid() != 0) return tmp_buf;
 	struct group *gr = getgrgid(gid);
@@ -828,7 +834,9 @@ char * config_disp_gid (gid_t gid) {
 	return tmp_buf;
 }
 
-char * config_disp_hostport (char *host, char *port) {
+char *
+config_disp_hostport(char *host, char *port)
+{
 	memset(tmp_buf, '\0', sizeof(tmp_buf));
 	if (host == NULL && port == NULL)
 		return "";
@@ -844,7 +852,9 @@ char * config_disp_hostport (char *host, char *port) {
 	return tmp_buf;
 }
 
-const char * config_disp_log_facility (int facility) {
+const char *
+config_disp_log_facility (int facility)
+{
 	switch (facility)
 	{
 		case LOG_AUTHPRIV:
@@ -886,7 +896,9 @@ const char * config_disp_log_facility (int facility) {
 	}
 }
 
-void config_print_usage_fd (char *prog, hitch_config *cfg, FILE *out) {
+void
+config_print_usage_fd(char *prog, hitch_config *cfg, FILE *out)
+{
 	if (out == NULL)
 		out = stderr;
 	fprintf(out, "Usage: %s [OPTIONS] PEM\n\n", basename(prog));
@@ -976,7 +988,9 @@ void config_print_usage_fd (char *prog, hitch_config *cfg, FILE *out) {
 }
 
 #ifndef NO_CONFIG_FILE
-void config_print_default (FILE *fd, hitch_config *cfg) {
+void
+config_print_default(FILE *fd, hitch_config *cfg)
+{
 	if (fd == NULL)
 		return;
 	fprintf(fd, "#\n");
@@ -1192,11 +1206,15 @@ void config_print_default (FILE *fd, hitch_config *cfg) {
 }
 #endif /* NO_CONFIG_FILE */
 
-void config_print_usage (char *prog, hitch_config *cfg) {
+void
+config_print_usage(char *prog, hitch_config *cfg)
+{
 	config_print_usage_fd(prog, cfg, stdout);
 }
 
-void config_parse_cli(int argc, char **argv, hitch_config *cfg) {
+void
+config_parse_cli(int argc, char **argv, hitch_config *cfg)
+{
 	static int tls = 0, ssl = 0;
 	static int client = 0;
 	int c, i;
@@ -1251,11 +1269,9 @@ void config_parse_cli(int argc, char **argv, hitch_config *cfg) {
 
 	while (1) {
 		int option_index = 0;
-		c = getopt_long(
-			argc, argv,
+		c = getopt_long(argc, argv,
 			"c:e:Ob:f:n:B:C:U:p:P:M:k:r:u:g:qstVh",
-			long_options, &option_index
-		);
+			long_options, &option_index);
 
 		if (c == -1)
 			break;
@@ -1360,12 +1376,11 @@ void config_parse_cli(int argc, char **argv, hitch_config *cfg) {
 			cfg->ETYPE = ENC_TLS;
 	}
 
-	if (client) {
+	if (client)
 		cfg->PMODE = SSL_CLIENT;
-	}
 
-	if ((!!cfg->WRITE_IP_OCTET + !!cfg->PROXY_PROXY_LINE
-	    + !!cfg->WRITE_PROXY_LINE + !!cfg->WRITE_PROXY_LINE_V2) >= 2)
+	if ((!!cfg->WRITE_IP_OCTET + !!cfg->PROXY_PROXY_LINE +
+	    !!cfg->WRITE_PROXY_LINE + !!cfg->WRITE_PROXY_LINE_V2) >= 2)
 		config_die("Options --write-ip, --write-proxy-proxy,"
 		    " --write-proxy and --write-proxy-v2 are mutually exclusive.");
 
