@@ -135,6 +135,7 @@ static unsigned char shared_secret[SHA_DIGEST_LENGTH];
 
 #define AZ(foo)		do { assert((foo) == 0); } while (0)
 #define AN(foo)		do { assert((foo) != 0); } while (0)
+#define NULL_DEV "/dev/null"
 
 long openssl_version;
 int create_workers;
@@ -207,77 +208,76 @@ struct ha_proxy_v2_hdr {
  * All state associated with one proxied connection
  */
 typedef struct proxystate {
-    unsigned magic;
+	unsigned magic;
 #define PROXYSTATE_MAGIC 0xcf877ed9
-    ringbuffer ring_ssl2clear;          /* Pushing bytes from secure to clear stream */
-    ringbuffer ring_clear2ssl;          /* Pushing bytes from clear to secure stream */
+	ringbuffer ring_ssl2clear;          /* Pushing bytes from secure to clear stream */
+	ringbuffer ring_clear2ssl;          /* Pushing bytes from clear to secure stream */
 
-    ev_io ev_r_ssl;                     /* Secure stream write event */
-    ev_io ev_w_ssl;                     /* Secure stream read event */
+	ev_io ev_r_ssl;                     /* Secure stream write event */
+	ev_io ev_w_ssl;                     /* Secure stream read event */
 
-    ev_io ev_r_handshake;               /* Secure stream handshake write event */
-    ev_io ev_w_handshake;               /* Secure stream handshake read event */
-    ev_timer ev_t_handshake; /* handshake timer */
+	ev_io ev_r_handshake;               /* Secure stream handshake write event */
+	ev_io ev_w_handshake;               /* Secure stream handshake read event */
+	ev_timer ev_t_handshake; /* handshake timer */
 
-    ev_io ev_w_connect;                 /* Backend connect event */
-    ev_timer ev_t_connect; /* backend connect timer */
+	ev_io ev_w_connect;                 /* Backend connect event */
+	ev_timer ev_t_connect; /* backend connect timer */
 
-    ev_io ev_r_clear;                   /* Clear stream write event */
-    ev_io ev_w_clear;                   /* Clear stream read event */
-    ev_io ev_proxy;                     /* proxy read event */
+	ev_io ev_r_clear;                   /* Clear stream write event */
+	ev_io ev_w_clear;                   /* Clear stream read event */
+	ev_io ev_proxy;                     /* proxy read event */
 
-    int fd_up;                          /* Upstream (client) socket */
-    int fd_down;                        /* Downstream (backend) socket */
+	int fd_up;                          /* Upstream (client) socket */
+	int fd_down;                        /* Downstream (backend) socket */
 
-    int want_shutdown:1;                /* Connection is half-shutdown */
-    int handshaked:1;                   /* Initial handshake happened */
-    int clear_connected:1;              /* Clear stream is connected  */
-    int renegotiation:1;                /* Renegotation is occuring */
+	int want_shutdown:1;                /* Connection is half-shutdown */
+	int handshaked:1;                   /* Initial handshake happened */
+	int clear_connected:1;              /* Clear stream is connected  */
+	int renegotiation:1;                /* Renegotation is occuring */
 
-    SSL *ssl;                           /* OpenSSL SSL state */
+	SSL *ssl;                           /* OpenSSL SSL state */
 
-    struct sockaddr_storage remote_ip;  /* Remote ip returned from `accept` */
-    int connect_port;	/* local port for connection */
+	struct sockaddr_storage remote_ip;  /* Remote ip returned from `accept` */
+	int connect_port;	/* local port for connection */
 } proxystate;
 
-static void VWLOG (int level, const char* fmt, va_list ap)
-{
-    if (logf) {
-	struct timeval tv;
-	struct tm tm;
-	char buf[1024];
-	int n;
-	va_list ap1;
+static void VWLOG (int level, const char *fmt, va_list ap) {
+	if (logf) {
+		struct timeval tv;
+		struct tm tm;
+		char buf[1024];
+		int n;
+		va_list ap1;
 
-	gettimeofday(&tv,NULL);
-	if (logf != stdout && logf != stderr && tv.tv_sec >= logf_check_t+LOG_REOPEN_INTERVAL) {
-	    struct stat st;
-	    if (stat(CONFIG->LOG_FILENAME, &st) < 0
-		    || st.st_dev != logf_st.st_dev
-		    || st.st_ino != logf_st.st_ino)
-	    {
-		fclose(logf);
+		gettimeofday(&tv,NULL);
+		if (logf != stdout && logf != stderr && tv.tv_sec >= logf_check_t+LOG_REOPEN_INTERVAL) {
+			struct stat st;
+			if (stat(CONFIG->LOG_FILENAME, &st) < 0
+			    || st.st_dev != logf_st.st_dev
+			    || st.st_ino != logf_st.st_ino) {
+				fclose(logf);
 
-		logf = fopen(CONFIG->LOG_FILENAME, "a");
-		if (logf == NULL || fstat(fileno(logf), &logf_st) < 0)
-		    memset(&logf_st, 0, sizeof(logf_st));
-	    }
-	    logf_check_t = tv.tv_sec;
+				logf = fopen(CONFIG->LOG_FILENAME, "a");
+				if (logf == NULL || fstat(fileno(logf), &logf_st) < 0)
+					memset(&logf_st, 0, sizeof(logf_st));
+			}
+			logf_check_t = tv.tv_sec;
+		}
+
+		localtime_r(&tv.tv_sec, &tm);
+		n = strftime(buf, sizeof(buf), "%Y%m%dT%H%M%S", &tm);
+		sprintf(buf+n, ".%06d [%5d] %s", (int)tv.tv_usec, getpid(), fmt);
+		va_copy(ap1, ap);
+		vfprintf(logf, buf, ap1);
+		va_end(ap1);
 	}
-
-	localtime_r(&tv.tv_sec, &tm);
-	n = strftime(buf, sizeof(buf), "%Y%m%dT%H%M%S", &tm);
-	sprintf(buf+n, ".%06d [%5d] %s", (int)tv.tv_usec, getpid(), fmt);
-	va_copy(ap1, ap);
-	vfprintf(logf, buf, ap1);
-	va_end(ap1);
-    }
-    if (CONFIG->SYSLOG) {
-	vsyslog(level, fmt, ap);
-    }
+	if (CONFIG->SYSLOG) {
+		vsyslog(level, fmt, ap);
+	}
 }
 
-static void WLOG (int level, const char* fmt, ...)
+static void
+WLOG (int level, const char *fmt, ...)
 {
     va_list ap;
 
@@ -305,35 +305,36 @@ static void WLOG (int level, const char* fmt, ...)
 
 
 static void
-logproxy (int level, const proxystate* ps, const char* fmt, ...)
+logproxy (int level, const proxystate* ps, const char *fmt, ...)
 {
-    char buf[1024];
-    char hbuf[INET6_ADDRSTRLEN+1];
-    char sbuf[8];
-    int n;
-    va_list ap;
-    socklen_t salen;
+	char buf[1024];
+	char hbuf[INET6_ADDRSTRLEN+1];
+	char sbuf[8];
+	int n;
+	va_list ap;
+	socklen_t salen;
 
-    CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
+	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
 
-    salen = (ps->remote_ip.ss_family == AF_INET) ?
-	sizeof(struct sockaddr) : sizeof(struct sockaddr_in6);
-    n = getnameinfo((struct sockaddr *) &ps->remote_ip, salen, hbuf,
-	sizeof hbuf, sbuf, sizeof sbuf, NI_NUMERICHOST | NI_NUMERICSERV);
-    if (n != 0) {
-	    strcpy(hbuf, "n/a");
-	    strcpy(sbuf, "n/a");
-    }
+	salen = (ps->remote_ip.ss_family == AF_INET) ?
+	    sizeof(struct sockaddr) : sizeof(struct sockaddr_in6);
+	n = getnameinfo((struct sockaddr *) &ps->remote_ip, salen, hbuf,
+		sizeof hbuf, sbuf, sizeof sbuf,
+		NI_NUMERICHOST | NI_NUMERICSERV);
+	if (n != 0) {
+		strcpy(hbuf, "n/a");
+		strcpy(sbuf, "n/a");
+	}
 
-    va_start(ap, fmt);
-    if (ps->remote_ip.ss_family == AF_INET)
-	    snprintf(buf, sizeof(buf), "%s:%s :%d %d:%d %s",
-		hbuf, sbuf, ps->connect_port, ps->fd_up, ps->fd_down, fmt);
-    else
-	    snprintf(buf, sizeof(buf), "[%s]:%s :%d %d:%d %s",
-		hbuf, sbuf, ps->connect_port, ps->fd_up, ps->fd_down, fmt);
-    VWLOG(level, buf, ap);
-    va_end(ap);
+	va_start(ap, fmt);
+	if (ps->remote_ip.ss_family == AF_INET)
+		snprintf(buf, sizeof(buf), "%s:%s :%d %d:%d %s",
+		    hbuf, sbuf, ps->connect_port, ps->fd_up, ps->fd_down, fmt);
+	else
+		snprintf(buf, sizeof(buf), "[%s]:%s :%d %d:%d %s",
+		    hbuf, sbuf, ps->connect_port, ps->fd_up, ps->fd_down, fmt);
+	VWLOG(level, buf, ap);
+	va_end(ap);
 }
 
 #define LOGPROXY(...)							\
@@ -349,86 +350,94 @@ logproxy (int level, const proxystate* ps, const char* fmt, ...)
 	} while (0)
 
 
-#define NULL_DEV "/dev/null"
-
 /* set a file descriptor (socket) to non-blocking mode */
-static void setnonblocking(int fd) {
-    int flag = 1;
+static void
+setnonblocking(int fd)
+{
+	int flag = 1;
 
-    if (ioctl(fd, FIONBIO, &flag) < 0) {
-	SOCKERR("Error setting FIONBIO");
-    }
+	if (ioctl(fd, FIONBIO, &flag) < 0) {
+		SOCKERR("Error setting FIONBIO");
+	}
 }
 
 
 /* set a tcp socket to use TCP Keepalive */
-static void settcpkeepalive(int fd) {
-    int optval = 1;
-    socklen_t optlen = sizeof(optval);
+static void
+settcpkeepalive(int fd)
+{
+	int optval = 1;
+	socklen_t optlen = sizeof(optval);
 
-    if(setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen) < 0) {
-        SOCKERR("Error activating SO_KEEPALIVE on client socket");
-    }
+	if(setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen) < 0) {
+		SOCKERR("Error activating SO_KEEPALIVE on client socket");
+	}
 
 #ifdef TCP_KEEPIDLE
-    optval = CONFIG->TCP_KEEPALIVE_TIME;
-    optlen = sizeof(optval);
-    if(setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, &optval, optlen) < 0) {
-        SOCKERR("Error setting TCP_KEEPIDLE on client socket");
-    }
+	optval = CONFIG->TCP_KEEPALIVE_TIME;
+	optlen = sizeof(optval);
+	if (setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, &optval, optlen) < 0) {
+		SOCKERR("Error setting TCP_KEEPIDLE on client socket");
+	}
 #endif
 }
 
-static void fail(const char* s) {
-    ERR("%s: %s\n", s, strerror(errno));
-    exit(1);
+static void
+fail(const char *s)
+{
+	ERR("%s: %s\n", s, strerror(errno));
+	exit(1);
 }
 
-void die (char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
-    va_end(args);
+void
+die(char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	vfprintf(stderr, fmt, args);
+	va_end(args);
 
-    exit(1);
+	exit(1);
 }
 
 #ifndef OPENSSL_NO_DH
-static int init_dh(SSL_CTX *ctx, const char *cert) {
-    DH *dh;
-    BIO *bio;
+static int
+init_dh(SSL_CTX *ctx, const char *cert)
+{
+	DH *dh;
+	BIO *bio;
 
-    assert(cert);
+	assert(cert);
 
-    bio = BIO_new_file(cert, "r");
-    if (!bio) {
-        ERR_print_errors_fp(stderr);
-        return -1;
-    }
+	bio = BIO_new_file(cert, "r");
+	if (!bio) {
+		ERR_print_errors_fp(stderr);
+		return -1;
+	}
 
-    dh = PEM_read_bio_DHparams(bio, NULL, NULL, NULL);
-    BIO_free(bio);
-    if (!dh) {
-        ERR("{core} Note: no DH parameters found in %s\n", cert);
-        return -1;
-    }
+	dh = PEM_read_bio_DHparams(bio, NULL, NULL, NULL);
+	BIO_free(bio);
+	if (!dh) {
+		ERR("{core} Note: no DH parameters found in %s\n", cert);
+		return -1;
+	}
 
-    LOG("{core} Using DH parameters from %s\n", cert);
-    SSL_CTX_set_tmp_dh(ctx, dh);
-    LOG("{core} DH initialized with %d bit key\n", 8*DH_size(dh));
-    DH_free(dh);
+	LOG("{core} Using DH parameters from %s\n", cert);
+	SSL_CTX_set_tmp_dh(ctx, dh);
+	LOG("{core} DH initialized with %d bit key\n", 8*DH_size(dh));
+	DH_free(dh);
 
 #ifndef OPENSSL_NO_EC
 #ifdef NID_X9_62_prime256v1
-    EC_KEY *ecdh = NULL;
-    ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
-    SSL_CTX_set_tmp_ecdh(ctx, ecdh);
-    EC_KEY_free(ecdh);
-    LOG("{core} ECDH Initialized with NIST P-256\n");
+	EC_KEY *ecdh = NULL;
+	ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+	SSL_CTX_set_tmp_ecdh(ctx, ecdh);
+	EC_KEY_free(ecdh);
+	LOG("{core} ECDH Initialized with NIST P-256\n");
 #endif /* NID_X9_62_prime256v1 */
 #endif /* OPENSSL_NO_EC */
 
-    return 0;
+	return 0;
 }
 #endif /* OPENSSL_NO_DH */
 
@@ -436,290 +445,310 @@ static int init_dh(SSL_CTX *ctx, const char *cert) {
  * handshake and does SSL record layer stuff.  It's used to trap
  * client-initiated renegotiations.
  */
-static void info_callback(const SSL *ssl, int where, int ret) {
-    proxystate *ps;
-    (void)ret;
-    if (where & SSL_CB_HANDSHAKE_START) {
-        CAST_OBJ_NOTNULL(ps, SSL_get_app_data(ssl), PROXYSTATE_MAGIC);
-        if (ps->handshaked) {
-            ps->renegotiation = 1;
-            LOG("{core} SSL renegotiation asked by client\n");
-        }
-    }
+static void
+info_callback(const SSL *ssl, int where, int ret)
+{
+	proxystate *ps;
+	(void)ret;
+	if (where & SSL_CB_HANDSHAKE_START) {
+		CAST_OBJ_NOTNULL(ps, SSL_get_app_data(ssl), PROXYSTATE_MAGIC);
+		if (ps->handshaked) {
+			ps->renegotiation = 1;
+			LOG("{core} SSL renegotiation asked by client\n");
+		}
+	}
 }
 
 #ifdef USE_SHARED_CACHE
 
 /* Handle incoming message updates */
-static void handle_shcupd(struct ev_loop *loop, ev_io *w, int revents) {
-    (void) revents;
-    unsigned char msg[SHSESS_MAX_ENCODED_LEN], hash[EVP_MAX_MD_SIZE];
-    ssize_t r;
-    unsigned int hash_len;
-    uint32_t encdate;
-    long now = (time_t)ev_now(loop);
+static void
+handle_shcupd(struct ev_loop *loop, ev_io *w, int revents)
+{
+	(void)revents;
+	unsigned char msg[SHSESS_MAX_ENCODED_LEN], hash[EVP_MAX_MD_SIZE];
+	ssize_t r;
+	unsigned int hash_len;
+	uint32_t encdate;
+	long now = (time_t)ev_now(loop);
 
-    while ( ( r = recv(w->fd, msg, sizeof(msg), 0) ) > 0 ) {
+	while ((r = recv(w->fd, msg, sizeof(msg), 0)) > 0) {
+		/* msg len must be greater than 1 Byte of data + sig length */
+		if (r < (int)(1+sizeof(shared_secret)))
+			continue;
 
-        /* msg len must be greater than 1 Byte of data + sig length */
-        if (r < (int)(1+sizeof(shared_secret)))
-           continue;
+		/* compute sig */
+		r -= sizeof(shared_secret);
+		HMAC(EVP_sha1(), shared_secret, sizeof(shared_secret), msg,
+		    r, hash, &hash_len);
 
-        /* compute sig */
-        r -= sizeof(shared_secret);
-        HMAC(EVP_sha1(), shared_secret, sizeof(shared_secret), msg, r, hash, &hash_len);
+		if (hash_len != sizeof(shared_secret)) /* should never happen */
+		   continue;
 
-        if (hash_len != sizeof(shared_secret)) /* should never append */
-           continue;
+		/* check sign */
+		if (memcmp(msg+r, hash, hash_len))
+			continue;
 
-        /* check sign */
-        if(memcmp(msg+r, hash, hash_len))
-           continue;
+		/* msg len must be greater than 1 Byte of data + encdate length */
+		if (r < (int)(1+sizeof(uint32_t)))
+			continue;
 
-        /* msg len must be greater than 1 Byte of data + encdate length */
-        if (r < (int)(1+sizeof(uint32_t)))
-           continue;
+		/* drop too unsync updates */
+		r -= sizeof(uint32_t);
+		encdate = *((uint32_t *)&msg[r]);
+		if (!(abs((int)(int32_t)now-ntohl(encdate)) < SSL_CTX_get_timeout(default_ctx)))
+			continue;
 
-        /* drop too unsync updates */
-        r -= sizeof(uint32_t);
-        encdate = *((uint32_t *)&msg[r]);
-        if (!(abs((int)(int32_t)now-ntohl(encdate)) < SSL_CTX_get_timeout(default_ctx)))
-           continue;
-
-        shctx_sess_add(msg, r, now);
-    }
+		shctx_sess_add(msg, r, now);
+	}
 }
 
 /* Send remote updates messages callback */
-void shcupd_session_new(unsigned char *msg, unsigned int len, long cdate) {
-    unsigned int hash_len;
-    struct addrinfo **pai = shcupd_peers;
-    uint32_t ncdate;
+void
+shcupd_session_new(unsigned char *msg, unsigned int len, long cdate)
+{
+	unsigned int hash_len;
+	struct addrinfo **pai = shcupd_peers;
+	uint32_t ncdate;
 
-    /* add session creation encoded date to footer */
-    ncdate = htonl((uint32_t)cdate);
-    memcpy(msg+len, &ncdate, sizeof(ncdate));
-    len += sizeof(ncdate);
+	/* add session creation encoded date to footer */
+	ncdate = htonl((uint32_t)cdate);
+	memcpy(msg+len, &ncdate, sizeof(ncdate));
+	len += sizeof(ncdate);
 
-    /* add msg sign */
-    HMAC(EVP_sha1(), shared_secret, sizeof(shared_secret),
-                     msg, len, msg+len, &hash_len);
-    len += hash_len;
+	/* add msg sign */
+	HMAC(EVP_sha1(), shared_secret, sizeof(shared_secret),
+	    msg, len, msg+len, &hash_len);
+	len += hash_len;
 
-    /* send msg to peers */
-    while (*pai) {
-        sendto(shcupd_socket, msg, len, 0, (*pai)->ai_addr, (*pai)->ai_addrlen);
-        pai++;
-    }
+	/* send msg to peers */
+	while (*pai) {
+		sendto(shcupd_socket, msg, len, 0, (*pai)->ai_addr,
+		    (*pai)->ai_addrlen);
+		pai++;
+	}
 }
 
 /* Compute a sha1 secret from an ASN1 rsa private key */
-static int compute_secret(RSA *rsa, unsigned char *secret) {
-    unsigned char *buf,*p;
-    unsigned int length;
+static int
+compute_secret(RSA *rsa, unsigned char *secret)
+{
+	unsigned char *buf, *p;
+	unsigned int length;
 
-    length = i2d_RSAPrivateKey(rsa, NULL);
-    if (length <= 0)
-        return -1;
+	length = i2d_RSAPrivateKey(rsa, NULL);
+	if (length <= 0)
+		return -1;
 
-    p = buf = (unsigned char *)malloc(length*sizeof(unsigned char));
-    if (!buf)
-        return -1;
+	p = buf = (unsigned char *)malloc(length*sizeof(unsigned char));
+	if (!buf)
+		return -1;
 
-    i2d_RSAPrivateKey(rsa,&p);
-
-    SHA1(buf, length, secret);
-
-    free(buf);
-
-    return 0;
+	i2d_RSAPrivateKey(rsa,&p);
+	SHA1(buf, length, secret);
+	free(buf);
+	return 0;
 }
 
 /* Create udp socket to receive and send updates */
-static int create_shcupd_socket() {
-    struct addrinfo *ai, hints;
-    struct addrinfo **pai = shcupd_peers;
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
-    const int gai_err = getaddrinfo(CONFIG->SHCUPD_IP, CONFIG->SHCUPD_PORT,
-                                    &hints, &ai);
-    if (gai_err != 0) {
-        ERR("{getaddrinfo}: [%s]\n", gai_strerror(gai_err));
-        exit(1);
-    }
+static int
+create_shcupd_socket()
+{
+	struct addrinfo *ai, hints;
+	struct addrinfo **pai = shcupd_peers;
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
+	const int gai_err = getaddrinfo(CONFIG->SHCUPD_IP,
+	    CONFIG->SHCUPD_PORT, &hints, &ai);
+	if (gai_err != 0) {
+		ERR("{getaddrinfo}: [%s]\n", gai_strerror(gai_err));
+		exit(1);
+	}
 
-    /* check if peers inet family addresses match */
-    while (*pai) {
-        if ((*pai)->ai_family != ai->ai_family) {
-            ERR("Share host and peers inet family differs\n");
-            exit(1);
-        }
-        pai++;
-    }
+	/* check if peers inet family addresses match */
+	while (*pai) {
+		if ((*pai)->ai_family != ai->ai_family) {
+			ERR("Share host and peers inet family differs\n");
+			exit(1);
+		}
+		pai++;
+	}
 
-    int s = socket(ai->ai_family, SOCK_DGRAM, IPPROTO_UDP);
+	int s = socket(ai->ai_family, SOCK_DGRAM, IPPROTO_UDP);
 
-    if (s == -1)
-      fail("{socket: shared cache updates}");
+	if (s == -1)
+		fail("{socket: shared cache updates}");
 
-    int t = 1;
-    (void)setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(int));
+	int t = 1;
+	(void)setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(int));
 #ifdef SO_REUSEPORT
-    (void)setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &t, sizeof(int));
+	(void)setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &t, sizeof(int));
 #endif
 
-    setnonblocking(s);
+	setnonblocking(s);
 
-    if (ai->ai_addr->sa_family == AF_INET) {
-        struct ip_mreqn mreqn;
+	if (ai->ai_addr->sa_family == AF_INET) {
+		struct ip_mreqn mreqn;
 
-        memset(&mreqn, 0, sizeof(mreqn));
-        mreqn.imr_multiaddr.s_addr = ((struct sockaddr_in *)ai->ai_addr)->sin_addr.s_addr;
+		memset(&mreqn, 0, sizeof(mreqn));
+		mreqn.imr_multiaddr.s_addr = \
+		    ((struct sockaddr_in *)ai->ai_addr)->sin_addr.s_addr;
 
-        if (CONFIG->SHCUPD_MCASTIF) {
-            if (isalpha(*CONFIG->SHCUPD_MCASTIF)) { /* appears to be an iface name */
-                struct ifreq ifr;
+		if (CONFIG->SHCUPD_MCASTIF) {
+			if (isalpha(*CONFIG->SHCUPD_MCASTIF)) {
+				/* appears to be an iface name */
+				struct ifreq ifr;
+				memset(&ifr, 0, sizeof(ifr));
+				if (strlen(CONFIG->SHCUPD_MCASTIF) > IFNAMSIZ) {
+					ERR("Error iface name is too long [%s]\n",CONFIG->SHCUPD_MCASTIF);
+					exit(1);
+				}
 
-                memset(&ifr, 0, sizeof(ifr));
-                if (strlen(CONFIG->SHCUPD_MCASTIF) > IFNAMSIZ) {
-                    ERR("Error iface name is too long [%s]\n",CONFIG->SHCUPD_MCASTIF);
-                    exit(1);
-                }
+				memcpy(ifr.ifr_name, CONFIG->SHCUPD_MCASTIF,
+				    strlen(CONFIG->SHCUPD_MCASTIF));
+				if (ioctl(s, SIOCGIFINDEX, &ifr)) {
+					fail("{ioctl: SIOCGIFINDEX}");
+				}
 
-                memcpy(ifr.ifr_name, CONFIG->SHCUPD_MCASTIF, strlen(CONFIG->SHCUPD_MCASTIF));
-                if (ioctl(s, SIOCGIFINDEX, &ifr)) {
-                    fail("{ioctl: SIOCGIFINDEX}");
-                }
+				mreqn.imr_ifindex = ifr.ifr_ifindex;
+			} else if (strchr(CONFIG->SHCUPD_MCASTIF,'.')) {
+				/* appears to be an ipv4 address */
+				mreqn.imr_address.s_addr = inet_addr(CONFIG->SHCUPD_MCASTIF);
+			} else {
+				/* appears to be an iface index */
+				mreqn.imr_ifindex = \
+				    atoi(CONFIG->SHCUPD_MCASTIF);
+			}
+		}
 
-                mreqn.imr_ifindex = ifr.ifr_ifindex;
-            }
-            else if (strchr(CONFIG->SHCUPD_MCASTIF,'.')) { /* appears to be an ipv4 address */
-                mreqn.imr_address.s_addr = inet_addr(CONFIG->SHCUPD_MCASTIF);
-            }
-            else { /* appears to be an iface index */
-                mreqn.imr_ifindex = atoi(CONFIG->SHCUPD_MCASTIF);
-            }
-        }
+		if (setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+		    &mreqn, sizeof(mreqn)) < 0) {
+			if (errno != EINVAL) {
+				/* EINVAL if it is not a multicast address,
+				 * not an error we consider unicast */
+				fail("{setsockopt: IP_ADD_MEMBERSIP}");
+			}
+		} else { /* this is a multicast address */
+			unsigned char loop = 0;
+			if (setsockopt(s, IPPROTO_IP, IP_MULTICAST_LOOP,
+			    &loop, sizeof(loop)) < 0) {
+				fail("{setsockopt: IP_MULTICAST_LOOP}");
+			}
+		}
 
-        if (setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreqn, sizeof(mreqn)) < 0) {
-            if (errno != EINVAL) { /* EINVAL if it is not a multicast address,
-                                                not an error we consider unicast */
-                fail("{setsockopt: IP_ADD_MEMBERSIP}");
-            }
-        }
-        else { /* this is a multicast address */
-            unsigned char loop = 0;
+		/* optional set sockopts for sending to multicast msg */
+		if (CONFIG->SHCUPD_MCASTIF &&
+		    setsockopt(s, IPPROTO_IP, IP_MULTICAST_IF,
+		    &mreqn, sizeof(mreqn)) < 0) {
+			fail("{setsockopt: IP_MULTICAST_IF}");
+		}
 
-            if(setsockopt(s, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop)) < 0) {
-               fail("{setsockopt: IP_MULTICAST_LOOP}");
-            }
-        }
+		if (CONFIG->SHCUPD_MCASTTTL) {
+			unsigned char ttl;
 
-        /* optional set sockopts for sending to multicast msg */
-        if (CONFIG->SHCUPD_MCASTIF &&
-            setsockopt(s, IPPROTO_IP, IP_MULTICAST_IF, &mreqn, sizeof(mreqn)) < 0) {
-            fail("{setsockopt: IP_MULTICAST_IF}");
-        }
-
-        if (CONFIG->SHCUPD_MCASTTTL) {
-             unsigned char ttl;
-
-             ttl = (unsigned char)atoi(CONFIG->SHCUPD_MCASTTTL);
-             if (setsockopt(s, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) < 0) {
-                 fail("{setsockopt: IP_MULTICAST_TTL}");
-             }
-        }
-
-     }
+			ttl = (unsigned char)atoi(CONFIG->SHCUPD_MCASTTTL);
+			if (setsockopt(s, IPPROTO_IP, IP_MULTICAST_TTL,
+			    &ttl, sizeof(ttl)) < 0) {
+				fail("{setsockopt: IP_MULTICAST_TTL}");
+			}
+		}
+	 }
 #ifdef IPV6_ADD_MEMBERSHIP
-     else if (ai->ai_addr->sa_family == AF_INET6) {
-        struct ipv6_mreq mreq;
+	 else if (ai->ai_addr->sa_family == AF_INET6) {
+		struct ipv6_mreq mreq;
 
-        memset(&mreq, 0, sizeof(mreq));
-        memcpy(&mreq.ipv6mr_multiaddr, &((struct sockaddr_in6 *)ai->ai_addr)->sin6_addr,
-                                       sizeof(mreq.ipv6mr_multiaddr));
+		memset(&mreq, 0, sizeof(mreq));
+		memcpy(&mreq.ipv6mr_multiaddr,
+		    &((struct sockaddr_in6 *)ai->ai_addr)->sin6_addr,
+		    sizeof(mreq.ipv6mr_multiaddr));
 
-        if (CONFIG->SHCUPD_MCASTIF) {
-            if (isalpha(*CONFIG->SHCUPD_MCASTIF)) { /* appears to be an iface name */
-                struct ifreq ifr;
+		if (CONFIG->SHCUPD_MCASTIF) {
+			if (isalpha(*CONFIG->SHCUPD_MCASTIF)) {
+				/* appears to be an iface name */
+				struct ifreq ifr;
 
-                memset(&ifr, 0, sizeof(ifr));
-                if (strlen(CONFIG->SHCUPD_MCASTIF) > IFNAMSIZ) {
-                    ERR("Error iface name is too long [%s]\n",CONFIG->SHCUPD_MCASTIF);
-                    exit(1);
-                }
+				memset(&ifr, 0, sizeof(ifr));
+				if (strlen(CONFIG->SHCUPD_MCASTIF) > IFNAMSIZ) {
+					ERR("Error iface name is too long [%s]\n", CONFIG->SHCUPD_MCASTIF);
+					exit(1);
+				}
 
-                memcpy(ifr.ifr_name, CONFIG->SHCUPD_MCASTIF, strlen(CONFIG->SHCUPD_MCASTIF));
-                if (ioctl(s, SIOCGIFINDEX, &ifr)) {
-                    fail("{ioctl: SIOCGIFINDEX}");
-                }
+				memcpy(ifr.ifr_name, CONFIG->SHCUPD_MCASTIF,
+				    strlen(CONFIG->SHCUPD_MCASTIF));
 
-                mreq.ipv6mr_interface = ifr.ifr_ifindex;
-            }
-            else { /* option appears to be an iface index */
-                mreq.ipv6mr_interface = atoi(CONFIG->SHCUPD_MCASTIF);
-            }
-        }
+				if (ioctl(s, SIOCGIFINDEX, &ifr))
+					fail("{ioctl: SIOCGIFINDEX}");
 
-        if (setsockopt(s, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
-            if (errno != EINVAL) { /* EINVAL if it is not a multicast address,
-                                                not an error we consider unicast */
-                fail("{setsockopt: IPV6_ADD_MEMBERSIP}");
-            }
-        }
-        else { /* this is a multicast address */
-            unsigned int loop = 0;
+				mreq.ipv6mr_interface = ifr.ifr_ifindex;
+			} else { /* option appears to be an iface index */
+				mreq.ipv6mr_interface = \
+				    atoi(CONFIG->SHCUPD_MCASTIF);
+			}
+		}
 
-            if(setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &loop, sizeof(loop)) < 0) {
-               fail("{setsockopt: IPV6_MULTICAST_LOOP}");
-            }
-        }
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP,
+		    &mreq, sizeof(mreq)) < 0) {
+			if (errno != EINVAL) {
+				/* EINVAL if it is not a multicast address,
+				 * not an error we consider unicast */
+				fail("{setsockopt: IPV6_ADD_MEMBERSIP}");
+			}
+		} else { /* this is a multicast address */
+			unsigned int loop = 0;
+			if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP,
+			    &loop, sizeof(loop)) < 0) {
+				fail("{setsockopt: IPV6_MULTICAST_LOOP}");
+			}
+		}
+		/* optional set sockopts for sending to multicast msg */
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_IF,
+		    &mreq.ipv6mr_interface,
+		    sizeof(mreq.ipv6mr_interface)) < 0) {
+			fail("{setsockopt: IPV6_MULTICAST_IF}");
+		}
 
-        /* optional set sockopts for sending to multicast msg */
-        if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_IF,
-                               &mreq.ipv6mr_interface, sizeof(mreq.ipv6mr_interface)) < 0) {
-            fail("{setsockopt: IPV6_MULTICAST_IF}");
-        }
+		if (CONFIG->SHCUPD_MCASTTTL) {
+			int hops;
 
-        if (CONFIG->SHCUPD_MCASTTTL) {
-            int hops;
-
-            hops = atoi(CONFIG->SHCUPD_MCASTTTL);
-            if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &hops, sizeof(hops)) < 0) {
-                fail("{setsockopt: IPV6_MULTICAST_HOPS}");
-            }
-        }
-    }
+			hops = atoi(CONFIG->SHCUPD_MCASTTTL);
+			if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
+			    &hops, sizeof(hops)) < 0) {
+				fail("{setsockopt: IPV6_MULTICAST_HOPS}");
+			}
+		}
+	}
 #endif /* IPV6_ADD_MEMBERSHIP */
 
-    if (bind(s, ai->ai_addr, ai->ai_addrlen)) {
-        fail("{bind-socket}");
-    }
+	if (bind(s, ai->ai_addr, ai->ai_addrlen)) {
+		fail("{bind-socket}");
+	}
 
-    freeaddrinfo(ai);
-
-    return s;
+	freeaddrinfo(ai);
+	return s;
 }
 
 #endif /*USE_SHARED_CACHE */
 
-RSA *load_rsa_privatekey(SSL_CTX *ctx, const char *file) {
-    BIO *bio;
-    RSA *rsa;
+RSA *
+load_rsa_privatekey(SSL_CTX *ctx, const char *file)
+{
+	BIO *bio;
+	RSA *rsa;
 
-    bio = BIO_new_file(file, "r");
-    if (!bio) {
-        ERR_print_errors_fp(stderr);
-        return NULL;
-    }
+	bio = BIO_new_file(file, "r");
+	if (!bio) {
+		ERR_print_errors_fp(stderr);
+		return NULL;
+	}
 
-    rsa = PEM_read_bio_RSAPrivateKey(bio, NULL,
-          ctx->default_passwd_callback, ctx->default_passwd_callback_userdata);
-    BIO_free(bio);
+	rsa = PEM_read_bio_RSAPrivateKey(bio, NULL,
+	    ctx->default_passwd_callback,
+	    ctx->default_passwd_callback_userdata);
+	BIO_free(bio);
 
-    return rsa;
+	return rsa;
 }
 
 #ifndef OPENSSL_NO_TLSEXT
@@ -767,93 +796,89 @@ int sni_switch_ctx(SSL *ssl, int *al, void *data) {
 #endif /* OPENSSL_NO_TLSEXT */
 
 
-/*
- * Initialize an SSL context
- */
+/* Initialize an SSL context */
+SSL_CTX *
+make_ctx(const char *pemfile)
+{
+	SSL_CTX *ctx;
+	RSA *rsa;
 
-SSL_CTX *make_ctx(const char *pemfile) {
-    SSL_CTX *ctx;
-    RSA *rsa;
-
-    long ssloptions = SSL_OP_NO_SSLv2 | SSL_OP_ALL |
-            SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION;
+	long ssloptions = SSL_OP_NO_SSLv2 | SSL_OP_ALL |
+	    SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION;
 
 #ifdef SSL_OP_NO_COMPRESSION
-    ssloptions |= SSL_OP_NO_COMPRESSION;
+	ssloptions |= SSL_OP_NO_COMPRESSION;
 #endif
-    if (CONFIG->ETYPE == ENC_TLS)
-	    ssloptions |= SSL_OP_NO_SSLv3;
-    ctx = SSL_CTX_new((CONFIG->PMODE == SSL_CLIENT) ?
-                SSLv23_client_method() : SSLv23_server_method());
+	if (CONFIG->ETYPE == ENC_TLS)
+		ssloptions |= SSL_OP_NO_SSLv3;
+	ctx = SSL_CTX_new((CONFIG->PMODE == SSL_CLIENT) ?
+	    SSLv23_client_method() : SSLv23_server_method());
 
-    SSL_CTX_set_options(ctx, ssloptions);
-    SSL_CTX_set_info_callback(ctx, info_callback);
+	SSL_CTX_set_options(ctx, ssloptions);
+	SSL_CTX_set_info_callback(ctx, info_callback);
 
-    if (CONFIG->CIPHER_SUITE) {
-        if (SSL_CTX_set_cipher_list(ctx, CONFIG->CIPHER_SUITE) != 1) {
-            ERR_print_errors_fp(stderr);
-        }
-    }
+	if (CONFIG->CIPHER_SUITE) {
+		if (SSL_CTX_set_cipher_list(ctx, CONFIG->CIPHER_SUITE) != 1) {
+			ERR_print_errors_fp(stderr);
+		}
+	}
 
-    if (CONFIG->PREFER_SERVER_CIPHERS) {
-        SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
-    }
+	if (CONFIG->PREFER_SERVER_CIPHERS)
+		SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
 
-    if (CONFIG->PMODE == SSL_CLIENT) {
-        return ctx;
-    }
+	if (CONFIG->PMODE == SSL_CLIENT)
+		return ctx;
 
-    /* SSL_SERVER Mode stuff */
-    if (SSL_CTX_use_certificate_chain_file(ctx, pemfile) <= 0) {
-        ERR_print_errors_fp(stderr);
-        exit(1);
-    }
+	/* SSL_SERVER Mode stuff */
+	if (SSL_CTX_use_certificate_chain_file(ctx, pemfile) <= 0) {
+		ERR_print_errors_fp(stderr);
+		exit(1);
+	}
 
-    rsa = load_rsa_privatekey(ctx, pemfile);
-    if (!rsa) {
-       ERR("Error loading rsa private key\n");
-       exit(1);
-    }
+	rsa = load_rsa_privatekey(ctx, pemfile);
+	if (!rsa) {
+		ERR("Error loading RSA private key\n");
+		exit(1);
+	}
 
-    if (SSL_CTX_use_RSAPrivateKey(ctx, rsa) <= 0) {
-        ERR_print_errors_fp(stderr);
-        exit(1);
-    }
+	if (SSL_CTX_use_RSAPrivateKey(ctx, rsa) <= 0) {
+		ERR_print_errors_fp(stderr);
+		exit(1);
+	}
 
 #ifndef OPENSSL_NO_DH
-    init_dh(ctx, pemfile);
+	init_dh(ctx, pemfile);
 #endif /* OPENSSL_NO_DH */
 
 #ifndef OPENSSL_NO_TLSEXT
-    if (!SSL_CTX_set_tlsext_servername_callback(ctx, sni_switch_ctx)) {
-        ERR("Error setting up SNI support\n");
-    }
+	if (!SSL_CTX_set_tlsext_servername_callback(ctx, sni_switch_ctx)) {
+		ERR("Error setting up SNI support\n");
+	}
 #endif /* OPENSSL_NO_TLSEXT */
 
 #ifdef USE_SHARED_CACHE
-    if (CONFIG->SHARED_CACHE) {
-        if (shared_context_init(ctx, CONFIG->SHARED_CACHE) < 0) {
-            ERR("Unable to alloc memory for shared cache.\n");
-            exit(1);
-        }
-        if (CONFIG->SHCUPD_PORT) {
-            if (compute_secret(rsa, shared_secret) < 0) {
-                ERR("Unable to compute shared secret.\n");
-                exit(1);
-            }
+	if (CONFIG->SHARED_CACHE) {
+		if (shared_context_init(ctx, CONFIG->SHARED_CACHE) < 0) {
+			ERR("Unable to alloc memory for shared cache.\n");
+			exit(1);
+		}
+		if (CONFIG->SHCUPD_PORT) {
+			if (compute_secret(rsa, shared_secret) < 0) {
+				ERR("Unable to compute shared secret.\n");
+				exit(1);
+			}
 
-            /* Force tls tickets cause keys differs */
-            SSL_CTX_set_options(ctx, SSL_OP_NO_TICKET);
+			/* Force tls tickets cause keys differs */
+			SSL_CTX_set_options(ctx, SSL_OP_NO_TICKET);
 
-            if (*shcupd_peers) {
-                shsess_set_new_cbk(shcupd_session_new);
-            }
-        }
-    }
+			if (*shcupd_peers) {
+				shsess_set_new_cbk(shcupd_session_new);
+			}
+		}
+	}
 #endif
-
-    RSA_free(rsa);
-    return ctx;
+	RSA_free(rsa);
+	return ctx;
 }
 
 #ifndef OPENSSL_NO_TLSEXT
@@ -926,7 +951,8 @@ load_cert_ctx(SSL_CTX *ctx, const char *file)
 
 /* Check that we don't needlessly load a cert that's already loaded. */
 static SSL_CTX *
-find_ctx(const char *file) {
+find_ctx(const char *file)
+{
 	struct ctx_list *cl;
 	VTAILQ_FOREACH(cl, &sni_ctxs, list) {
 		if (strcmp(cl->filename, file) == 0)
@@ -939,7 +965,9 @@ find_ctx(const char *file) {
 /* Init library and load specified certificate.
  * Establishes a SSL_ctx, to act as a template for
  * each connection */
-void init_openssl(void) {
+void
+init_openssl(void)
+{
 	struct cert_files *cf;
 	struct listen_sock *ls;
 	SSL_CTX *ctx;
@@ -1099,242 +1127,263 @@ create_listen_sock(const struct front_arg *fa)
 
 /* Initiate a clear-text nonblocking connect() to the backend IP on behalf
  * of a newly connected upstream (encrypted) client*/
-static int create_back_socket() {
-    int s = socket(backaddr->ai_family, SOCK_STREAM, IPPROTO_TCP);
+static int
+create_back_socket()
+{
+	int s = socket(backaddr->ai_family, SOCK_STREAM, IPPROTO_TCP);
 
-    if (s == -1)
-      return -1;
+	if (s == -1)
+		return -1;
 
-    int flag = 1;
-    int ret = setsockopt(s, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag));
-    if (ret == -1) {
-      ERR("Couldn't setsockopt to backend (TCP_NODELAY): %s\n", strerror(errno));
-    }
-    setnonblocking(s);
-
-    return s;
+	int flag = 1;
+	int ret = setsockopt(s, IPPROTO_TCP, TCP_NODELAY,
+	    (char *)&flag,sizeof(flag));
+	if (ret == -1)
+		ERR("Couldn't setsockopt to backend (TCP_NODELAY): %s\n", strerror(errno));
+	setnonblocking(s);
+	return s;
 }
 
 /* Only enable a libev ev_io event if the proxied connection still
  * has both up and down connected */
-static void safe_enable_io(proxystate *ps, ev_io *w) {
-    CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
-    if (!ps->want_shutdown)
-        ev_io_start(loop, w);
+static void
+safe_enable_io(proxystate *ps, ev_io *w)
+{
+	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
+	if (!ps->want_shutdown)
+		ev_io_start(loop, w);
 }
 
 /* Only enable a libev ev_io event if the proxied connection still
  * has both up and down connected */
-static void shutdown_proxy(proxystate *ps, SHUTDOWN_REQUESTOR req) {
-    CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
-    LOGPROXY(ps, "proxy shutdown req=%d\n", req);
-    if (ps->want_shutdown || req == SHUTDOWN_HARD) {
-        ev_io_stop(loop, &ps->ev_w_ssl);
-        ev_io_stop(loop, &ps->ev_r_ssl);
-        ev_io_stop(loop, &ps->ev_w_handshake);
-        ev_io_stop(loop, &ps->ev_r_handshake);
-        ev_timer_stop(loop, &ps->ev_t_handshake);
-        ev_io_stop(loop, &ps->ev_w_connect);
-        ev_timer_stop(loop, &ps->ev_t_connect);
-        ev_io_stop(loop, &ps->ev_w_clear);
-        ev_io_stop(loop, &ps->ev_r_clear);
-        ev_io_stop(loop, &ps->ev_proxy);
+static void
+shutdown_proxy(proxystate *ps, SHUTDOWN_REQUESTOR req)
+{
+	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
+	LOGPROXY(ps, "proxy shutdown req=%d\n", req);
+	if (ps->want_shutdown || req == SHUTDOWN_HARD) {
+		ev_io_stop(loop, &ps->ev_w_ssl);
+		ev_io_stop(loop, &ps->ev_r_ssl);
+		ev_io_stop(loop, &ps->ev_w_handshake);
+		ev_io_stop(loop, &ps->ev_r_handshake);
+		ev_timer_stop(loop, &ps->ev_t_handshake);
+		ev_io_stop(loop, &ps->ev_w_connect);
+		ev_timer_stop(loop, &ps->ev_t_connect);
+		ev_io_stop(loop, &ps->ev_w_clear);
+		ev_io_stop(loop, &ps->ev_r_clear);
+		ev_io_stop(loop, &ps->ev_proxy);
 
-        close(ps->fd_up);
-        close(ps->fd_down);
+		close(ps->fd_up);
+		close(ps->fd_down);
 
-        ERR_clear_error();
+		ERR_clear_error();
 
-        SSL_set_shutdown(ps->ssl, SSL_SENT_SHUTDOWN);
-        SSL_free(ps->ssl);
+		SSL_set_shutdown(ps->ssl, SSL_SENT_SHUTDOWN);
+		SSL_free(ps->ssl);
 
-	ringbuffer_cleanup(&ps->ring_clear2ssl);
-	ringbuffer_cleanup(&ps->ring_ssl2clear);
-        free(ps);
-    }
-    else {
-        ps->want_shutdown = 1;
-        if (req == SHUTDOWN_CLEAR && ringbuffer_is_empty(&ps->ring_clear2ssl))
-            shutdown_proxy(ps, SHUTDOWN_HARD);
-        else if (req == SHUTDOWN_SSL && ringbuffer_is_empty(&ps->ring_ssl2clear))
-            shutdown_proxy(ps, SHUTDOWN_HARD);
-    }
+		ringbuffer_cleanup(&ps->ring_clear2ssl);
+		ringbuffer_cleanup(&ps->ring_ssl2clear);
+		free(ps);
+	}
+	else {
+		ps->want_shutdown = 1;
+		if (req == SHUTDOWN_CLEAR &&
+		    ringbuffer_is_empty(&ps->ring_clear2ssl))
+			shutdown_proxy(ps, SHUTDOWN_HARD);
+		else if (req == SHUTDOWN_SSL &&
+		    ringbuffer_is_empty(&ps->ring_ssl2clear))
+			shutdown_proxy(ps, SHUTDOWN_HARD);
+	}
 }
 
 /* Handle various socket errors */
-static void handle_socket_errno(proxystate *ps, int backend) {
-    CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
-    if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
-        return;
+static void
+handle_socket_errno(proxystate *ps, int backend)
+{
+	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
+	if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+		return;
 
-    if (backend) {
-	ERR("{backend} Socket error: %s\n", strerror(errno));
-    } else {
-        LOG("{client} Socket error: %s\n", strerror(errno));
-    }
-    shutdown_proxy(ps, SHUTDOWN_CLEAR);
+	if (backend)
+		ERR("{backend} Socket error: %s\n", strerror(errno));
+	else
+		LOG("{client} Socket error: %s\n", strerror(errno));
+	shutdown_proxy(ps, SHUTDOWN_CLEAR);
 }
+
 /* Start connect to backend */
-static int start_connect(proxystate *ps) {
-    int t = 1;
-    CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
-    t = connect(ps->fd_down, backaddr->ai_addr, backaddr->ai_addrlen);
-    if (t == 0 || errno == EINPROGRESS || errno == EINTR) {
-        ev_io_start(loop, &ps->ev_w_connect);
-        ev_timer_start(loop, &ps->ev_t_connect);
-        return 0;
-    }
-    ERR("{backend-connect}: %s\n", strerror(errno));
-    shutdown_proxy(ps, SHUTDOWN_HARD);
-    return -1;
+static int
+start_connect(proxystate *ps)
+{
+	int t = 1;
+	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
+	t = connect(ps->fd_down, backaddr->ai_addr, backaddr->ai_addrlen);
+	if (t == 0 || errno == EINPROGRESS || errno == EINTR) {
+		ev_io_start(loop, &ps->ev_w_connect);
+		ev_timer_start(loop, &ps->ev_t_connect);
+		return 0;
+	}
+	ERR("{backend-connect}: %s\n", strerror(errno));
+	shutdown_proxy(ps, SHUTDOWN_HARD);
+	return -1;
 }
 
 /* Read some data from the backend when libev says data is available--
  * write it into the upstream buffer and make sure the write event is
  * enabled for the upstream socket */
-static void clear_read(struct ev_loop *loop, ev_io *w, int revents) {
-    (void) revents;
-    int t;
-    proxystate *ps;
-    CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
-    if (ps->want_shutdown) {
-        ev_io_stop(loop, &ps->ev_r_clear);
-        return;
-    }
-    int fd = w->fd;
-    char * buf = ringbuffer_write_ptr(&ps->ring_clear2ssl);
-    t = recv(fd, buf, ps->ring_clear2ssl.data_len, 0);
+static void
+clear_read(struct ev_loop *loop, ev_io *w, int revents)
+{
+	(void) revents;
+	int t;
+	proxystate *ps;
+	CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
+	if (ps->want_shutdown) {
+		ev_io_stop(loop, &ps->ev_r_clear);
+		return;
+	}
+	int fd = w->fd;
+	char *buf = ringbuffer_write_ptr(&ps->ring_clear2ssl);
+	t = recv(fd, buf, ps->ring_clear2ssl.data_len, 0);
 
-    if (t > 0) {
-        ringbuffer_write_append(&ps->ring_clear2ssl, t);
-        if (ringbuffer_is_full(&ps->ring_clear2ssl))
-            ev_io_stop(loop, &ps->ev_r_clear);
-        if (ps->handshaked)
-            safe_enable_io(ps, &ps->ev_w_ssl);
-    }
-    else if (t == 0) {
-        LOGPROXY(ps,"Connection closed by %s\n", fd == ps->fd_down ? "backend" : "client");
-        shutdown_proxy(ps, SHUTDOWN_CLEAR);
-    }
-    else {
-        assert(t == -1);
-        handle_socket_errno(ps, fd == ps->fd_down ? 1 : 0);
-    }
+	if (t > 0) {
+		ringbuffer_write_append(&ps->ring_clear2ssl, t);
+		if (ringbuffer_is_full(&ps->ring_clear2ssl))
+			ev_io_stop(loop, &ps->ev_r_clear);
+		if (ps->handshaked)
+			safe_enable_io(ps, &ps->ev_w_ssl);
+	}
+	else if (t == 0) {
+		LOGPROXY(ps,"Connection closed by %s\n",
+		    fd == ps->fd_down ? "backend" : "client");
+		shutdown_proxy(ps, SHUTDOWN_CLEAR);
+	}
+	else {
+		assert(t == -1);
+		handle_socket_errno(ps, fd == ps->fd_down ? 1 : 0);
+	}
 }
+
+
 /* Write some data, previously received on the secure upstream socket,
  * out of the downstream buffer and onto the backend socket */
-static void clear_write(struct ev_loop *loop, ev_io *w, int revents) {
-    (void) revents;
-    int t;
-    proxystate *ps;
-    int fd = w->fd;
-    int sz;
+static void
+clear_write(struct ev_loop *loop, ev_io *w, int revents)
+{
+	(void)revents;
+	int t;
+	proxystate *ps;
+	int fd = w->fd;
+	int sz;
 
-    CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
-    assert(!ringbuffer_is_empty(&ps->ring_ssl2clear));
+	CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
+	assert(!ringbuffer_is_empty(&ps->ring_ssl2clear));
 
-    char *next = ringbuffer_read_next(&ps->ring_ssl2clear, &sz);
-    t = send(fd, next, sz, MSG_NOSIGNAL);
+	char *next = ringbuffer_read_next(&ps->ring_ssl2clear, &sz);
+	t = send(fd, next, sz, MSG_NOSIGNAL);
 
-    if (t > 0) {
-        if (t == sz) {
-            ringbuffer_read_pop(&ps->ring_ssl2clear);
-            if (ps->handshaked)
-                safe_enable_io(ps, &ps->ev_r_ssl);
-            if (ringbuffer_is_empty(&ps->ring_ssl2clear)) {
-                if (ps->want_shutdown) {
-                    shutdown_proxy(ps, SHUTDOWN_HARD);
-                    return; // dealloc'd
-                }
-                ev_io_stop(loop, &ps->ev_w_clear);
-            }
-        }
-        else {
-            ringbuffer_read_skip(&ps->ring_ssl2clear, t);
-        }
-    }
-    else {
-        assert(t == -1);
-        handle_socket_errno(ps, fd == ps->fd_down ? 1 : 0);
-    }
+	if (t > 0) {
+		if (t == sz) {
+			ringbuffer_read_pop(&ps->ring_ssl2clear);
+			if (ps->handshaked)
+				safe_enable_io(ps, &ps->ev_r_ssl);
+			if (ringbuffer_is_empty(&ps->ring_ssl2clear)) {
+				if (ps->want_shutdown) {
+					shutdown_proxy(ps, SHUTDOWN_HARD);
+					return; // dealloc'd
+				}
+				ev_io_stop(loop, &ps->ev_w_clear);
+			}
+		} else {
+			ringbuffer_read_skip(&ps->ring_ssl2clear, t);
+		}
+	} else {
+		assert(t == -1);
+		handle_socket_errno(ps, fd == ps->fd_down ? 1 : 0);
+	}
 }
 
 static void start_handshake(proxystate *ps, int err);
 
-/* Continue/complete the asynchronous connect() before starting data transmission
- * between front/backend */
-static void handle_connect(struct ev_loop *loop, ev_io *w, int revents) {
-    (void) revents;
-    int t;
-    proxystate *ps;
+/* Continue/complete the asynchronous connect() before starting data
+ * transmission between front/backend */
+static void
+handle_connect(struct ev_loop *loop, ev_io *w, int revents)
+{
+	(void)revents;
+	int t;
+	proxystate *ps;
 
-    CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
+	CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
 
-    t = connect(ps->fd_down, backaddr->ai_addr, backaddr->ai_addrlen);
-    if (!t || errno == EISCONN || !errno) {
-        ev_io_stop(loop, &ps->ev_w_connect);
-        ev_timer_stop(loop, &ps->ev_t_connect);
+	t = connect(ps->fd_down, backaddr->ai_addr, backaddr->ai_addrlen);
+	if (!t || errno == EISCONN || !errno) {
+		ev_io_stop(loop, &ps->ev_w_connect);
+		ev_timer_stop(loop, &ps->ev_t_connect);
 
-        if (!ps->clear_connected) {
-            struct sockaddr_storage addr;
-            socklen_t sl;
+		if (!ps->clear_connected) {
+			struct sockaddr_storage addr;
+			socklen_t sl;
 
-            sl = sizeof(addr);
-            getsockname(ps->fd_down, (struct sockaddr*)&addr, &sl);
-            ps->connect_port = ntohs(((struct sockaddr_in*)&addr)->sin_port);
-            LOGPROXY(ps, "backend connected\n");
+			sl = sizeof(addr);
+			getsockname(ps->fd_down, (struct sockaddr*)&addr, &sl);
+			ps->connect_port = \
+			    ntohs(((struct sockaddr_in*)&addr)->sin_port);
+			LOGPROXY(ps, "backend connected\n");
 
-            ps->clear_connected = 1;
+			ps->clear_connected = 1;
 
-            /* if incoming buffer is not full */
-            if (!ringbuffer_is_full(&ps->ring_clear2ssl))
-                safe_enable_io(ps, &ps->ev_r_clear);
+			/* if incoming buffer is not full */
+			if (!ringbuffer_is_full(&ps->ring_clear2ssl))
+				safe_enable_io(ps, &ps->ev_r_clear);
 
-            /* if outgoing buffer is not empty */
-            if (!ringbuffer_is_empty(&ps->ring_ssl2clear))
-                // not safe.. we want to resume stream even during half-closed
-                ev_io_start(loop, &ps->ev_w_clear);
-        }
-        else {
-            /* Clear side already connected so connect is on secure side: perform handshake */
-            start_handshake(ps, SSL_ERROR_WANT_WRITE);
-        }
-    }
-    else if (errno == EINPROGRESS || errno == EINTR || errno == EALREADY) {
-        /* do nothing, we'll get phoned home again... */
-    }
-    else {
-        ERR("{backend-connect}: %s\n", strerror(errno));
-        shutdown_proxy(ps, SHUTDOWN_HARD);
-    }
+			/* if outgoing buffer is not empty */
+			if (!ringbuffer_is_empty(&ps->ring_ssl2clear))
+				// not safe.. we want to resume stream even during half-closed
+				ev_io_start(loop, &ps->ev_w_clear);
+		} else {
+			/* Clear side already connected so connect is on
+			 * secure side: perform handshake */
+			start_handshake(ps, SSL_ERROR_WANT_WRITE);
+		}
+	}
+	else if (errno == EINPROGRESS || errno == EINTR || errno == EALREADY) {
+		/* do nothing, we'll get phoned home again... */
+	} else {
+		ERR("{backend-connect}: %s\n", strerror(errno));
+		shutdown_proxy(ps, SHUTDOWN_HARD);
+	}
 }
 
-static void connect_timeout(EV_P_ ev_timer *w, int revents)
+static void
+connect_timeout(EV_P_ ev_timer *w, int revents)
 {
-    (void) loop;
-    (void) revents;
-    proxystate *ps;
-    CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
-    ERRPROXY(ps,"backend connect timeout\n");
-    //shutdown_proxy(ps, SHUTDOWN_HARD);
+	(void)loop;
+	(void)revents;
+	proxystate *ps;
+	CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
+	ERRPROXY(ps,"backend connect timeout\n");
+	//shutdown_proxy(ps, SHUTDOWN_HARD);
 }
 
 /* Upon receiving a signal from OpenSSL that a handshake is required, re-wire
  * the read/write events to hook up to the handshake handlers */
-static void start_handshake(proxystate *ps, int err) {
-    CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
+static void
+start_handshake(proxystate *ps, int err)
+{
+	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
 
-    ev_io_stop(loop, &ps->ev_r_ssl);
-    ev_io_stop(loop, &ps->ev_w_ssl);
+	ev_io_stop(loop, &ps->ev_r_ssl);
+	ev_io_stop(loop, &ps->ev_w_ssl);
 
-    ps->handshaked = 0;
+	ps->handshaked = 0;
 
-    LOGPROXY(ps,"ssl handshake start\n");
-    if (err == SSL_ERROR_WANT_READ)
-        ev_io_start(loop, &ps->ev_r_handshake);
-    else if (err == SSL_ERROR_WANT_WRITE)
-        ev_io_start(loop, &ps->ev_w_handshake);
-    ev_timer_start(loop, &ps->ev_t_handshake);
+	LOGPROXY(ps,"ssl handshake start\n");
+	if (err == SSL_ERROR_WANT_READ)
+		ev_io_start(loop, &ps->ev_r_handshake);
+	else if (err == SSL_ERROR_WANT_WRITE)
+		ev_io_start(loop, &ps->ev_w_handshake);
+	ev_timer_start(loop, &ps->ev_t_handshake);
 }
 
 static void
@@ -1346,6 +1395,7 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 		struct sockaddr_in	sa4;
 		struct sockaddr_in6	sa6;
 	} *l, *r;
+
 	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
 	p = (struct ha_proxy_v2_hdr *)
 	    ringbuffer_write_ptr(&ps->ring_ssl2clear);
@@ -1475,16 +1525,13 @@ static void end_handshake(proxystate *ps) {
 				    slen);
 			else
 				write_proxy_v2(ps, (struct sockaddr *) &local);
-		}
-		else if (CONFIG->WRITE_IP_OCTET) {
+		} else if (CONFIG->WRITE_IP_OCTET) {
 			write_ip_octet(ps);
 		}
 		/* start connect now */
-		if (0 != start_connect(ps)) {
+		if (0 != start_connect(ps))
 			return;
-		}
-	}
-	else {
+	} else {
 		/* hitch used in client mode, keep client session ) */
 		if (!SSL_session_reused(ps->ssl)) {
 			if (client_session)
@@ -1503,111 +1550,114 @@ static void end_handshake(proxystate *ps) {
 		ev_io_start(loop, &ps->ev_w_ssl);
 }
 
-static void client_proxy_proxy(struct ev_loop *loop, ev_io *w, int revents) {
-    (void) revents;
-    int t;
-    char *proxy = tcp_proxy_line, *end = tcp_proxy_line + sizeof(tcp_proxy_line);
-    proxystate *ps;
-    BIO *b;
+static void
+client_proxy_proxy(struct ev_loop *loop, ev_io *w, int revents)
+{
+	(void)revents;
+	int t;
+	char *proxy = tcp_proxy_line;
+	char *end = tcp_proxy_line + sizeof(tcp_proxy_line);
+	proxystate *ps;
+	BIO *b;
 
-    CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
-    b = SSL_get_rbio(ps->ssl);
+	CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
+	b = SSL_get_rbio(ps->ssl);
 
-    // Copy characters one-by-one until we hit a \n or an error
-    while (proxy != end && (t = BIO_read(b, proxy, 1)) == 1) {
-        if (*proxy++ == '\n') break;
-    }
+	// Copy characters one-by-one until we hit a \n or an error
+	while (proxy != end && (t = BIO_read(b, proxy, 1)) == 1) {
+		if (*proxy++ == '\n')
+			break;
+	}
 
-    if (proxy == end) {
-        LOG("{client} Unexpectedly long PROXY line. Perhaps a malformed request?");
-        shutdown_proxy(ps, SHUTDOWN_SSL);
-    }
-    else if (t == 1) {
-        if (ringbuffer_is_full(&ps->ring_ssl2clear)) {
-            LOG("{client} Error writing PROXY line");
-            shutdown_proxy(ps, SHUTDOWN_SSL);
-            return;
-        }
+	if (proxy == end) {
+		LOG("{client} Unexpectedly long PROXY line. Malformed req?");
+		shutdown_proxy(ps, SHUTDOWN_SSL);
+	} else if (t == 1) {
+		if (ringbuffer_is_full(&ps->ring_ssl2clear)) {
+			LOG("{client} Error writing PROXY line");
+			shutdown_proxy(ps, SHUTDOWN_SSL);
+			return;
+		}
 
-        char *ring = ringbuffer_write_ptr(&ps->ring_ssl2clear);
-        memcpy(ring, tcp_proxy_line, proxy - tcp_proxy_line);
-        ringbuffer_write_append(&ps->ring_ssl2clear, proxy - tcp_proxy_line);
+		char *ring = ringbuffer_write_ptr(&ps->ring_ssl2clear);
+		memcpy(ring, tcp_proxy_line, proxy - tcp_proxy_line);
+		ringbuffer_write_append(&ps->ring_ssl2clear,
+		    proxy - tcp_proxy_line);
 
-        // Finished reading the PROXY header
-        if (*(proxy - 1) == '\n') {
-            ev_io_stop(loop, &ps->ev_proxy);
+		// Finished reading the PROXY header
+		if (*(proxy - 1) == '\n') {
+			ev_io_stop(loop, &ps->ev_proxy);
 
-            // Start the real handshake
-            start_handshake(ps, SSL_ERROR_WANT_READ);
-        }
-    }
-    else if (!BIO_should_retry(b)) {
-        LOG("{client} Unexpected error reading PROXY line");
-        shutdown_proxy(ps, SHUTDOWN_SSL);
-    }
+			// Start the real handshake
+			start_handshake(ps, SSL_ERROR_WANT_READ);
+		}
+	} else if (!BIO_should_retry(b)) {
+		LOG("{client} Unexpected error reading PROXY line");
+		shutdown_proxy(ps, SHUTDOWN_SSL);
+	}
 }
 
 static void
 log_ssl_error (proxystate* ps, const char* what)
 {
-    int e;
-    CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
-    while ((e = ERR_get_error())) {
-	char buf[1024];
-	ERR_error_string_n(e, buf, sizeof(buf));
-	ERRPROXY(ps, "%s: %s\n", what, buf);
-    }
+	int e;
+	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
+
+	while ((e = ERR_get_error())) {
+		char buf[1024];
+		ERR_error_string_n(e, buf, sizeof(buf));
+		ERRPROXY(ps, "%s: %s\n", what, buf);
+	}
 }
 
 /* The libev I/O handler during the OpenSSL handshake phase.  Basically, just
  * let OpenSSL do what it likes with the socket and obey its requests for reads
  * or writes */
-static void client_handshake(struct ev_loop *loop, ev_io *w, int revents) {
-    (void) revents;
-    int t;
-    proxystate *ps;
+static void
+client_handshake(struct ev_loop *loop, ev_io *w, int revents)
+{
+	(void)revents;
+	int t;
+	proxystate *ps;
 
-    CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
+	CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
 
-    LOGPROXY(ps,"ssl client handshake revents=%x\n",revents);
-    t = SSL_do_handshake(ps->ssl);
-    if (t == 1) {
-        end_handshake(ps);
-    }
-    else {
-        int err = SSL_get_error(ps->ssl, t);
-        LOGPROXY(ps,"ssl client handshake err=%d\n",err);
-        if (err == SSL_ERROR_WANT_READ) {
-            ev_io_stop(loop, &ps->ev_w_handshake);
-            ev_io_start(loop, &ps->ev_r_handshake);
-        }
-        else if (err == SSL_ERROR_WANT_WRITE) {
-            ev_io_stop(loop, &ps->ev_r_handshake);
-            ev_io_start(loop, &ps->ev_w_handshake);
-        }
-        else if (err == SSL_ERROR_ZERO_RETURN) {
-            LOG("{%s} Connection closed (in handshake)\n", w->fd == ps->fd_up ? "client" : "backend");
-            shutdown_proxy(ps, SHUTDOWN_SSL);
-        }
-        else {
-            if (err == SSL_ERROR_SSL) {
-                log_ssl_error(ps, "Handshake failure");
-            } else {
-        	LOG("{%s} Unexpected SSL error (in handshake): %d\n", w->fd == ps->fd_up ? "client" : "backend", err);
-            }
-            shutdown_proxy(ps, SHUTDOWN_SSL);
-        }
-    }
+	LOGPROXY(ps,"ssl client handshake revents=%x\n",revents);
+	t = SSL_do_handshake(ps->ssl);
+	if (t == 1) {
+		end_handshake(ps);
+	} else {
+		int err = SSL_get_error(ps->ssl, t);
+		LOGPROXY(ps,"ssl client handshake err=%d\n",err);
+		if (err == SSL_ERROR_WANT_READ) {
+			ev_io_stop(loop, &ps->ev_w_handshake);
+			ev_io_start(loop, &ps->ev_r_handshake);
+		} else if (err == SSL_ERROR_WANT_WRITE) {
+			ev_io_stop(loop, &ps->ev_r_handshake);
+			ev_io_start(loop, &ps->ev_w_handshake);
+		} else if (err == SSL_ERROR_ZERO_RETURN) {
+			LOG("{%s} Connection closed (in handshake)\n", w->fd == ps->fd_up ? "client" : "backend");
+			shutdown_proxy(ps, SHUTDOWN_SSL);
+		} else {
+			if (err == SSL_ERROR_SSL) {
+				log_ssl_error(ps, "Handshake failure");
+			} else {
+				LOG("{%s} Unexpected SSL error (in handshake): %d\n", w->fd == ps->fd_up ? "client" : "backend", err);
+			}
+			shutdown_proxy(ps, SHUTDOWN_SSL);
+		}
+	}
 }
 
-static void handshake_timeout(EV_P_ ev_timer *w, int revents)
+static void
+handshake_timeout(EV_P_ ev_timer *w, int revents)
 {
-    (void) loop;
-    (void) revents;
-    proxystate *ps;
-    CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
-    LOGPROXY(ps,"SSL handshake timeout\n");
-    shutdown_proxy(ps, SHUTDOWN_HARD);
+	(void)loop;
+	(void)revents;
+	proxystate *ps;
+	CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
+	LOGPROXY(ps,"SSL handshake timeout\n");
+	shutdown_proxy(ps, SHUTDOWN_HARD);
 }
 
 #define SSLERR(ps,which,log) \
@@ -1626,235 +1676,251 @@ default: \
     log(ps,"{" which "} Unexpected SSL_read error (" which "): %d\n",err); \
 }
 
-    /* Handle a socket error condition passed to us from OpenSSL */
-static void handle_fatal_ssl_error(proxystate *ps, int err, int backend) {
-    CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
-    if (backend) {
-	SSLERR(ps, "backend", ERRPROXY);
-    } else {
-	SSLERR(ps, "client", LOGPROXY);
-    }
-    shutdown_proxy(ps, SHUTDOWN_SSL);
+/* Handle a socket error condition passed to us from OpenSSL */
+static void
+handle_fatal_ssl_error(proxystate *ps, int err, int backend)
+{
+	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
+	if (backend) {
+		SSLERR(ps, "backend", ERRPROXY);
+	} else {
+		SSLERR(ps, "client", LOGPROXY);
+	}
+	shutdown_proxy(ps, SHUTDOWN_SSL);
 }
 
 /* Read some data from the upstream secure socket via OpenSSL,
  * and buffer anything we get for writing to the backend */
-static void ssl_read(struct ev_loop *loop, ev_io *w, int revents) {
-    (void) revents;
-    int t;
-    proxystate *ps;
+static void
+ssl_read(struct ev_loop *loop, ev_io *w, int revents)
+{
+	(void)revents;
+	int t;
+	proxystate *ps;
 
-    CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
+	CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
 
-    if (ps->want_shutdown) {
-        ev_io_stop(loop, &ps->ev_r_ssl);
-        return;
-    }
-    if (ringbuffer_is_full(&ps->ring_ssl2clear)) {
-	ERRPROXY(ps, "attempt to read ssl when ring full");
-	ev_io_stop(loop, &ps->ev_r_ssl);
-	return;
-    }
-    char * buf = ringbuffer_write_ptr(&ps->ring_ssl2clear);
-    t = SSL_read(ps->ssl, buf, ps->ring_ssl2clear.data_len);
+	if (ps->want_shutdown) {
+		ev_io_stop(loop, &ps->ev_r_ssl);
+		return;
+	}
+	if (ringbuffer_is_full(&ps->ring_ssl2clear)) {
+		ERRPROXY(ps, "attempt to read ssl when ring full");
+		ev_io_stop(loop, &ps->ev_r_ssl);
+		return;
+	}
 
-    /* Fix CVE-2009-3555. Disable reneg if started by client. */
-    if (ps->renegotiation) {
-        shutdown_proxy(ps, SHUTDOWN_SSL);
-        return;
-    }
+	char *buf = ringbuffer_write_ptr(&ps->ring_ssl2clear);
+	t = SSL_read(ps->ssl, buf, ps->ring_ssl2clear.data_len);
 
-    if (t > 0) {
-        ringbuffer_write_append(&ps->ring_ssl2clear, t);
-        if (ringbuffer_is_full(&ps->ring_ssl2clear))
-            ev_io_stop(loop, &ps->ev_r_ssl);
-        if (ps->clear_connected)
-            safe_enable_io(ps, &ps->ev_w_clear);
-    }
-    else {
-        int err = SSL_get_error(ps->ssl, t);
-        if (err == SSL_ERROR_WANT_WRITE) {
-            start_handshake(ps, err);
-        }
-        else if (err == SSL_ERROR_WANT_READ) { } /* incomplete SSL data */
-        else {
-            if (err == SSL_ERROR_SSL) {
-        	log_ssl_error(ps, "SSL_read error");
-            } else {
-        	LOG("{%s} SSL_read error: %d\n", w->fd == ps->fd_up ? "client" : "backend", err);
-            }
-            handle_fatal_ssl_error(ps, err, w->fd == ps->fd_up ? 0 : 1);
-        }
-    }
+	/* Fix CVE-2009-3555. Disable reneg if started by client. */
+	if (ps->renegotiation) {
+		shutdown_proxy(ps, SHUTDOWN_SSL);
+		return;
+	}
+
+	if (t > 0) {
+		ringbuffer_write_append(&ps->ring_ssl2clear, t);
+		if (ringbuffer_is_full(&ps->ring_ssl2clear))
+			ev_io_stop(loop, &ps->ev_r_ssl);
+		if (ps->clear_connected)
+			safe_enable_io(ps, &ps->ev_w_clear);
+	} else {
+		int err = SSL_get_error(ps->ssl, t);
+		if (err == SSL_ERROR_WANT_WRITE) {
+			start_handshake(ps, err);
+		} else if (err == SSL_ERROR_WANT_READ) {
+			/* NOOP. Incomplete SSL data */
+		} else {
+			if (err == SSL_ERROR_SSL) {
+				log_ssl_error(ps, "SSL_read error");
+			} else {
+				LOG("{%s} SSL_read error: %d\n", w->fd == ps->fd_up ? "client" : "backend", err);
+			}
+			handle_fatal_ssl_error(ps, err, w->fd == ps->fd_up ? 0 : 1);
+		}
+	}
 }
 
 /* Write some previously-buffered backend data upstream on the
  * secure socket using OpenSSL */
-static void ssl_write(struct ev_loop *loop, ev_io *w, int revents) {
-    (void) revents;
-    int t;
-    int sz;
-    proxystate *ps;
+static void
+ssl_write(struct ev_loop *loop, ev_io *w, int revents)
+{
+	(void)revents;
+	int t;
+	int sz;
+	proxystate *ps;
 
-    CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
+	CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
 
-    assert(!ringbuffer_is_empty(&ps->ring_clear2ssl));
-    char * next = ringbuffer_read_next(&ps->ring_clear2ssl, &sz);
-    t = SSL_write(ps->ssl, next, sz);
-    if (t > 0) {
-        if (t == sz) {
-            ringbuffer_read_pop(&ps->ring_clear2ssl);
-            if (ps->clear_connected)
-                safe_enable_io(ps, &ps->ev_r_clear); // can be re-enabled b/c we've popped
-            if (ringbuffer_is_empty(&ps->ring_clear2ssl)) {
-                if (ps->want_shutdown) {
-                    shutdown_proxy(ps, SHUTDOWN_HARD);
-                    return;
-                }
-                ev_io_stop(loop, &ps->ev_w_ssl);
-            }
-        }
-        else {
-            ringbuffer_read_skip(&ps->ring_clear2ssl, t);
-        }
-    }
-    else {
-        int err = SSL_get_error(ps->ssl, t);
-        if (err == SSL_ERROR_WANT_READ) {
-            start_handshake(ps, err);
-        }
-        else if (err == SSL_ERROR_WANT_WRITE) {} /* incomplete SSL data */
-        else {
-            if (err == SSL_ERROR_SSL) {
-        	log_ssl_error(ps, "SSL_write error");
-            } else {
-        	LOG("{%s} SSL_write error: %d\n", w->fd == ps->fd_up ? "client" : "backend", err);
-            }
-            handle_fatal_ssl_error(ps, err,  w->fd == ps->fd_up ? 0 : 1);
-        }
-    }
+	assert(!ringbuffer_is_empty(&ps->ring_clear2ssl));
+	char *next = ringbuffer_read_next(&ps->ring_clear2ssl, &sz);
+	t = SSL_write(ps->ssl, next, sz);
+	if (t > 0) {
+		if (t == sz) {
+			ringbuffer_read_pop(&ps->ring_clear2ssl);
+			if (ps->clear_connected)
+				safe_enable_io(ps, &ps->ev_r_clear); // can be re-enabled b/c we've popped
+			if (ringbuffer_is_empty(&ps->ring_clear2ssl)) {
+				if (ps->want_shutdown) {
+					shutdown_proxy(ps, SHUTDOWN_HARD);
+					return;
+				}
+				ev_io_stop(loop, &ps->ev_w_ssl);
+			}
+		} else {
+			ringbuffer_read_skip(&ps->ring_clear2ssl, t);
+		}
+	} else {
+		int err = SSL_get_error(ps->ssl, t);
+		if (err == SSL_ERROR_WANT_READ) {
+			start_handshake(ps, err);
+		} else if (err == SSL_ERROR_WANT_WRITE) {
+			/* NOOP. Incomplete SSL data */
+		} else {
+			if (err == SSL_ERROR_SSL) {
+				log_ssl_error(ps, "SSL_write error");
+			} else {
+				LOG("{%s} SSL_write error: %d\n", w->fd == ps->fd_up ? "client" : "backend", err);
+			}
+			handle_fatal_ssl_error(ps, err,  w->fd == ps->fd_up ? 0 : 1);
+		}
+	}
 }
+
 
 /* libev read handler for the bound sockets.  Socket is accepted,
  * the proxystate is allocated and initalized, and we're off the races
  * connecting to the backend */
-static void handle_accept(struct ev_loop *loop, ev_io *w, int revents) {
-    (void) revents;
-    (void) loop;
-    struct sockaddr_storage addr;
-    proxystate *ps;
-    socklen_t sl = sizeof(addr);
-    int client = accept(w->fd, (struct sockaddr *) &addr, &sl);
-    if (client == -1) {
-        switch (errno) {
-        case EMFILE:
-            ERR("{client} accept() failed; too many open files for this process\n");
-            break;
+static void
+handle_accept(struct ev_loop *loop, ev_io *w, int revents)
+{
+	(void)revents;
+	(void)loop;
+	struct sockaddr_storage addr;
+	proxystate *ps;
+	socklen_t sl = sizeof(addr);
+	int client = accept(w->fd, (struct sockaddr *) &addr, &sl);
+	if (client == -1) {
+		switch (errno) {
+		case EMFILE:
+			ERR("{client} accept() failed; too many open files for this process\n");
+			break;
 
-        case ENFILE:
-            ERR("{client} accept() failed; too many open files for this system\n");
-            break;
+		case ENFILE:
+			ERR("{client} accept() failed; too many open files for this system\n");
+			break;
 
-        default:
-            if (errno != EINTR && errno != EWOULDBLOCK && errno != EAGAIN && errno != ENOTTY && errno != ECONNABORTED) {
-        	SOCKERR("{client} accept() failed");
-            }
-        }
-        return;
-    }
+		default:
+			if (errno != EINTR && errno != EWOULDBLOCK &&
+			    errno != EAGAIN && errno != ENOTTY &&
+			    errno != ECONNABORTED) {
+				SOCKERR("{client} accept() failed");
+			}
+		}
+		return;
+	}
 
-    int flag = 1;
-    int ret = setsockopt(client, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag) );
-    if (ret == -1) {
-      SOCKERR("Couldn't setsockopt on client (TCP_NODELAY)");
-    }
+	int flag = 1;
+	int ret = setsockopt(client, IPPROTO_TCP, TCP_NODELAY,
+	    (char *)&flag, sizeof(flag) );
+	if (ret == -1) {
+		SOCKERR("Couldn't setsockopt on client (TCP_NODELAY)");
+	}
 #ifdef TCP_CWND
-    int cwnd = 10;
-    ret = setsockopt(client, IPPROTO_TCP, TCP_CWND, &cwnd, sizeof(cwnd));
-    if (ret == -1) {
-      SOCKERR("Couldn't setsockopt on client (TCP_CWND)");
-    }
+	int cwnd = 10;
+	ret = setsockopt(client, IPPROTO_TCP, TCP_CWND, &cwnd, sizeof(cwnd));
+	if (ret == -1) {
+		SOCKERR("Couldn't setsockopt on client (TCP_CWND)");
+	}
 #endif
 
-    setnonblocking(client);
-    settcpkeepalive(client);
+	setnonblocking(client);
+	settcpkeepalive(client);
 
-    int back = create_back_socket();
+	int back = create_back_socket();
 
-    if (back == -1) {
-        close(client);
-        ERR("{backend-socket}: %s\n", strerror(errno));
-        return;
-    }
+	if (back == -1) {
+		close(client);
+		ERR("{backend-socket}: %s\n", strerror(errno));
+		return;
+	}
 
-    SSL_CTX * ctx = (SSL_CTX *)w->data;
-    SSL *ssl = SSL_new(ctx);
-    long mode = SSL_MODE_ENABLE_PARTIAL_WRITE;
+	SSL_CTX * ctx = (SSL_CTX *)w->data;
+	SSL *ssl = SSL_new(ctx);
+	long mode = SSL_MODE_ENABLE_PARTIAL_WRITE;
 #ifdef SSL_MODE_RELEASE_BUFFERS
-    mode |= SSL_MODE_RELEASE_BUFFERS;
+	mode |= SSL_MODE_RELEASE_BUFFERS;
 #endif
-    SSL_set_mode(ssl, mode);
-    SSL_set_accept_state(ssl);
-    SSL_set_fd(ssl, client);
+	SSL_set_mode(ssl, mode);
+	SSL_set_accept_state(ssl);
+	SSL_set_fd(ssl, client);
 
-    ALLOC_OBJ(ps, PROXYSTATE_MAGIC);
+	ALLOC_OBJ(ps, PROXYSTATE_MAGIC);
 
-    ps->fd_up = client;
-    ps->fd_down = back;
-    ps->ssl = ssl;
-    ps->want_shutdown = 0;
-    ps->clear_connected = 0;
-    ps->handshaked = 0;
-    ps->renegotiation = 0;
-    ps->remote_ip = addr;
-    ps->connect_port = 0;
+	ps->fd_up = client;
+	ps->fd_down = back;
+	ps->ssl = ssl;
+	ps->want_shutdown = 0;
+	ps->clear_connected = 0;
+	ps->handshaked = 0;
+	ps->renegotiation = 0;
+	ps->remote_ip = addr;
+	ps->connect_port = 0;
 
-    ringbuffer_init(&ps->ring_clear2ssl, CONFIG->RING_SLOTS, CONFIG->RING_DATA_LEN);
-    ringbuffer_init(&ps->ring_ssl2clear, CONFIG->RING_SLOTS, CONFIG->RING_DATA_LEN);
+	ringbuffer_init(&ps->ring_clear2ssl, CONFIG->RING_SLOTS,
+	    CONFIG->RING_DATA_LEN);
+	ringbuffer_init(&ps->ring_ssl2clear, CONFIG->RING_SLOTS,
+	    CONFIG->RING_DATA_LEN);
 
-    /* set up events */
-    ev_io_init(&ps->ev_r_ssl, ssl_read, client, EV_READ);
-    ev_io_init(&ps->ev_w_ssl, ssl_write, client, EV_WRITE);
+	/* set up events */
+	ev_io_init(&ps->ev_r_ssl, ssl_read, client, EV_READ);
+	ev_io_init(&ps->ev_w_ssl, ssl_write, client, EV_WRITE);
 
-    ev_io_init(&ps->ev_r_handshake, client_handshake, client, EV_READ);
-    ev_io_init(&ps->ev_w_handshake, client_handshake, client, EV_WRITE);
-    ev_timer_init(&ps->ev_t_handshake, handshake_timeout, CONFIG->SSL_HANDSHAKE_TIMEOUT, 0.);
+	ev_io_init(&ps->ev_r_handshake, client_handshake, client, EV_READ);
+	ev_io_init(&ps->ev_w_handshake, client_handshake, client, EV_WRITE);
+	ev_timer_init(&ps->ev_t_handshake, handshake_timeout,
+	    CONFIG->SSL_HANDSHAKE_TIMEOUT, 0.);
 
-    ev_io_init(&ps->ev_proxy, client_proxy_proxy, client, EV_READ);
+	ev_io_init(&ps->ev_proxy, client_proxy_proxy, client, EV_READ);
 
-    ev_io_init(&ps->ev_w_connect, handle_connect, back, EV_WRITE);
-    ev_timer_init(&ps->ev_t_connect, connect_timeout, CONFIG->BACKEND_CONNECT_TIMEOUT, 0.);
+	ev_io_init(&ps->ev_w_connect, handle_connect, back, EV_WRITE);
+	ev_timer_init(&ps->ev_t_connect, connect_timeout,
+	    CONFIG->BACKEND_CONNECT_TIMEOUT, 0.);
 
-    ev_io_init(&ps->ev_w_clear, clear_write, back, EV_WRITE);
-    ev_io_init(&ps->ev_r_clear, clear_read, back, EV_READ);
+	ev_io_init(&ps->ev_w_clear, clear_write, back, EV_WRITE);
+	ev_io_init(&ps->ev_r_clear, clear_read, back, EV_READ);
 
-    ps->ev_r_ssl.data = ps;
-    ps->ev_w_ssl.data = ps;
-    ps->ev_r_clear.data = ps;
-    ps->ev_w_clear.data = ps;
-    ps->ev_proxy.data = ps;
-    ps->ev_w_connect.data = ps;
-    ps->ev_t_connect.data = ps;
-    ps->ev_r_handshake.data = ps;
-    ps->ev_w_handshake.data = ps;
-    ps->ev_t_handshake.data = ps;
+	ps->ev_r_ssl.data = ps;
+	ps->ev_w_ssl.data = ps;
+	ps->ev_r_clear.data = ps;
+	ps->ev_w_clear.data = ps;
+	ps->ev_proxy.data = ps;
+	ps->ev_w_connect.data = ps;
+	ps->ev_t_connect.data = ps;
+	ps->ev_r_handshake.data = ps;
+	ps->ev_w_handshake.data = ps;
+	ps->ev_t_handshake.data = ps;
 
-    /* Link back proxystate to SSL state */
-    SSL_set_app_data(ssl, ps);
+	/* Link back proxystate to SSL state */
+	SSL_set_app_data(ssl, ps);
 
-    LOGPROXY(ps, "proxy connect\n");
-    if (CONFIG->PROXY_PROXY_LINE) {
-        ev_io_start(loop, &ps->ev_proxy);
-    }
-    else {
-        start_handshake(ps, SSL_ERROR_WANT_READ); /* for client-first handshake */
-    }
+	LOGPROXY(ps, "proxy connect\n");
+	if (CONFIG->PROXY_PROXY_LINE) {
+		ev_io_start(loop, &ps->ev_proxy);
+	} else {
+		/* for client-first handshake */
+		start_handshake(ps, SSL_ERROR_WANT_READ);
+	}
 }
 
 
-static void check_ppid(struct ev_loop *loop, ev_timer *w, int revents) {
+static void
+check_ppid(struct ev_loop *loop, ev_timer *w, int revents)
+{
 	struct listen_sock *ls;
-	(void) revents;
+	(void)revents;
 	pid_t ppid = getppid();
 	if (ppid != master_pid) {
 		ERR("{core} Process %d detected parent death, "
@@ -1868,110 +1934,118 @@ static void check_ppid(struct ev_loop *loop, ev_timer *w, int revents) {
 	}
 }
 
-static void handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents) {
-    (void) revents;
-    (void) loop;
-    struct sockaddr_storage addr;
-    proxystate *ps;
-    socklen_t sl = sizeof(addr);
-    int client = accept(w->fd, (struct sockaddr *) &addr, &sl);
-    if (client == -1) {
-        switch (errno) {
-        case EMFILE:
-            ERR("{client} accept() failed; too many open files for this process\n");
-            break;
+static void
+handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents)
+{
+	(void)revents;
+	(void)loop;
+	struct sockaddr_storage addr;
+	proxystate *ps;
+	socklen_t sl = sizeof(addr);
+	int client = accept(w->fd, (struct sockaddr *) &addr, &sl);
+	if (client == -1) {
+		switch (errno) {
+		case EMFILE:
+			ERR("{client} accept() failed; too many open files for this process\n");
+			break;
 
-        case ENFILE:
-            ERR("{client} accept() failed; too many open files for this system\n");
-            break;
+		case ENFILE:
+			ERR("{client} accept() failed; too many open files for this system\n");
+			break;
 
-        default:
-            if (errno != EINTR && errno != EWOULDBLOCK && errno != EAGAIN) {
-        	SOCKERR("{client} accept() failed");
-        	exit(1);
-            }
-            break;
-        }
-        return;
-    }
+		default:
+			if (errno != EINTR && errno != EWOULDBLOCK &&
+			    errno != EAGAIN) {
+				SOCKERR("{client} accept() failed");
+				exit(1);
+			}
+			break;
+		}
+		return;
+	}
 
-    int flag = 1;
-    int ret = setsockopt(client, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag) );
-    if (ret == -1) {
-      ERR("Couldn't setsockopt on client (TCP_NODELAY): %s\n", strerror(errno));
-    }
+	int flag = 1;
+	int ret = setsockopt(client, IPPROTO_TCP, TCP_NODELAY,
+	    (char *)&flag, sizeof(flag) );
+	if (ret == -1) {
+		ERR("Couldn't setsockopt on client (TCP_NODELAY): %s\n", strerror(errno));
+	}
 #ifdef TCP_CWND
-    int cwnd = 10;
-    ret = setsockopt(client, IPPROTO_TCP, TCP_CWND, &cwnd, sizeof(cwnd));
-    if (ret == -1) {
-      ERR("Couldn't setsockopt on client (TCP_CWND): %s\n", strerror(errno));
-    }
+	int cwnd = 10;
+	ret = setsockopt(client, IPPROTO_TCP, TCP_CWND, &cwnd, sizeof(cwnd));
+	if (ret == -1) {
+		ERR("Couldn't setsockopt on client (TCP_CWND): %s\n", strerror(errno));
+	}
 #endif
 
-    setnonblocking(client);
-    settcpkeepalive(client);
+	setnonblocking(client);
+	settcpkeepalive(client);
 
-    int back = create_back_socket();
+	int back = create_back_socket();
 
-    if (back == -1) {
-        close(client);
-        ERR("{backend-socket}: %s\n", strerror(errno));
-        return;
-    }
+	if (back == -1) {
+		close(client);
+		ERR("{backend-socket}: %s\n", strerror(errno));
+		return;
+	}
 
-    SSL_CTX * ctx = (SSL_CTX *)w->data;
-    SSL *ssl = SSL_new(ctx);
-    long mode = SSL_MODE_ENABLE_PARTIAL_WRITE;
+	SSL_CTX * ctx = (SSL_CTX *)w->data;
+	SSL *ssl = SSL_new(ctx);
+	long mode = SSL_MODE_ENABLE_PARTIAL_WRITE;
 #ifdef SSL_MODE_RELEASE_BUFFERS
-    mode |= SSL_MODE_RELEASE_BUFFERS;
+	mode |= SSL_MODE_RELEASE_BUFFERS;
 #endif
-    SSL_set_mode(ssl, mode);
-    SSL_set_connect_state(ssl);
-    SSL_set_fd(ssl, back);
-    if (client_session)
-        SSL_set_session(ssl, client_session);
+	SSL_set_mode(ssl, mode);
+	SSL_set_connect_state(ssl);
+	SSL_set_fd(ssl, back);
+	if (client_session)
+		SSL_set_session(ssl, client_session);
 
-    ALLOC_OBJ(ps, PROXYSTATE_MAGIC);
+	ALLOC_OBJ(ps, PROXYSTATE_MAGIC);
 
-    ps->fd_up = client;
-    ps->fd_down = back;
-    ps->ssl = ssl;
-    ps->want_shutdown = 0;
-    ps->clear_connected = 1;
-    ps->handshaked = 0;
-    ps->renegotiation = 0;
-    ps->remote_ip = addr;
-    ringbuffer_init(&ps->ring_clear2ssl, CONFIG->RING_SLOTS, CONFIG->RING_DATA_LEN);
-    ringbuffer_init(&ps->ring_ssl2clear, CONFIG->RING_SLOTS, CONFIG->RING_DATA_LEN);
+	ps->fd_up = client;
+	ps->fd_down = back;
+	ps->ssl = ssl;
+	ps->want_shutdown = 0;
+	ps->clear_connected = 1;
+	ps->handshaked = 0;
+	ps->renegotiation = 0;
+	ps->remote_ip = addr;
+	ringbuffer_init(&ps->ring_clear2ssl, CONFIG->RING_SLOTS,
+	    CONFIG->RING_DATA_LEN);
+	ringbuffer_init(&ps->ring_ssl2clear, CONFIG->RING_SLOTS,
+	    CONFIG->RING_DATA_LEN);
 
-    /* set up events */
-    ev_io_init(&ps->ev_r_clear, clear_read, client, EV_READ);
-    ev_io_init(&ps->ev_w_clear, clear_write, client, EV_WRITE);
+	/* set up events */
+	ev_io_init(&ps->ev_r_clear, clear_read, client, EV_READ);
+	ev_io_init(&ps->ev_w_clear, clear_write, client, EV_WRITE);
 
-    ev_io_init(&ps->ev_w_connect, handle_connect, back, EV_WRITE);
-    ev_timer_init(&ps->ev_t_connect, connect_timeout, CONFIG->BACKEND_CONNECT_TIMEOUT, 0.);
+	ev_io_init(&ps->ev_w_connect, handle_connect, back, EV_WRITE);
+	ev_timer_init(&ps->ev_t_connect, connect_timeout,
+	    CONFIG->BACKEND_CONNECT_TIMEOUT, 0.);
 
-    ev_io_init(&ps->ev_r_handshake, client_handshake, back, EV_READ);
-    ev_io_init(&ps->ev_w_handshake, client_handshake, back, EV_WRITE);
-    ev_timer_init(&ps->ev_t_handshake, handshake_timeout, CONFIG->SSL_HANDSHAKE_TIMEOUT, 0.);
+	ev_io_init(&ps->ev_r_handshake, client_handshake, back, EV_READ);
+	ev_io_init(&ps->ev_w_handshake, client_handshake, back, EV_WRITE);
+	ev_timer_init(&ps->ev_t_handshake, handshake_timeout,
+	    CONFIG->SSL_HANDSHAKE_TIMEOUT, 0.);
 
-    ev_io_init(&ps->ev_w_ssl, ssl_write, back, EV_WRITE);
-    ev_io_init(&ps->ev_r_ssl, ssl_read, back, EV_READ);
+	ev_io_init(&ps->ev_w_ssl, ssl_write, back, EV_WRITE);
+	ev_io_init(&ps->ev_r_ssl, ssl_read, back, EV_READ);
 
-    ps->ev_r_ssl.data = ps;
-    ps->ev_w_ssl.data = ps;
-    ps->ev_r_clear.data = ps;
-    ps->ev_w_clear.data = ps;
-    ps->ev_w_connect.data = ps;
-    ps->ev_r_handshake.data = ps;
-    ps->ev_w_handshake.data = ps;
-    ps->ev_t_handshake.data = ps;
+	ps->ev_r_ssl.data = ps;
+	ps->ev_w_ssl.data = ps;
+	ps->ev_r_clear.data = ps;
+	ps->ev_w_clear.data = ps;
+	ps->ev_w_connect.data = ps;
+	ps->ev_r_handshake.data = ps;
+	ps->ev_w_handshake.data = ps;
+	ps->ev_t_handshake.data = ps;
 
-    /* Link back proxystate to SSL state */
-    SSL_set_app_data(ssl, ps);
+	/* Link back proxystate to SSL state */
+	SSL_set_app_data(ssl, ps);
 
-    ev_io_start(loop, &ps->ev_r_clear);
-    start_connect(ps); /* start connect */
+	ev_io_start(loop, &ps->ev_r_clear);
+	start_connect(ps); /* start connect */
 }
 
 /* Set up the child (worker) process including libev event loop, read event
@@ -2022,272 +2096,295 @@ handle_connections(void)
 	exit(1);
 }
 
-void change_root() {
-    if (chroot(CONFIG->CHROOT) == -1)
-        fail("chroot");
-    if (chdir("/"))
-        fail("chdir");
+void
+change_root()
+{
+	if (chroot(CONFIG->CHROOT) == -1)
+		fail("chroot");
+	if (chdir("/"))
+		fail("chdir");
 }
 
-void drop_privileges() {
-    if (geteuid() != 0)
-    	LOG("{core} Warning: Dropping privileges when not root may not work.\n");
+void
+drop_privileges()
+{
+	if (geteuid() != 0)
+		LOG("{core} Warning: Dropping privileges when not root may not work.\n");
 
-    if (CONFIG->UID >= 0 && setgroups(0, NULL) < 0)
-        fail("setgroups() failed");
-    if (CONFIG->GID >= 0 && setgid(CONFIG->GID) < 0)
-        fail("setgid failed");
-    if (CONFIG->UID >= 0 && setuid(CONFIG->UID) < 0)
-        fail("setuid failed");
+	if (CONFIG->UID >= 0 && setgroups(0, NULL) < 0)
+		fail("setgroups() failed");
+	if (CONFIG->GID >= 0 && setgid(CONFIG->GID) < 0)
+		fail("setgid failed");
+	if (CONFIG->UID >= 0 && setuid(CONFIG->UID) < 0)
+		fail("setuid failed");
 }
 
 
-void init_globals(void) {
-    /* backaddr */
-    struct addrinfo hints;
+void
+init_globals(void)
+{
+	/* backaddr */
+	struct addrinfo hints;
 
-    VTAILQ_INIT(&listen_socks);
-    VTAILQ_INIT(&sni_ctxs);
+	VTAILQ_INIT(&listen_socks);
+	VTAILQ_INIT(&sni_ctxs);
 
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = 0;
-    const int gai_err = getaddrinfo(CONFIG->BACK_IP, CONFIG->BACK_PORT,
-                                    &hints, &backaddr);
-    if (gai_err != 0) {
-        ERR("{getaddrinfo}: [%s]", gai_strerror(gai_err));
-        exit(1);
-    }
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = 0;
+	const int gai_err = getaddrinfo(CONFIG->BACK_IP, CONFIG->BACK_PORT,
+	    &hints, &backaddr);
+	if (gai_err != 0) {
+		ERR("{getaddrinfo}: [%s]", gai_strerror(gai_err));
+		exit(1);
+	}
 
 #ifdef USE_SHARED_CACHE
-    if (CONFIG->SHARED_CACHE) {
-        /* cache update peers addresses */
-        shcupd_peer_opt *spo = CONFIG->SHCUPD_PEERS;
-        struct addrinfo **pai = shcupd_peers;
+	if (CONFIG->SHARED_CACHE) {
+		/* cache update peers addresses */
+		shcupd_peer_opt *spo = CONFIG->SHCUPD_PEERS;
+		struct addrinfo **pai = shcupd_peers;
 
-        while (spo->ip) {
-            memset(&hints, 0, sizeof hints);
-            hints.ai_family = AF_UNSPEC;
-            hints.ai_socktype = SOCK_DGRAM;
-            hints.ai_flags = 0;
-            const int gai_err = getaddrinfo(spo->ip,
-                                spo->port ? spo->port : CONFIG->SHCUPD_PORT, &hints, pai);
-            if (gai_err != 0) {
-                ERR("{getaddrinfo}: [%s]", gai_strerror(gai_err));
-                exit(1);
-            }
-            spo++;
-            pai++;
-        }
-    }
+		while (spo->ip) {
+			memset(&hints, 0, sizeof hints);
+			hints.ai_family = AF_UNSPEC;
+			hints.ai_socktype = SOCK_DGRAM;
+			hints.ai_flags = 0;
+			const int gai_err = getaddrinfo(spo->ip,
+			    spo->port ? spo->port : CONFIG->SHCUPD_PORT,
+			    &hints, pai);
+			if (gai_err != 0) {
+				ERR("{getaddrinfo}: [%s]",
+				    gai_strerror(gai_err));
+				exit(1);
+			}
+			spo++;
+			pai++;
+		}
+	}
 #endif
-    /* child_pids */
-    if ((child_pids = calloc(CONFIG->NCORES, sizeof(pid_t))) == NULL)
-        fail("calloc");
+	/* child_pids */
+	if ((child_pids = calloc(CONFIG->NCORES, sizeof(pid_t))) == NULL)
+		fail("calloc");
 
-    if (CONFIG->SYSLOG)
-        openlog("hitch", LOG_CONS | LOG_PID | LOG_NDELAY, CONFIG->SYSLOG_FACILITY);
+	if (CONFIG->SYSLOG)
+		openlog("hitch", LOG_CONS | LOG_PID | LOG_NDELAY,
+		    CONFIG->SYSLOG_FACILITY);
 }
 
 /* Forks COUNT children starting with START_INDEX.
- * Each child's index is stored in child_num and its pid is stored in child_pids[child_num]
- * so the parent can manage it later. */
-void start_children(int start_index, int count) {
-    /* don't do anything if we're not allowed to create new children */
-    if (!create_workers) return;
+ * Each child's index is stored in child_num and its pid is stored in
+ * child_pids[child_num] so the parent can manage it later. */
+void
+start_children(int start_index, int count)
+{
+	/* don't do anything if we're not allowed to create new children */
+	if (!create_workers)
+		return;
 
-    for (child_num = start_index; child_num < start_index + count; child_num++) {
-        int pid = fork();
-        if (pid == -1) {
-            ERR("{core} fork() failed: %s; Goodbye cruel world!\n", strerror(errno));
-            exit(1);
-        }
-        else if (pid == 0) { /* child */
-            handle_connections();
-            exit(0);
-        }
-        else { /* parent. Track new child. */
-            child_pids[child_num] = pid;
-        }
-    }
+	for (child_num = start_index;
+	    child_num < start_index + count; child_num++) {
+		int pid = fork();
+		if (pid == -1) {
+			ERR("{core} fork() failed: %s; Goodbye cruel world!\n", strerror(errno));
+			exit(1);
+		} else if (pid == 0) { /* child */
+			handle_connections();
+			exit(0);
+		} else { /* parent. Track new child. */
+			child_pids[child_num] = pid;
+		}
+	}
 }
 
 /* Forks a new child to replace the old, dead, one with the given PID.*/
-void replace_child_with_pid(pid_t pid) {
-    int i;
+void
+replace_child_with_pid(pid_t pid)
+{
+	int i;
 
-    /* find old child's slot and put a new child there */
-    for (i = 0; i < CONFIG->NCORES; i++) {
-        if (child_pids[i] == pid) {
-            start_children(i, 1);
-            return;
-        }
-    }
+	/* find old child's slot and put a new child there */
+	for (i = 0; i < CONFIG->NCORES; i++) {
+		if (child_pids[i] == pid) {
+			start_children(i, 1);
+			return;
+		}
+	}
 
-    ERR("Cannot find index for child pid %d", pid);
+	ERR("Cannot find index for child pid %d", pid);
 }
 
 /* Manage status changes in child processes */
-static void do_wait(int __attribute__ ((unused)) signo) {
+static void
+do_wait(int __attribute__ ((unused)) signo)
+{
 
-    int status;
-    int pid = wait(&status);
+	int status;
+	int pid = wait(&status);
 
-    if (pid == -1) {
-        if (errno == ECHILD) {
-            ERR("{core} All children have exited! Restarting...\n");
-            start_children(0, CONFIG->NCORES);
-        }
-        else if (errno == EINTR) {
-            ERR("{core} Interrupted wait\n");
-        }
-        else {
-            fail("wait");
-        }
-    }
-    else {
-        if (WIFEXITED(status)) {
-            ERR("{core} Child %d exited with status %d. Replacing...\n", pid, WEXITSTATUS(status));
-            replace_child_with_pid(pid);
-        }
-        else if (WIFSIGNALED(status)) {
-            ERR("{core} Child %d was terminated by signal %d. Replacing...\n", pid, WTERMSIG(status));
-            replace_child_with_pid(pid);
-        }
-    }
+	if (pid == -1) {
+		if (errno == ECHILD) {
+			ERR("{core} All children have exited! Restarting...\n");
+			start_children(0, CONFIG->NCORES);
+		} else if (errno == EINTR) {
+			ERR("{core} Interrupted wait\n");
+		} else {
+			fail("wait");
+		}
+	} else {
+		if (WIFEXITED(status)) {
+			ERR("{core} Child %d exited with status %d. Replacing...\n", pid, WEXITSTATUS(status));
+			replace_child_with_pid(pid);
+		} else if (WIFSIGNALED(status)) {
+			ERR("{core} Child %d was terminated by signal %d. Replacing...\n", pid, WTERMSIG(status));
+			replace_child_with_pid(pid);
+		}
+	}
 }
 
-static void sigh_terminate (int __attribute__ ((unused)) signo) {
-    /* don't create any more children */
-    create_workers = 0;
+static void
+sigh_terminate (int __attribute__ ((unused)) signo)
+{
+	/* don't create any more children */
+	create_workers = 0;
 
-    /* are we the master? */
-    if (getpid() == master_pid) {
-        LOG("{core} Received signal %d, shutting down.\n", signo);
+	/* are we the master? */
+	if (getpid() == master_pid) {
+		LOG("{core} Received signal %d, shutting down.\n", signo);
 
-        /* kill all children */
-        int i;
-        for (i = 0; i < CONFIG->NCORES; i++) {
-            /* LOG("Stopping worker pid %d.\n", child_pids[i]); */
-            if (child_pids[i] > 1 && kill(child_pids[i], SIGTERM) != 0) {
-                ERR("{core} Unable to send SIGTERM to worker pid %d: %s\n", child_pids[i], strerror(errno));
-            }
-        }
-        /* LOG("Shutdown complete.\n"); */
-    }
+		/* kill all children */
+		int i;
+		for (i = 0; i < CONFIG->NCORES; i++) {
+			/* LOG("Stopping worker pid %d.\n", child_pids[i]); */
+			if (child_pids[i] > 1 &&
+			    kill(child_pids[i], SIGTERM) != 0) {
+				ERR("{core} Unable to send SIGTERM to worker pid %d: %s\n", child_pids[i], strerror(errno));
+			}
+		}
+		/* LOG("Shutdown complete.\n"); */
+	}
 
-    /* this is it, we're done... */
-    exit(0);
+	/* this is it, we're done... */
+	exit(0);
 }
 
-void init_signals() {
-    struct sigaction act;
+void
+init_signals()
+{
+	struct sigaction act;
 
-    sigemptyset(&act.sa_mask);
-    act.sa_flags = 0;
-    act.sa_handler = SIG_IGN;
+	sigemptyset(&act.sa_mask);
+	act.sa_flags = 0;
+	act.sa_handler = SIG_IGN;
 
-    /* Avoid getting PIPE signal when writing to a closed file descriptor */
-    if (sigaction(SIGPIPE, &act, NULL) < 0)
-        fail("sigaction - sigpipe");
+	/* Avoid getting PIPE signal when writing to a closed file descriptor */
+	if (sigaction(SIGPIPE, &act, NULL) < 0)
+		fail("sigaction - sigpipe");
 
-    /* We don't care if someone stops and starts a child process with kill (1) */
-    act.sa_flags = SA_NOCLDSTOP;
+	/* We don't care if someone stops and starts a child process with kill (1) */
+	act.sa_flags = SA_NOCLDSTOP;
+	act.sa_handler = do_wait;
 
-    act.sa_handler = do_wait;
+	/* We do care when child processes change status */
+	if (sigaction(SIGCHLD, &act, NULL) < 0)
+		fail("sigaction - sigchld");
 
-    /* We do care when child processes change status */
-    if (sigaction(SIGCHLD, &act, NULL) < 0)
-        fail("sigaction - sigchld");
-
-    /* catch INT and TERM signals */
-    act.sa_flags = 0;
-    act.sa_handler = sigh_terminate;
-    if (sigaction(SIGINT, &act, NULL) < 0) {
-        ERR("Unable to register SIGINT signal handler: %s\n", strerror(errno));
-        exit(1);
-    }
-    if (sigaction(SIGTERM, &act, NULL) < 0) {
-        ERR("Unable to register SIGTERM signal handler: %s\n", strerror(errno));
-        exit(1);
-    }
+	/* catch INT and TERM signals */
+	act.sa_flags = 0;
+	act.sa_handler = sigh_terminate;
+	if (sigaction(SIGINT, &act, NULL) < 0) {
+		ERR("Unable to register SIGINT signal handler: %s\n",
+		    strerror(errno));
+		exit(1);
+	}
+	if (sigaction(SIGTERM, &act, NULL) < 0) {
+		ERR("Unable to register SIGTERM signal handler: %s\n",
+		    strerror(errno));
+		exit(1);
+	}
 }
 
-void daemonize () {
-    if (logf == stdout || logf == stderr) {
-	logf = NULL;
-    }
+void
+daemonize()
+{
+	if (logf == stdout || logf == stderr) {
+		logf = NULL;
+	}
 
-    /* go to root directory */
-    if (chdir("/") != 0) {
-        ERR("Unable change directory to /: %s\n", strerror(errno));
-        exit(1);
-    }
+	/* go to root directory */
+	if (chdir("/") != 0) {
+		ERR("Unable change directory to /: %s\n", strerror(errno));
+		exit(1);
+	}
 
-    /* let's make some children, baby :) */
-    pid_t pid = fork();
-    if (pid < 0) {
-        ERR("Unable to daemonize: fork failed: %s\n", strerror(errno));
-        exit(1);
-    }
+	/* let's make some children, baby :) */
+	pid_t pid = fork();
+	if (pid < 0) {
+		ERR("Unable to daemonize: fork failed: %s\n", strerror(errno));
+		exit(1);
+	}
 
-    /* am i the parent? */
-    if (pid != 0) {
-        LOG("{core} Daemonized as pid %d.\n", pid);
-        exit(0);
-    }
+	/* am i the parent? */
+	if (pid != 0) {
+		LOG("{core} Daemonized as pid %d.\n", pid);
+		exit(0);
+	}
 
-    /* close standard streams */
-    fclose(stdin);
-    fclose(stdout);
-    fclose(stderr);
+	/* close standard streams */
+	fclose(stdin);
+	fclose(stdout);
+	fclose(stderr);
 
-    /* reopen standard streams to null device */
-    stdin = fopen(NULL_DEV, "r");
-    if (stdin == NULL) {
-        ERR("Unable to reopen stdin to %s: %s\n", NULL_DEV, strerror(errno));
-        exit(1);
-    }
-    stdout = fopen(NULL_DEV, "w");
-    if (stdout == NULL) {
-        ERR("Unable to reopen stdout to %s: %s\n", NULL_DEV, strerror(errno));
-        exit(1);
-    }
-    stderr = fopen(NULL_DEV, "w");
-    if (stderr == NULL) {
-        ERR("Unable to reopen stderr to %s: %s\n", NULL_DEV, strerror(errno));
-        exit(1);
-    }
+	/* reopen standard streams to null device */
+	stdin = fopen(NULL_DEV, "r");
+	if (stdin == NULL) {
+		ERR("Unable to reopen stdin to %s: %s\n", NULL_DEV, strerror(errno));
+		exit(1);
+	}
+	stdout = fopen(NULL_DEV, "w");
+	if (stdout == NULL) {
+		ERR("Unable to reopen stdout to %s: %s\n", NULL_DEV, strerror(errno));
+		exit(1);
+	}
+	stderr = fopen(NULL_DEV, "w");
+	if (stderr == NULL) {
+		ERR("Unable to reopen stderr to %s: %s\n", NULL_DEV, strerror(errno));
+		exit(1);
+	}
 
-    /* this is child, the new master */
-    pid_t s = setsid();
-    if (s < 0) {
-        ERR("Unable to create new session, setsid(2) failed: %s :: %d\n", strerror(errno), s);
-        exit(1);
-    }
+	/* this is child, the new master */
+	pid_t s = setsid();
+	if (s < 0) {
+		ERR("Unable to create new session, setsid(2) failed: %s :: %d\n", strerror(errno), s);
+		exit(1);
+	}
 
-    LOG("Successfully daemonized as pid %d.\n", getpid());
+	LOG("Successfully daemonized as pid %d.\n", getpid());
 }
 
-void openssl_check_version() {
-    /* detect OpenSSL version in runtime */
-    openssl_version = SSLeay();
+void
+openssl_check_version()
+{
+	/* detect OpenSSL version in runtime */
+	openssl_version = SSLeay();
 
-    /* check if we're running the same openssl that we were */
-    /* compiled with */
-    if ((openssl_version ^ OPENSSL_VERSION_NUMBER) & ~0xff0L) {
-        ERR(
-            "WARNING: {core} OpenSSL version mismatch; hitch was compiled with %lx, now using %lx.\n",
-            (unsigned long int) OPENSSL_VERSION_NUMBER,
-            (unsigned long int) openssl_version
-        );
-        /* now what? exit now? */
-        /* exit(1); */
-    }
+	/* check if we're running the same openssl that we were */
+	/* compiled with */
+	if ((openssl_version ^ OPENSSL_VERSION_NUMBER) & ~0xff0L) {
+		ERR(
+			"WARNING: {core} OpenSSL version mismatch; hitch was compiled with %lx, now using %lx.\n",
+			(unsigned long int) OPENSSL_VERSION_NUMBER,
+			(unsigned long int) openssl_version
+		);
+		/* now what? exit now? */
+		/* exit(1); */
+	}
 
-    LOG("{core} Using OpenSSL version %lx.\n", (unsigned long int) openssl_version);
+	LOG("{core} Using OpenSSL version %lx.\n",
+	    (unsigned long int)openssl_version);
 }
+
 
 static void
 remove_pfh(void)
@@ -2299,99 +2396,100 @@ remove_pfh(void)
 
 /* Process command line args, create the bound socket,
  * spawn child (worker) processes, and respawn if any die */
-int main(int argc, char **argv) {
-    // initialize configuration
-    struct front_arg *fa;
-    CONFIG = config_new();
+int
+main(int argc, char **argv)
+{
+	// initialize configuration
+	struct front_arg *fa;
+	CONFIG = config_new();
 
-    if (CONFIG->LOG_FILENAME) {
-	FILE* f;
-	if ((f = fopen(CONFIG->LOG_FILENAME, "a")) == NULL) {
-	    ERR("FATAL: Unable to open log file: %s: %s\n", CONFIG->LOG_FILENAME, strerror(errno));
-	    exit(2);
+	if (CONFIG->LOG_FILENAME) {
+		FILE* f;
+		if ((f = fopen(CONFIG->LOG_FILENAME, "a")) == NULL) {
+			ERR("FATAL: Unable to open log file: %s: %s\n", CONFIG->LOG_FILENAME, strerror(errno));
+			exit(2);
+		}
+		logf = f;
+		if (CONFIG->UID >=0 || CONFIG->GID >= 0) {
+			AZ(fchown(fileno(logf), CONFIG->UID, CONFIG->GID));
+		}
+		AZ(fstat(fileno(logf), &logf_st));
+		logf_check_t = time(NULL);
+	} else {
+		logf = CONFIG->QUIET ? stderr : stdout;
 	}
-	logf = f;
-	if (CONFIG->UID >=0 || CONFIG->GID >= 0) {
-	    AZ(fchown(fileno(logf), CONFIG->UID, CONFIG->GID));
-	}
-	AZ(fstat(fileno(logf), &logf_st));
-	logf_check_t = time(NULL);
-    } else {
-	logf = CONFIG->QUIET ? stderr : stdout;
-    }
-    setbuf(logf, NULL);
+	setbuf(logf, NULL);
 
-    // parse command line
-    config_parse_cli(argc, argv, CONFIG);
+	// parse command line
+	config_parse_cli(argc, argv, CONFIG);
 
-    create_workers = 1;
+	create_workers = 1;
 
-    openssl_check_version();
+	openssl_check_version();
 
-    init_signals();
+	init_signals();
 
-    init_globals();
+	init_globals();
 
-    VTAILQ_FOREACH(fa, &CONFIG->LISTEN_ARGS, list)
-	create_listen_sock(fa);
+	VTAILQ_FOREACH(fa, &CONFIG->LISTEN_ARGS, list)
+		create_listen_sock(fa);
 
 #ifdef USE_SHARED_CACHE
-    if (CONFIG->SHCUPD_PORT) {
-        /* create socket to send(children) and
-               receive(parent) cache updates */
-        shcupd_socket = create_shcupd_socket();
-    }
+	if (CONFIG->SHCUPD_PORT) {
+		/* create socket to send(children) and
+		   receive(parent) cache updates */
+		shcupd_socket = create_shcupd_socket();
+	}
 #endif /* USE_SHARED_CACHE */
 
-    /* load certificates, pass to handle_connections */
-    init_openssl();
+	/* load certificates, pass to handle_connections */
+	init_openssl();
 
-    if (CONFIG->CHROOT && CONFIG->CHROOT[0])
-        change_root();
+	if (CONFIG->CHROOT && CONFIG->CHROOT[0])
+		change_root();
 
-    if (CONFIG->UID >= 0 || CONFIG->GID >= 0)
-        drop_privileges();
+	if (CONFIG->UID >= 0 || CONFIG->GID >= 0)
+		drop_privileges();
 
-    /* should we daemonize ?*/
-    if (CONFIG->DAEMONIZE) {
-        /* become a daemon */
-        daemonize();
-    }
+	/* should we daemonize ?*/
+	if (CONFIG->DAEMONIZE) {
+		/* become a daemon */
+		daemonize();
+	}
 
-    master_pid = getpid();
+	master_pid = getpid();
 
-    if (CONFIG->PIDFILE) {
-	    pfh = VPF_Open(CONFIG->PIDFILE, 0644, NULL);
-	    if (pfh == NULL) {
-		    ERR("FATAL: Could not open pid (-p) file (%s): %s\n",
+	if (CONFIG->PIDFILE) {
+		pfh = VPF_Open(CONFIG->PIDFILE, 0644, NULL);
+		if (pfh == NULL) {
+			ERR("FATAL: Could not open pid (-p) file (%s): %s\n",
 			CONFIG->PIDFILE, strerror(errno));
-		    exit(1);
-	    }
+			exit(1);
+		}
 
-	    AZ(VPF_Write(pfh));
-	    atexit(remove_pfh);
-    }
+		AZ(VPF_Write(pfh));
+		atexit(remove_pfh);
+	}
 
-    start_children(0, CONFIG->NCORES);
+	start_children(0, CONFIG->NCORES);
 
 #ifdef USE_SHARED_CACHE
-    if (CONFIG->SHCUPD_PORT) {
-        /* start event loop to receive cache updates */
+	if (CONFIG->SHCUPD_PORT) {
+		/* start event loop to receive cache updates */
 
-        loop = ev_default_loop(EVFLAG_AUTO);
-
-        ev_io_init(&shcupd_listener, handle_shcupd, shcupd_socket, EV_READ);
-        ev_io_start(loop, &shcupd_listener);
-
-        ev_loop(loop, 0);
-    }
+		loop = ev_default_loop(EVFLAG_AUTO);
+		ev_io_init(&shcupd_listener, handle_shcupd, shcupd_socket,
+		    EV_READ);
+		ev_io_start(loop, &shcupd_listener);
+		ev_loop(loop, 0);
+	}
 #endif /* USE_SHARED_CACHE */
 
-    for (;;) {
-        /* Sleep and let the children work.
-         * Parent will be woken up if a signal arrives */
-        pause();
-    }
+	for (;;) {
+		/* Sleep and let the children work.
+		 * Parent will be woken up if a signal arrives */
+		pause();
+	}
 
-    exit(0); /* just a formality; we never get here */
+	exit(0); /* just a formality; we never get here */
 }
