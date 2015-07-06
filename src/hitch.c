@@ -2,29 +2,36 @@
   * Copyright 2015 Varnish Software AB
   * Copyright 2011 Bump Technologies, Inc. All rights reserved.
   *
-  * Redistribution and use in source and binary forms, with or without modification, are
-  * permitted provided that the following conditions are met:
+  * Redistribution and use in source and binary forms, with or without
+  * modification, are permitted provided that the following conditions
+  * are met:
   *
-  *    1. Redistributions of source code must retain the above copyright notice, this list of
-  *       conditions and the following disclaimer.
+  *    1. Redistributions of source code must retain the above
+  *       copyright notice, this list of conditions and the following
+  *       disclaimer.
   *
-  *    2. Redistributions in binary form must reproduce the above copyright notice, this list
-  *       of conditions and the following disclaimer in the documentation and/or other materials
+  *    2. Redistributions in binary form must reproduce the above
+  *       copyright notice, this list of conditions and the following
+  *       disclaimer in the documentation and/or other materials
   *       provided with the distribution.
   *
-  * THIS SOFTWARE IS PROVIDED BY BUMP TECHNOLOGIES, INC. ``AS IS'' AND ANY EXPRESS OR IMPLIED
-  * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
-  * FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL BUMP TECHNOLOGIES, INC. OR
-  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-  * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-  * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  * THIS SOFTWARE IS PROVIDED BY BUMP TECHNOLOGIES, INC. ``AS IS'' AND
+  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+  * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+  * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL BUMP
+  * TECHNOLOGIES, INC. OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+  * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+  * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+  * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   *
-  * The views and conclusions contained in the software and documentation are those of the
-  * authors and should not be interpreted as representing official policies, either expressed
-  * or implied, of Bump Technologies, Inc.
+  * The views and conclusions contained in the software and
+  * documentation are those of the authors and should not be
+  * interpreted as representing official policies, either expressed or
+  * implied, of Bump Technologies, Inc.
   *
   **/
 
@@ -148,9 +155,9 @@ static char tcp_proxy_line[128] = "";
 /* What agent/state requests the shutdown--for proper half-closed
  * handling */
 typedef enum _SHUTDOWN_REQUESTOR {
-    SHUTDOWN_HARD,
-    SHUTDOWN_CLEAR,
-    SHUTDOWN_SSL
+	SHUTDOWN_HARD,
+	SHUTDOWN_CLEAR,
+	SHUTDOWN_SSL
 } SHUTDOWN_REQUESTOR;
 
 #ifndef OPENSSL_NO_TLSEXT
@@ -176,30 +183,31 @@ static struct ctx_list_head sni_ctxs;
 
 
 union ha_proxy_v2_addr {
-    struct {        /* for TCP/UDP over IPv4, len = 12 */
-        uint32_t src_addr;
-        uint32_t dst_addr;
-        uint16_t src_port;
-        uint16_t dst_port;
-    } ipv4;
-    struct {        /* for TCP/UDP over IPv6, len = 36 */
-         uint8_t  src_addr[16];
-         uint8_t  dst_addr[16];
-         uint16_t src_port;
-         uint16_t dst_port;
-    } ipv6;
-    struct {        /* for AF_UNIX sockets, len = 216 */
-         uint8_t src_addr[108];
-         uint8_t dst_addr[108];
-    } unix;
+	struct {        /* for TCP/UDP over IPv4, len = 12 */
+		uint32_t src_addr;
+		uint32_t dst_addr;
+		uint16_t src_port;
+		uint16_t dst_port;
+	} ipv4;
+	struct {        /* for TCP/UDP over IPv6, len = 36 */
+		uint8_t  src_addr[16];
+		uint8_t  dst_addr[16];
+		uint16_t src_port;
+		uint16_t dst_port;
+	} ipv6;
+	struct {        /* for AF_UNIX sockets, len = 216 */
+		uint8_t src_addr[108];
+		uint8_t dst_addr[108];
+	} unix;
 };
 
 struct ha_proxy_v2_hdr {
-	uint8_t sig[12];
-	uint8_t ver_cmd;
-	uint8_t fam;
-	uint16_t len;	/* number of following bytes part of the header */
-	union ha_proxy_v2_addr addr;
+	uint8_t			sig[12];
+	uint8_t			ver_cmd;
+	uint8_t			fam;
+	uint16_t		len;	/* number of following bytes
+					 * part of the header */
+	union ha_proxy_v2_addr	addr;
 };
 
 /*
@@ -208,40 +216,50 @@ struct ha_proxy_v2_hdr {
  * All state associated with one proxied connection
  */
 typedef struct proxystate {
-	unsigned magic;
-#define PROXYSTATE_MAGIC 0xcf877ed9
-	ringbuffer ring_ssl2clear;          /* Pushing bytes from secure to clear stream */
-	ringbuffer ring_clear2ssl;          /* Pushing bytes from clear to secure stream */
+	unsigned		magic;
+#define PROXYSTATE_MAGIC	0xcf877ed9
+	ringbuffer		ring_ssl2clear;	/* Pushing bytes from
+						 * secure to clear
+						 * stream */
+	ringbuffer		ring_clear2ssl;	/* Pushing bytes from
+						 * clear to secure
+						 * stream */
+	ev_io 			ev_r_ssl;	/* Secure stream write event */
+	ev_io			ev_w_ssl;	/* Secure stream read event */
+	ev_io			ev_r_handshake;	/* Secure stream handshake
+						 * write event */
+	ev_io			ev_w_handshake;	/* Secure stream handshake
+						 * read event */
+	ev_timer		ev_t_handshake;	/* handshake timer */
+	ev_io			ev_w_connect;	/* Backend connect event */
+	ev_timer		ev_t_connect;	/* backend connect timer */
 
-	ev_io ev_r_ssl;                     /* Secure stream write event */
-	ev_io ev_w_ssl;                     /* Secure stream read event */
+	ev_io			ev_r_clear;	/* Clear stream write event */
+	ev_io			ev_w_clear;	/* Clear stream read event */
+	ev_io			ev_proxy;	/* proxy read event */
 
-	ev_io ev_r_handshake;               /* Secure stream handshake write event */
-	ev_io ev_w_handshake;               /* Secure stream handshake read event */
-	ev_timer ev_t_handshake; /* handshake timer */
+	int			fd_up;		/* Upstream (client) socket */
+	int			fd_down;	/* Downstream (backend)
+						 * socket */
 
-	ev_io ev_w_connect;                 /* Backend connect event */
-	ev_timer ev_t_connect; /* backend connect timer */
+	int			want_shutdown:1; /* Connection is
+						  * half-shutdown */
+	int			handshaked:1;	/* Initial handshake happened */
+	int			clear_connected:1; /* Clear stream is
+						    * connected */
+	int			renegotiation:1; /* Renegotation is
+						  * occuring */
 
-	ev_io ev_r_clear;                   /* Clear stream write event */
-	ev_io ev_w_clear;                   /* Clear stream read event */
-	ev_io ev_proxy;                     /* proxy read event */
+	SSL			*ssl;		/* OpenSSL SSL state */
 
-	int fd_up;                          /* Upstream (client) socket */
-	int fd_down;                        /* Downstream (backend) socket */
-
-	int want_shutdown:1;                /* Connection is half-shutdown */
-	int handshaked:1;                   /* Initial handshake happened */
-	int clear_connected:1;              /* Clear stream is connected  */
-	int renegotiation:1;                /* Renegotation is occuring */
-
-	SSL *ssl;                           /* OpenSSL SSL state */
-
-	struct sockaddr_storage remote_ip;  /* Remote ip returned from `accept` */
-	int connect_port;	/* local port for connection */
+	struct sockaddr_storage	remote_ip;	/* Remote ip returned
+						 * from `accept` */
+	int			connect_port;	/* local port for connection */
 } proxystate;
 
-static void VWLOG (int level, const char *fmt, va_list ap) {
+static void
+VWLOG (int level, const char *fmt, va_list ap)
+{
 	if (logf) {
 		struct timeval tv;
 		struct tm tm;
@@ -250,7 +268,8 @@ static void VWLOG (int level, const char *fmt, va_list ap) {
 		va_list ap1;
 
 		gettimeofday(&tv,NULL);
-		if (logf != stdout && logf != stderr && tv.tv_sec >= logf_check_t+LOG_REOPEN_INTERVAL) {
+		if (logf != stdout && logf != stderr
+		    && tv.tv_sec >= logf_check_t+LOG_REOPEN_INTERVAL) {
 			struct stat st;
 			if (stat(CONFIG->LOG_FILENAME, &st) < 0
 			    || st.st_dev != logf_st.st_dev
@@ -258,7 +277,8 @@ static void VWLOG (int level, const char *fmt, va_list ap) {
 				fclose(logf);
 
 				logf = fopen(CONFIG->LOG_FILENAME, "a");
-				if (logf == NULL || fstat(fileno(logf), &logf_st) < 0)
+				if (logf == NULL
+				    || fstat(fileno(logf), &logf_st) < 0)
 					memset(&logf_st, 0, sizeof(logf_st));
 			}
 			logf_check_t = tv.tv_sec;
@@ -266,7 +286,8 @@ static void VWLOG (int level, const char *fmt, va_list ap) {
 
 		localtime_r(&tv.tv_sec, &tm);
 		n = strftime(buf, sizeof(buf), "%Y%m%dT%H%M%S", &tm);
-		sprintf(buf+n, ".%06d [%5d] %s", (int)tv.tv_usec, getpid(), fmt);
+		sprintf(buf + n, ".%06d [%5d] %s",
+		    (int) tv.tv_usec, getpid(), fmt);
 		va_copy(ap1, ap);
 		vfprintf(logf, buf, ap1);
 		va_end(ap1);
@@ -279,11 +300,11 @@ static void VWLOG (int level, const char *fmt, va_list ap) {
 static void
 WLOG (int level, const char *fmt, ...)
 {
-    va_list ap;
+	va_list ap;
 
-    va_start(ap, fmt);
-    VWLOG(level, fmt, ap);
-    va_end(ap);
+	va_start(ap, fmt);
+	VWLOG(level, fmt, ap);
+	va_end(ap);
 }
 
 #define LOG(...)							\
@@ -489,14 +510,16 @@ handle_shcupd(struct ev_loop *loop, ev_io *w, int revents)
 		if (memcmp(msg+r, hash, hash_len))
 			continue;
 
-		/* msg len must be greater than 1 Byte of data + encdate length */
+		/* msg len must be greater than 1 Byte of data +
+		 * encdate length */
 		if (r < (int)(1+sizeof(uint32_t)))
 			continue;
 
 		/* drop too unsync updates */
 		r -= sizeof(uint32_t);
 		encdate = *((uint32_t *)&msg[r]);
-		if (!(abs((int)(int32_t)now-ntohl(encdate)) < SSL_CTX_get_timeout(default_ctx)))
+		if (!(abs((int)(int32_t)now - ntohl(encdate))
+			< SSL_CTX_get_timeout(default_ctx)))
 			continue;
 
 		shctx_sess_add(msg, r, now);
@@ -602,7 +625,9 @@ create_shcupd_socket()
 				struct ifreq ifr;
 				memset(&ifr, 0, sizeof(ifr));
 				if (strlen(CONFIG->SHCUPD_MCASTIF) > IFNAMSIZ) {
-					ERR("Error iface name is too long [%s]\n",CONFIG->SHCUPD_MCASTIF);
+					ERR("Error iface name is too "
+					    "long [%s]\n",
+					    CONFIG->SHCUPD_MCASTIF);
 					exit(1);
 				}
 
@@ -615,10 +640,11 @@ create_shcupd_socket()
 				mreqn.imr_ifindex = ifr.ifr_ifindex;
 			} else if (strchr(CONFIG->SHCUPD_MCASTIF,'.')) {
 				/* appears to be an ipv4 address */
-				mreqn.imr_address.s_addr = inet_addr(CONFIG->SHCUPD_MCASTIF);
+				mreqn.imr_address.s_addr =
+				    inet_addr(CONFIG->SHCUPD_MCASTIF);
 			} else {
 				/* appears to be an iface index */
-				mreqn.imr_ifindex = \
+				mreqn.imr_ifindex =
 				    atoi(CONFIG->SHCUPD_MCASTIF);
 			}
 		}
@@ -633,7 +659,7 @@ create_shcupd_socket()
 		} else { /* this is a multicast address */
 			unsigned char loop = 0;
 			if (setsockopt(s, IPPROTO_IP, IP_MULTICAST_LOOP,
-			    &loop, sizeof(loop)) < 0) {
+				&loop, sizeof(loop)) < 0) {
 				fail("{setsockopt: IP_MULTICAST_LOOP}");
 			}
 		}
@@ -671,7 +697,9 @@ create_shcupd_socket()
 
 				memset(&ifr, 0, sizeof(ifr));
 				if (strlen(CONFIG->SHCUPD_MCASTIF) > IFNAMSIZ) {
-					ERR("Error iface name is too long [%s]\n", CONFIG->SHCUPD_MCASTIF);
+					ERR("Error iface name is too "
+					    "long [%s]\n",
+					    CONFIG->SHCUPD_MCASTIF);
 					exit(1);
 				}
 
@@ -769,7 +797,9 @@ sni_match(const struct ctx_list *cl, const char *srvname)
  * Switch the context of the current SSL object to the most appropriate one
  * based on the SNI header
  */
-int sni_switch_ctx(SSL *ssl, int *al, void *data) {
+static int
+sni_switch_ctx(SSL *ssl, int *al, void *data)
+{
 	(void)data;
 	(void)al;
 	const char *servername;
@@ -996,7 +1026,7 @@ init_openssl(void)
 	}
 
 	for (ls = VTAILQ_FIRST(&listen_socks); ls != NULL;
-	     ls = VTAILQ_NEXT(ls, list)) {
+	    ls = VTAILQ_NEXT(ls, list)) {
 		if (ls->cert) {
 			ctx = find_ctx(ls->cert);
 			if (ctx == NULL) {
@@ -1062,10 +1092,12 @@ create_listen_sock(const struct front_arg *fa)
 			fail("{socket: main}");
 
 		int t = 1;
-		if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(int)) < 0)
+		if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(int))
+		    < 0)
 			fail("{setsockopt-reuseaddr}");
 #ifdef SO_REUSEPORT
-		if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &t, sizeof(int)) < 0)
+		if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &t, sizeof(int))
+		    < 0)
 			fail("{setsockopt-reuseport}");
 #endif
 		setnonblocking(s);
@@ -1139,7 +1171,8 @@ create_back_socket()
 	int ret = setsockopt(s, IPPROTO_TCP, TCP_NODELAY,
 	    (char *)&flag,sizeof(flag));
 	if (ret == -1)
-		ERR("Couldn't setsockopt to backend (TCP_NODELAY): %s\n", strerror(errno));
+		ERR("Couldn't setsockopt to backend (TCP_NODELAY): %s\n",
+		    strerror(errno));
 	setnonblocking(s);
 	return s;
 }
@@ -1339,7 +1372,8 @@ handle_connect(struct ev_loop *loop, ev_io *w, int revents)
 
 			/* if outgoing buffer is not empty */
 			if (!ringbuffer_is_empty(&ps->ring_ssl2clear))
-				// not safe.. we want to resume stream even during half-closed
+				// not safe.. we want to resume stream
+				// even during half-closed
 				ev_io_start(loop, &ps->ev_w_clear);
 		} else {
 			/* Clear side already connected so connect is on
@@ -1636,13 +1670,17 @@ client_handshake(struct ev_loop *loop, ev_io *w, int revents)
 			ev_io_stop(loop, &ps->ev_r_handshake);
 			ev_io_start(loop, &ps->ev_w_handshake);
 		} else if (err == SSL_ERROR_ZERO_RETURN) {
-			LOG("{%s} Connection closed (in handshake)\n", w->fd == ps->fd_up ? "client" : "backend");
+			LOG("{%s} Connection closed (in handshake)\n",
+			    w->fd == ps->fd_up ? "client" : "backend");
 			shutdown_proxy(ps, SHUTDOWN_SSL);
 		} else {
 			if (err == SSL_ERROR_SSL) {
 				log_ssl_error(ps, "Handshake failure");
 			} else {
-				LOG("{%s} Unexpected SSL error (in handshake): %d\n", w->fd == ps->fd_up ? "client" : "backend", err);
+				LOG("{%s} Unexpected SSL error "
+				    "(in handshake): %d\n",
+				    w->fd == ps->fd_up ? "client" : "backend",
+				    err);
 			}
 			shutdown_proxy(ps, SHUTDOWN_SSL);
 		}
@@ -1660,21 +1698,23 @@ handshake_timeout(EV_P_ ev_timer *w, int revents)
 	shutdown_proxy(ps, SHUTDOWN_HARD);
 }
 
-#define SSLERR(ps,which,log) \
-switch (err) { \
-case SSL_ERROR_ZERO_RETURN: \
-log(ps,"Connection closed by " which "\n"); \
-    break; \
-case SSL_ERROR_SYSCALL: \
-    if (errno == 0) {\
-        log(ps,"Connection closed by " which "\n"); \
-    } else {\
-	log(ps,"SSL socket error (" which "): %s\n",strerror(errno)); \
-    }\
-    break; \
-default: \
-    log(ps,"{" which "} Unexpected SSL_read error (" which "): %d\n",err); \
-}
+#define SSLERR(ps, which, log)						\
+	switch (err) {							\
+	case SSL_ERROR_ZERO_RETURN:					\
+		log(ps,"Connection closed by " which "\n");		\
+		break;							\
+	case SSL_ERROR_SYSCALL:						\
+		if (errno == 0) {					\
+			log(ps,"Connection closed by " which "\n");	\
+		} else {						\
+			log(ps,"SSL socket error (" which "): %s\n",	\
+			    strerror(errno));				\
+		}							\
+		break;							\
+	default:							\
+		log(ps,"{" which "} Unexpected SSL_read error ("	\
+		    which "): %d\n", err);				\
+	}
 
 /* Handle a socket error condition passed to us from OpenSSL */
 static void
@@ -1735,9 +1775,12 @@ ssl_read(struct ev_loop *loop, ev_io *w, int revents)
 			if (err == SSL_ERROR_SSL) {
 				log_ssl_error(ps, "SSL_read error");
 			} else {
-				LOG("{%s} SSL_read error: %d\n", w->fd == ps->fd_up ? "client" : "backend", err);
+				LOG("{%s} SSL_read error: %d\n",
+				    w->fd == ps->fd_up ? "client" : "backend",
+				    err);
 			}
-			handle_fatal_ssl_error(ps, err, w->fd == ps->fd_up ? 0 : 1);
+			handle_fatal_ssl_error(ps, err,
+			    w->fd == ps->fd_up ? 0 : 1);
 		}
 	}
 }
@@ -1761,7 +1804,8 @@ ssl_write(struct ev_loop *loop, ev_io *w, int revents)
 		if (t == sz) {
 			ringbuffer_read_pop(&ps->ring_clear2ssl);
 			if (ps->clear_connected)
-				safe_enable_io(ps, &ps->ev_r_clear); // can be re-enabled b/c we've popped
+				// can be re-enabled b/c we've popped
+				safe_enable_io(ps, &ps->ev_r_clear);
 			if (ringbuffer_is_empty(&ps->ring_clear2ssl)) {
 				if (ps->want_shutdown) {
 					shutdown_proxy(ps, SHUTDOWN_HARD);
@@ -1782,9 +1826,12 @@ ssl_write(struct ev_loop *loop, ev_io *w, int revents)
 			if (err == SSL_ERROR_SSL) {
 				log_ssl_error(ps, "SSL_write error");
 			} else {
-				LOG("{%s} SSL_write error: %d\n", w->fd == ps->fd_up ? "client" : "backend", err);
+				LOG("{%s} SSL_write error: %d\n",
+				    w->fd == ps->fd_up ? "client" : "backend",
+				    err);
 			}
-			handle_fatal_ssl_error(ps, err,  w->fd == ps->fd_up ? 0 : 1);
+			handle_fatal_ssl_error(ps, err,
+			    w->fd == ps->fd_up ? 0 : 1);
 		}
 	}
 }
@@ -1805,11 +1852,13 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 	if (client == -1) {
 		switch (errno) {
 		case EMFILE:
-			ERR("{client} accept() failed; too many open files for this process\n");
+			ERR("{client} accept() failed; "
+			    "too many open files for this process\n");
 			break;
 
 		case ENFILE:
-			ERR("{client} accept() failed; too many open files for this system\n");
+			ERR("{client} accept() failed; "
+			    "too many open files for this system\n");
 			break;
 
 		default:
@@ -1840,7 +1889,6 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 	settcpkeepalive(client);
 
 	int back = create_back_socket();
-
 	if (back == -1) {
 		close(client);
 		ERR("{backend-socket}: %s\n", strerror(errno));
@@ -1946,11 +1994,13 @@ handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents)
 	if (client == -1) {
 		switch (errno) {
 		case EMFILE:
-			ERR("{client} accept() failed; too many open files for this process\n");
+			ERR("{client} accept() failed; "
+			    "too many open files for this process\n");
 			break;
 
 		case ENFILE:
-			ERR("{client} accept() failed; too many open files for this system\n");
+			ERR("{client} accept() failed; "
+			    "too many open files for this system\n");
 			break;
 
 		default:
@@ -1968,13 +2018,15 @@ handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents)
 	int ret = setsockopt(client, IPPROTO_TCP, TCP_NODELAY,
 	    (char *)&flag, sizeof(flag) );
 	if (ret == -1) {
-		ERR("Couldn't setsockopt on client (TCP_NODELAY): %s\n", strerror(errno));
+		ERR("Couldn't setsockopt on client (TCP_NODELAY): %s\n",
+		    strerror(errno));
 	}
 #ifdef TCP_CWND
 	int cwnd = 10;
 	ret = setsockopt(client, IPPROTO_TCP, TCP_CWND, &cwnd, sizeof(cwnd));
 	if (ret == -1) {
-		ERR("Couldn't setsockopt on client (TCP_CWND): %s\n", strerror(errno));
+		ERR("Couldn't setsockopt on client (TCP_CWND): %s\n",
+		    strerror(errno));
 	}
 #endif
 
@@ -1982,7 +2034,6 @@ handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents)
 	settcpkeepalive(client);
 
 	int back = create_back_socket();
-
 	if (back == -1) {
 		close(client);
 		ERR("{backend-socket}: %s\n", strerror(errno));
@@ -2109,7 +2160,8 @@ void
 drop_privileges()
 {
 	if (geteuid() != 0)
-		LOG("{core} Warning: Dropping privileges when not root may not work.\n");
+		LOG("{core} Warning: Dropping privileges when "
+		    "not root may not work.\n");
 
 	if (CONFIG->UID >= 0 && setgroups(0, NULL) < 0)
 		fail("setgroups() failed");
@@ -2187,7 +2239,8 @@ start_children(int start_index, int count)
 	    child_num < start_index + count; child_num++) {
 		int pid = fork();
 		if (pid == -1) {
-			ERR("{core} fork() failed: %s; Goodbye cruel world!\n", strerror(errno));
+			ERR("{core} fork() failed: %s; Goodbye cruel world!\n",
+			    strerror(errno));
 			exit(1);
 		} else if (pid == 0) { /* child */
 			handle_connections();
@@ -2234,10 +2287,12 @@ do_wait(int __attribute__ ((unused)) signo)
 		}
 	} else {
 		if (WIFEXITED(status)) {
-			ERR("{core} Child %d exited with status %d. Replacing...\n", pid, WEXITSTATUS(status));
+			ERR("{core} Child %d exited with status %d. "
+			    "Replacing...\n", pid, WEXITSTATUS(status));
 			replace_child_with_pid(pid);
 		} else if (WIFSIGNALED(status)) {
-			ERR("{core} Child %d was terminated by signal %d. Replacing...\n", pid, WTERMSIG(status));
+			ERR("{core} Child %d was terminated by signal %d. "
+			    "Replacing...\n", pid, WTERMSIG(status));
 			replace_child_with_pid(pid);
 		}
 	}
@@ -2259,7 +2314,9 @@ sigh_terminate (int __attribute__ ((unused)) signo)
 			/* LOG("Stopping worker pid %d.\n", child_pids[i]); */
 			if (child_pids[i] > 1 &&
 			    kill(child_pids[i], SIGTERM) != 0) {
-				ERR("{core} Unable to send SIGTERM to worker pid %d: %s\n", child_pids[i], strerror(errno));
+				ERR("{core} Unable to send SIGTERM to worker "
+				    "pid %d: %s\n", child_pids[i],
+				    strerror(errno));
 			}
 		}
 		/* LOG("Shutdown complete.\n"); */
@@ -2269,7 +2326,7 @@ sigh_terminate (int __attribute__ ((unused)) signo)
 	exit(0);
 }
 
-void
+static void
 init_signals()
 {
 	struct sigaction act;
@@ -2282,7 +2339,8 @@ init_signals()
 	if (sigaction(SIGPIPE, &act, NULL) < 0)
 		fail("sigaction - sigpipe");
 
-	/* We don't care if someone stops and starts a child process with kill (1) */
+	/* We don't care if someone stops and starts a child process
+	 * with kill (1) */
 	act.sa_flags = SA_NOCLDSTOP;
 	act.sa_handler = do_wait;
 
@@ -2305,7 +2363,7 @@ init_signals()
 	}
 }
 
-void
+static void
 daemonize()
 {
 	if (logf == stdout || logf == stderr) {
@@ -2339,31 +2397,35 @@ daemonize()
 	/* reopen standard streams to null device */
 	stdin = fopen(NULL_DEV, "r");
 	if (stdin == NULL) {
-		ERR("Unable to reopen stdin to %s: %s\n", NULL_DEV, strerror(errno));
+		ERR("Unable to reopen stdin to %s: %s\n",
+		    NULL_DEV, strerror(errno));
 		exit(1);
 	}
 	stdout = fopen(NULL_DEV, "w");
 	if (stdout == NULL) {
-		ERR("Unable to reopen stdout to %s: %s\n", NULL_DEV, strerror(errno));
+		ERR("Unable to reopen stdout to %s: %s\n",
+		    NULL_DEV, strerror(errno));
 		exit(1);
 	}
 	stderr = fopen(NULL_DEV, "w");
 	if (stderr == NULL) {
-		ERR("Unable to reopen stderr to %s: %s\n", NULL_DEV, strerror(errno));
+		ERR("Unable to reopen stderr to %s: %s\n",
+		    NULL_DEV, strerror(errno));
 		exit(1);
 	}
 
 	/* this is child, the new master */
 	pid_t s = setsid();
 	if (s < 0) {
-		ERR("Unable to create new session, setsid(2) failed: %s :: %d\n", strerror(errno), s);
+		ERR("Unable to create new session, setsid(2) failed: "
+		    "%s :: %d\n", strerror(errno), s);
 		exit(1);
 	}
 
 	LOG("Successfully daemonized as pid %d.\n", getpid());
 }
 
-void
+static void
 openssl_check_version()
 {
 	/* detect OpenSSL version in runtime */
@@ -2373,7 +2435,8 @@ openssl_check_version()
 	/* compiled with */
 	if ((openssl_version ^ OPENSSL_VERSION_NUMBER) & ~0xff0L) {
 		ERR(
-			"WARNING: {core} OpenSSL version mismatch; hitch was compiled with %lx, now using %lx.\n",
+			"WARNING: {core} OpenSSL version mismatch; "
+			    "hitch was compiled with %lx, now using %lx.\n",
 			(unsigned long int) OPENSSL_VERSION_NUMBER,
 			(unsigned long int) openssl_version
 		);
@@ -2406,7 +2469,8 @@ main(int argc, char **argv)
 	if (CONFIG->LOG_FILENAME) {
 		FILE* f;
 		if ((f = fopen(CONFIG->LOG_FILENAME, "a")) == NULL) {
-			ERR("FATAL: Unable to open log file: %s: %s\n", CONFIG->LOG_FILENAME, strerror(errno));
+			ERR("FATAL: Unable to open log file: %s: %s\n",
+			    CONFIG->LOG_FILENAME, strerror(errno));
 			exit(2);
 		}
 		logf = f;
@@ -2476,7 +2540,6 @@ main(int argc, char **argv)
 #ifdef USE_SHARED_CACHE
 	if (CONFIG->SHCUPD_PORT) {
 		/* start event loop to receive cache updates */
-
 		loop = ev_default_loop(EVFLAG_AUTO);
 		ev_io_init(&shcupd_listener, handle_shcupd, shcupd_socket,
 		    EV_READ);
