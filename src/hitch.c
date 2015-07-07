@@ -1343,10 +1343,10 @@ static void start_handshake(proxystate *ps, int err);
 static void
 handle_connect(struct ev_loop *loop, ev_io *w, int revents)
 {
-	(void)revents;
-	int t;
+	int t, r;
 	proxystate *ps;
 
+	(void)revents;
 	CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
 
 	t = connect(ps->fd_down, backaddr->ai_addr, backaddr->ai_addrlen);
@@ -1359,8 +1359,15 @@ handle_connect(struct ev_loop *loop, ev_io *w, int revents)
 			socklen_t sl;
 
 			sl = sizeof(addr);
-			getsockname(ps->fd_down, (struct sockaddr*)&addr, &sl);
-			ps->connect_port = \
+			r = getsockname(ps->fd_down,
+			    (struct sockaddr*) &addr, &sl);
+			if (r < 0) {
+				ERR("{backend-connect}: getsockname: ""%s\n",
+				    strerror(errno));
+				shutdown_proxy(ps, SHUTDOWN_HARD);
+				return;
+			}
+			ps->connect_port =
 			    ntohs(((struct sockaddr_in*)&addr)->sin_port);
 			LOGPROXY(ps, "backend connected\n");
 
