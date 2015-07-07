@@ -2477,6 +2477,9 @@ main(int argc, char **argv)
 	struct front_arg *fa;
 	CONFIG = config_new();
 
+	// parse command line
+	config_parse_cli(argc, argv, CONFIG);
+
 	if (CONFIG->LOG_FILENAME) {
 		FILE* f;
 		if ((f = fopen(CONFIG->LOG_FILENAME, "a")) == NULL) {
@@ -2494,9 +2497,6 @@ main(int argc, char **argv)
 		logf = CONFIG->QUIET ? stderr : stdout;
 	}
 	setbuf(logf, NULL);
-
-	// parse command line
-	config_parse_cli(argc, argv, CONFIG);
 
 	create_workers = 1;
 
