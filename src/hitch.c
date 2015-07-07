@@ -1070,7 +1070,7 @@ create_listen_sock(const struct front_arg *fa)
 	char buf[INET6_ADDRSTRLEN+20];
 	char abuf[INET6_ADDRSTRLEN];
 	char pbuf[8];
-	int n;
+	int n, r;
 
 	CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
 
@@ -1102,14 +1102,18 @@ create_listen_sock(const struct front_arg *fa)
 #endif
 		setnonblocking(s);
 		if (CONFIG->RECV_BUFSIZE > 0) {
-			setsockopt(s, SOL_SOCKET, SO_RCVBUF,
+			r = setsockopt(s, SOL_SOCKET, SO_RCVBUF,
 			    &CONFIG->RECV_BUFSIZE,
 			    sizeof(CONFIG->RECV_BUFSIZE));
+			if (r < 0)
+				fail("{setsockopt-rcvbuf}");
 		}
 		if (CONFIG->SEND_BUFSIZE > 0) {
-			setsockopt(s, SOL_SOCKET, SO_SNDBUF,
+			r = setsockopt(s, SOL_SOCKET, SO_SNDBUF,
 			    &CONFIG->SEND_BUFSIZE,
 			    sizeof(CONFIG->SEND_BUFSIZE));
+			if (r < 0)
+				fail("{setsockopt-sndbuf}");
 		}
 
 		if (bind(s, it->ai_addr, it->ai_addrlen)) {
