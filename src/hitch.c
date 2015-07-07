@@ -260,41 +260,42 @@ typedef struct proxystate {
 static void
 VWLOG (int level, const char *fmt, va_list ap)
 {
-	if (logf) {
-		struct timeval tv;
-		struct tm tm;
-		char buf[1024];
-		int n;
-		va_list ap1;
+	struct timeval tv;
+	struct tm tm;
+	char buf[1024];
+	int n;
+	va_list ap1;
 
-		gettimeofday(&tv,NULL);
-		if (logf != stdout && logf != stderr
-		    && tv.tv_sec >= logf_check_t+LOG_REOPEN_INTERVAL) {
-			struct stat st;
-			if (stat(CONFIG->LOG_FILENAME, &st) < 0
-			    || st.st_dev != logf_st.st_dev
-			    || st.st_ino != logf_st.st_ino) {
-				fclose(logf);
-
-				logf = fopen(CONFIG->LOG_FILENAME, "a");
-				if (logf == NULL
-				    || fstat(fileno(logf), &logf_st) < 0)
-					memset(&logf_st, 0, sizeof(logf_st));
-			}
-			logf_check_t = tv.tv_sec;
-		}
-
-		localtime_r(&tv.tv_sec, &tm);
-		n = strftime(buf, sizeof(buf), "%Y%m%dT%H%M%S", &tm);
-		sprintf(buf + n, ".%06d [%5d] %s",
-		    (int) tv.tv_usec, getpid(), fmt);
-		va_copy(ap1, ap);
-		vfprintf(logf, buf, ap1);
-		va_end(ap1);
-	}
 	if (CONFIG->SYSLOG) {
 		vsyslog(level, fmt, ap);
 	}
+
+	if (!logf)
+		return;
+	AZ(gettimeofday(&tv, NULL));
+	if (logf != stdout && logf != stderr
+	    && tv.tv_sec >= logf_check_t + LOG_REOPEN_INTERVAL) {
+		struct stat st;
+		if (stat(CONFIG->LOG_FILENAME, &st) < 0
+		    || st.st_dev != logf_st.st_dev
+		    || st.st_ino != logf_st.st_ino) {
+			fclose(logf);
+
+			logf = fopen(CONFIG->LOG_FILENAME, "a");
+			if (logf == NULL
+			    || fstat(fileno(logf), &logf_st) < 0)
+				memset(&logf_st, 0, sizeof(logf_st));
+		}
+		logf_check_t = tv.tv_sec;
+	}
+
+	AN(localtime_r(&tv.tv_sec, &tm));
+	n = strftime(buf, sizeof(buf), "%Y%m%dT%H%M%S", &tm);
+	snprintf(buf + n, sizeof(buf) - n, ".%06d [%5d] %s",
+	    (int) tv.tv_usec, getpid(), fmt);
+	va_copy(ap1, ap);
+	vfprintf(logf, buf, ap1);
+	va_end(ap1);
 }
 
 static void
