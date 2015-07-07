@@ -2483,6 +2483,7 @@ main(int argc, char **argv)
 	if (CONFIG->LOG_FILENAME) {
 		FILE* f;
 		if ((f = fopen(CONFIG->LOG_FILENAME, "a")) == NULL) {
+			logf = stderr;
 			ERR("FATAL: Unable to open log file: %s: %s\n",
 			    CONFIG->LOG_FILENAME, strerror(errno));
 			exit(2);
