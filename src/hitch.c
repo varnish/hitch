@@ -616,7 +616,7 @@ create_shcupd_socket()
 		struct ip_mreqn mreqn;
 
 		memset(&mreqn, 0, sizeof(mreqn));
-		mreqn.imr_multiaddr.s_addr = \
+		mreqn.imr_multiaddr.s_addr =
 		    ((struct sockaddr_in *)ai->ai_addr)->sin_addr.s_addr;
 
 		if (CONFIG->SHCUPD_MCASTIF) {
@@ -711,7 +711,7 @@ create_shcupd_socket()
 
 				mreq.ipv6mr_interface = ifr.ifr_ifindex;
 			} else { /* option appears to be an iface index */
-				mreq.ipv6mr_interface = \
+				mreq.ipv6mr_interface =
 				    atoi(CONFIG->SHCUPD_MCASTIF);
 			}
 		}
