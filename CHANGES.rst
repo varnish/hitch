@@ -4,6 +4,16 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch 1.0.0-beta4 (2015-07-08)
+------------------------------
+
+In general beta4 contains fixes to problems found with Coverity. These
+were all of minor character, but were fixed for completeness.
+
+Source code has been reindented from 3-4 different formatting
+styles to FreeBSD style.
+
+
 hitch 1.0.0-beta3 (2015-06-18)
 ------------------------------
 
