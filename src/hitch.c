@@ -2031,9 +2031,8 @@ handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents)
 
 		default:
 			if (errno != EINTR && errno != EWOULDBLOCK &&
-			    errno != EAGAIN) {
+			    errno != EAGAIN && errno != ECONNABORTED) {
 				SOCKERR("{client} accept() failed");
-				exit(1);
 			}
 			break;
 		}
