@@ -373,14 +373,17 @@ logproxy (int level, const proxystate* ps, const char *fmt, ...)
 
 
 /* set a file descriptor (socket) to non-blocking mode */
-static void
+static int
 setnonblocking(int fd)
 {
 	int flag = 1;
 
 	if (ioctl(fd, FIONBIO, &flag) < 0) {
-		SOCKERR("Error setting FIONBIO");
+		assert (errno == ECONNRESET || errno == ENOTCONN);
+		return (-1);
 	}
+
+	return (0);
 }
 
 
@@ -611,7 +614,8 @@ create_shcupd_socket()
 	(void)setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &t, sizeof(int));
 #endif
 
-	setnonblocking(s);
+	if (setnonblocking(s) < 0)
+		fail("{shared cache: setnonblocking}");
 
 	if (ai->ai_addr->sa_family == AF_INET) {
 		struct ip_mreqn mreqn;
@@ -1101,7 +1105,9 @@ create_listen_sock(const struct front_arg *fa)
 		    < 0)
 			fail("{setsockopt-reuseport}");
 #endif
-		setnonblocking(s);
+		if(setnonblocking(s) < 0)
+			fail("{listen sock: setnonblocking}");
+
 		if (CONFIG->RECV_BUFSIZE > 0) {
 			r = setsockopt(s, SOL_SOCKET, SO_RCVBUF,
 			    &CONFIG->RECV_BUFSIZE,
@@ -1178,7 +1184,10 @@ create_back_socket()
 	if (ret == -1)
 		ERR("Couldn't setsockopt to backend (TCP_NODELAY): %s\n",
 		    strerror(errno));
-	setnonblocking(s);
+	if (setnonblocking(s) < 0) {
+		(void) close(s);
+		return (-1);
+	}
 	return s;
 }
 
@@ -1897,12 +1906,17 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 	}
 #endif
 
-	setnonblocking(client);
+	if (setnonblocking(client) < 0) {
+		SOCKERR("{client} setnonblocking failed");
+		(void) close(client);
+		return;
+	}
+
 	settcpkeepalive(client);
 
 	int back = create_back_socket();
 	if (back == -1) {
-		close(client);
+		(void) close(client);
 		ERR("{backend-socket}: %s\n", strerror(errno));
 		return;
 	}
@@ -2042,7 +2056,12 @@ handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents)
 	}
 #endif
 
-	setnonblocking(client);
+	if (setnonblocking(client)) {
+		SOCKERR("{client} setnonblocking failed");
+		(void) close(client);
+		return;
+	}
+
 	settcpkeepalive(client);
 
 	int back = create_back_socket();
