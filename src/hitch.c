@@ -1375,12 +1375,7 @@ handle_connect(struct ev_loop *loop, ev_io *w, int revents)
 			sl = sizeof(addr);
 			r = getsockname(ps->fd_down,
 			    (struct sockaddr*) &addr, &sl);
-			if (r < 0) {
-				ERR("{backend-connect}: getsockname: ""%s\n",
-				    strerror(errno));
-				shutdown_proxy(ps, SHUTDOWN_HARD);
-				return;
-			}
+			AZ(r);
 			ps->connect_port =
 			    ntohs(((struct sockaddr_in*)&addr)->sin_port);
 			LOGPROXY(ps, "backend connected\n");
@@ -1571,10 +1566,8 @@ static void end_handshake(proxystate *ps) {
 		if (CONFIG->WRITE_PROXY_LINE_V2 || CONFIG->WRITE_PROXY_LINE) {
 			struct sockaddr_storage local;
 			socklen_t slen = sizeof local;
-			if (getsockname(ps->fd_up, (struct sockaddr *) &local,
-				&slen) != 0) {
-				SOCKERR("getsockname");
-			}
+			AZ(getsockname(ps->fd_up, (struct sockaddr *) &local,
+				&slen));
 			if (CONFIG->WRITE_PROXY_LINE)
 				write_proxy_v1(ps, (struct sockaddr *) &local,
 				    slen);
