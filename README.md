@@ -81,6 +81,10 @@ To install `hitch`:
     $ make
     $ sudo make install
 
+If you are installing from source on a Debian systems, you need these dependencies:
+
+    $ apt-get install automake libev-lib openssl-dev
+
 Installing from Packages
 ------------------------
 
