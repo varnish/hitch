@@ -12,7 +12,7 @@ before_script:
 
 script:
 #  - make check -j4
-  - cd tests && ./runtests
+  - cd src/tests && ./runtests
 
 compiler:
   - clang
