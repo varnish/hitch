@@ -11,6 +11,12 @@ DUMPFILE="$(mktemp -u)"
 HITCH=../hitch-openssl
 HITCH_ARGS="--pidfile=$PIDFILE --daemon --quiet"
 
+if [ "$USER" == "root" ]; then
+	HITCH_ARGS="$HITCH_ARGS --user=nobody"
+
+fi
+
+
 cleanup() {
         test -s $PIDFILE && kill `cat "$PIDFILE"`
         rm -f "$PIDFILE" "$CONFFILE" "$DUMPFILE" 2>/dev/null
