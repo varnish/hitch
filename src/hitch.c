@@ -2539,6 +2539,10 @@ main(int argc, char **argv)
 	if (CONFIG->UID >= 0 || CONFIG->GID >= 0)
 		drop_privileges();
 
+	if (geteuid() == 0)
+		LOG("{core} Warning: Running as root, "
+		    " consider --user=nobody.\n");
+
 	/* should we daemonize ?*/
 	if (CONFIG->DAEMONIZE) {
 		/* become a daemon */

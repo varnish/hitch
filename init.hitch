@@ -60,7 +60,7 @@ CHROOT_DIR=""
 
 # drop privileges and run as specified
 # user if set
-SETUID_USER=""
+SETUID_USER="nobody"
 
 # use shared cache with specified number of sessions
 # WARNING: hitch must be compiled with USE_SHARED_CACHE=1
