@@ -8,6 +8,7 @@ set +o errexit
 sessfile=$(mktemp)
 function rmsess {
 	rm -f $sessfile
+	cleanup
 }
 trap rmsess EXIT
 
