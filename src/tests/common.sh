@@ -8,7 +8,7 @@ PIDFILE="$(mktemp -u)"
 CONFFILE="$(mktemp -u)"
 DUMPFILE="$(mktemp -u)"
 
-HITCH=../src/hitch-openssl
+HITCH=../hitch-openssl
 HITCH_ARGS="--pidfile=$PIDFILE --daemon --quiet"
 
 cleanup() {
