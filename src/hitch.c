@@ -266,6 +266,7 @@ VWLOG(int level, const char *fmt, va_list ap)
 	int n;
 	va_list ap1;
 
+	va_copy(ap1, ap);
 	if (CONFIG->SYSLOG) {
 		vsyslog(level, fmt, ap);
 	}
@@ -293,7 +294,6 @@ VWLOG(int level, const char *fmt, va_list ap)
 	n = strftime(buf, sizeof(buf), "%Y%m%dT%H%M%S", &tm);
 	snprintf(buf + n, sizeof(buf) - n, ".%06d [%5d] %s",
 	    (int) tv.tv_usec, getpid(), fmt);
-	va_copy(ap1, ap);
 	vfprintf(logf, buf, ap1);
 	va_end(ap1);
 }
