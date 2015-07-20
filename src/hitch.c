@@ -2539,9 +2539,10 @@ main(int argc, char **argv)
 	if (CONFIG->UID >= 0 || CONFIG->GID >= 0)
 		drop_privileges();
 
-	if (geteuid() == 0)
-		LOG("{core} Warning: Running as root, "
-		    " consider --user=nobody.\n");
+	if (geteuid() == 0) {
+		ERR("{core} ERROR: Refusing to run workers as root.\n");
+		exit(1);
+	}
 
 	/* should we daemonize ?*/
 	if (CONFIG->DAEMONIZE) {
