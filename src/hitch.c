@@ -2509,7 +2509,7 @@ main(int argc, char **argv)
 	} else {
 		logf = CONFIG->QUIET ? stderr : stdout;
 	}
-	setbuf(logf, NULL);
+	AZ(setvbuf(logf, NULL, _IONBF, BUFSIZ));
 
 	create_workers = 1;
 
