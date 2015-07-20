@@ -2544,11 +2544,8 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-	/* should we daemonize ?*/
-	if (CONFIG->DAEMONIZE) {
-		/* become a daemon */
+	if (CONFIG->DAEMONIZE)
 		daemonize();
-	}
 
 	master_pid = getpid();
 
@@ -2556,7 +2553,7 @@ main(int argc, char **argv)
 		pfh = VPF_Open(CONFIG->PIDFILE, 0644, NULL);
 		if (pfh == NULL) {
 			ERR("FATAL: Could not open pid (-p) file (%s): %s\n",
-			CONFIG->PIDFILE, strerror(errno));
+			    CONFIG->PIDFILE, strerror(errno));
 			exit(1);
 		}
 
