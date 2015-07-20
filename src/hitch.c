@@ -258,7 +258,7 @@ typedef struct proxystate {
 } proxystate;
 
 static void
-VWLOG (int level, const char *fmt, va_list ap)
+VWLOG(int level, const char *fmt, va_list ap)
 {
 	struct timeval tv;
 	struct tm tm;
@@ -299,7 +299,7 @@ VWLOG (int level, const char *fmt, va_list ap)
 }
 
 static void
-WLOG (int level, const char *fmt, ...)
+WLOG(int level, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -327,7 +327,7 @@ WLOG (int level, const char *fmt, ...)
 
 
 static void
-logproxy (int level, const proxystate* ps, const char *fmt, ...)
+logproxy(int level, const proxystate* ps, const char *fmt, ...)
 {
 	char buf[1024];
 	char hbuf[INET6_ADDRSTRLEN+1];
