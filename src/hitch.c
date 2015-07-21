@@ -271,8 +271,10 @@ VWLOG(int level, const char *fmt, va_list ap)
 		vsyslog(level, fmt, ap);
 	}
 
-	if (!logf)
+	if (!logf) {
+		va_end(ap1);
 		return;
+	}
 	AZ(gettimeofday(&tv, NULL));
 	if (logf != stdout && logf != stderr
 	    && tv.tv_sec >= logf_check_t + LOG_REOPEN_INTERVAL) {
