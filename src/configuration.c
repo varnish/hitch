@@ -75,10 +75,8 @@
 	#define CONFIG_MAX_LINES 10000
 	#define CONFIG_BUF_SIZE 1024
 	#define CFG_PARAM_CFGFILE 10000
-	#define CFG_PARAM_DEFCFG 10001
 
 	#define CFG_CONFIG "config"
-	#define CFG_CONFIG_DEFAULT "default-config"
 #endif
 // END: configuration parameters
 
@@ -907,7 +905,6 @@ config_print_usage_fd(char *prog, hitch_config *cfg, FILE *out)
 	fprintf(out, "CONFIGURATION:\n");
 	fprintf(out, "\n");
 	fprintf(out, "        --config=FILE      Load configuration from specified file.\n");
-	fprintf(out, "        --default-config   Prints default configuration to stdout.\n");
 	fprintf(out, "\n");
 #endif
 	fprintf(out, "ENCRYPTION METHODS:\n");
@@ -987,225 +984,6 @@ config_print_usage_fd(char *prog, hitch_config *cfg, FILE *out)
 	fprintf(out, "  -h  --help                 This help message\n");
 }
 
-#ifndef NO_CONFIG_FILE
-void
-config_print_default(FILE *fd, hitch_config *cfg)
-{
-	if (fd == NULL)
-		return;
-	fprintf(fd, "#\n");
-	fprintf(fd, "# hitch(8), The Scalable TLS Unwrapping Daemon's configuration\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "\n");
-	fprintf(fd, "# NOTE: all config file parameters can be overriden\n");
-	fprintf(fd, "#       from command line!\n");
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Listening address. REQUIRED.\n");
-	fprintf(fd, "# Can be specified multiple times for multiple listen endpoints.\n");
-	fprintf(fd, "# type: string\n");
-	fprintf(fd, "# syntax: [HOST]:PORT[+CERT]\n");
-	fprintf(fd, FMT_QSTR, CFG_FRONTEND,
-	    config_disp_hostport(VTAILQ_FIRST(&cfg->LISTEN_ARGS)->ip,
-	    VTAILQ_FIRST(&cfg->LISTEN_ARGS)->port));
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Upstream server address. REQUIRED.\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: string\n");
-	fprintf(fd, "# syntax: [HOST]:PORT.\n");
-	fprintf(fd, FMT_QSTR, CFG_BACKEND, config_disp_hostport(cfg->BACK_IP, cfg->BACK_PORT));
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# SSL x509 certificate file. REQUIRED.\n");
-	fprintf(fd, "# List multiple certs to use SNI. Certs are used in the order they\n");
-	fprintf(fd, "# are listed; the last cert listed will be used if none of the others match\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: string\n");
-	fprintf(fd, FMT_QSTR, CFG_PEM_FILE, "");
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# SSL protocol.\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# tls = on\n");
-	fprintf(fd, "# ssl = off\n");
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# List of allowed SSL ciphers.\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# Run openssl ciphers for list of available ciphers.\n");
-	fprintf(fd, "# type: string\n");
-	fprintf(fd, FMT_QSTR, CFG_CIPHERS, config_disp_str(cfg->CIPHER_SUITE));
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Enforce server cipher list order\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: boolean\n");
-	fprintf(fd, FMT_STR, CFG_PREFER_SERVER_CIPHERS, config_disp_bool(cfg->PREFER_SERVER_CIPHERS));
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Use specified SSL engine\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: string\n");
-	fprintf(fd, FMT_QSTR, CFG_SSL_ENGINE, config_disp_str(cfg->ENGINE));
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Number of worker processes\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: integer\n");
-	fprintf(fd, FMT_ISTR, CFG_WORKERS, (int) cfg->NCORES);
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Listen backlog size\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: integer\n");
-	fprintf(fd, FMT_ISTR, CFG_BACKLOG, cfg->BACKLOG);
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# TCP socket keepalive interval in seconds\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: integer\n");
-	fprintf(fd, FMT_ISTR, CFG_KEEPALIVE, cfg->TCP_KEEPALIVE_TIME);
-	fprintf(fd, "\n");
-
-#ifdef USE_SHARED_CACHE
-	fprintf(fd, "# SSL session cache size\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: integer\n");
-	fprintf(fd, FMT_ISTR, CFG_SHARED_CACHE, cfg->SHARED_CACHE);
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Accept shared SSL cache updates on specified listener.\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: string\n");
-	fprintf(fd, "# syntax: [HOST]:PORT\n");
-	fprintf(fd, FMT_QSTR, CFG_SHARED_CACHE_LISTEN, config_disp_hostport(cfg->SHCUPD_IP, cfg->SHCUPD_PORT));
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Shared cache peer address.\n");
-	fprintf(fd, "# Multiple hitch processes on multiple hosts (host limit: %d)\n", MAX_SHCUPD_PEERS);
-	fprintf(fd, "# can share SSL session cache by sending updates to peers.\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# NOTE: This parameter can be specified multiple times in order\n");
-	fprintf(fd, "#       to specify multiple peers.\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: string\n");
-	fprintf(fd, "# syntax: [HOST]:PORT\n");
-	fprintf(fd, "# " FMT_QSTR, CFG_SHARED_CACHE_PEER, config_disp_hostport(NULL, NULL));
-	for (int i = 0; i < MAX_SHCUPD_PEERS; i++) {
-		if (cfg->SHCUPD_PEERS[i].ip == NULL && cfg->SHCUPD_PEERS[i].port == NULL)
-			break;
-		fprintf(fd, FMT_QSTR, CFG_SHARED_CACHE_PEER,
-		    config_disp_hostport(cfg->SHCUPD_PEERS[i].ip,
-		    cfg->SHCUPD_PEERS[i].port));
-	}
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Shared cache interface name and optional TTL\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: string\n");
-	fprintf(fd, "# syntax: iface[,TTL]\n");
-	fprintf(fd, "# %s = \"%s", CFG_SHARED_CACHE_MCASTIF, config_disp_str(cfg->SHCUPD_MCASTIF));
-	if (cfg->SHCUPD_MCASTTTL != NULL && strlen(cfg->SHCUPD_MCASTTTL) > 0) {
-		fprintf(fd, ",%s", cfg->SHCUPD_MCASTTTL);
-	}
-	fprintf(fd, "\"\n");
-	fprintf(fd, "\n");
-#endif
-
-	fprintf(fd, "# Chroot directory\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: string\n");
-	fprintf(fd, FMT_QSTR, CFG_CHROOT, config_disp_str(cfg->CHROOT));
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Set uid after binding a socket\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: string\n");
-	fprintf(fd, FMT_QSTR, CFG_USER, config_disp_uid(cfg->UID));
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Set gid after binding a socket\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: string\n");
-	fprintf(fd, FMT_QSTR, CFG_GROUP, config_disp_gid(cfg->GID));
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Quiet execution, report only error messages\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: boolean\n");
-	fprintf(fd, FMT_STR, CFG_QUIET, config_disp_bool(cfg->QUIET));
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Use syslog for logging\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: boolean\n");
-	fprintf(fd, FMT_STR, CFG_SYSLOG, config_disp_bool(cfg->SYSLOG));
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Syslog facility to use\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: string\n");
-	fprintf(fd, FMT_QSTR, CFG_SYSLOG_FACILITY, config_disp_log_facility(cfg->SYSLOG_FACILITY));
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Run as daemon\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: boolean\n");
-	fprintf(fd, FMT_STR, CFG_DAEMON, config_disp_bool(cfg->DAEMONIZE));
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Report client address by writing IP before sending data\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# NOTE: This option is mutually exclusive with option %s, %s and %s.\n",
-	    CFG_WRITE_PROXY_V2, CFG_WRITE_PROXY, CFG_PROXY_PROXY);
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: boolean\n");
-	fprintf(fd, FMT_STR, CFG_WRITE_IP, config_disp_bool(cfg->WRITE_IP_OCTET));
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Report client address using SENDPROXY protocol, see\n");
-	fprintf(fd, "# http://haproxy.1wt.eu/download/1.5/doc/proxy-protocol.txt\n");
-	fprintf(fd, "# for details.\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# NOTE: This option is mutually exclusive with option %s, %s and %s.\n",
-	    CFG_WRITE_PROXY_V2, CFG_WRITE_IP, CFG_PROXY_PROXY);
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: boolean\n");
-	fprintf(fd, FMT_STR, CFG_WRITE_PROXY, config_disp_bool(cfg->WRITE_PROXY_LINE));
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Report client address using SENDPROXY v2 binary protocol, see\n");
-	fprintf(fd, "# http://haproxy.1wt.eu/download/1.5/doc/proxy-protocol.txt\n");
-	fprintf(fd, "# for details.\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# NOTE: This option is mutually exclusive with option %s, %s and %s.\n",
-	    CFG_WRITE_IP, CFG_WRITE_PROXY, CFG_PROXY_PROXY);
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: boolean\n");
-	fprintf(fd, FMT_STR, CFG_WRITE_PROXY_V2, config_disp_bool(cfg->WRITE_PROXY_LINE_V2));
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Proxy an existing SENDPROXY protocol header through this request.\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# NOTE: This option is mutually exclusive with option %s, %s and %s.\n",
-	    CFG_WRITE_PROXY_V2, CFG_WRITE_IP, CFG_WRITE_PROXY);
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: boolean\n");
-	fprintf(fd, FMT_STR, CFG_PROXY_PROXY, config_disp_bool(cfg->PROXY_PROXY_LINE));
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# Abort handshake when the client submits an unrecognized SNI"
-			" server name.\n");
-	fprintf(fd, "#\n");
-	fprintf(fd, "# type: boolean\n");
-	fprintf(fd, FMT_STR, CFG_SNI_NOMATCH_ABORT, config_disp_bool(cfg->SNI_NOMATCH_ABORT));
-	fprintf(fd, "\n");
-
-	fprintf(fd, "# EOF\n");
-}
-#endif /* NO_CONFIG_FILE */
-
 void
 config_print_usage(char *prog, hitch_config *cfg)
 {
@@ -1224,7 +1002,6 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 	struct option long_options[] = {
 #ifndef NO_CONFIG_FILE
 		{ CFG_CONFIG, 1, NULL, CFG_PARAM_CFGFILE },
-		{ CFG_CONFIG_DEFAULT, 0, NULL, CFG_PARAM_DEFCFG },
 #endif
 
 		{ "tls", 0, &tls, 1},
@@ -1283,10 +1060,6 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 			case CFG_PARAM_CFGFILE:
 				if (!config_file_parse(optarg, cfg))
 				  config_die("%s", config_error_get());
-				break;
-			case CFG_PARAM_DEFCFG:
-				config_print_default(stdout, cfg);
-				exit(0);
 				break;
 #endif
 			case CFG_PARAM_SYSLOG_FACILITY:

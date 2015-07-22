@@ -113,7 +113,6 @@ Detail about the entire set of options can be found by invoking `hitch -h`:
     CONFIGURATION:
 
             --config=FILE      Load configuration from specified file.
-            --default-config   Prints default configuration to stdout.
 
     ENCRYPTION METHODS:
 
@@ -173,9 +172,8 @@ Configuration File
 ------------------
 
 hitch can also use a configuration file that supports all the same options as the
-command-line arguments. You can use `hitch --default-config` to
-generate the default configuration on stdout; then, customize your configuration and
-pass it to `hitch --config=FILE`.
+command-line arguments. You can use `hitch.conf.ex` as a starting point and
+then pass it to `hitch --config=FILE`.
 
 Diffie–Hellman
 --------------
