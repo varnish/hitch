@@ -180,7 +180,7 @@ Diffie–Hellman
 
 To use DH with hitch, you will need to add some bytes to your pem file:
 
-% openssl dhparam -rand - 1024 >> PEMFILE
+% openssl dhparam -rand - 2048 >> PEMFILE
 
 Be sure to set your cipher suite appropriately: -c DHE-RSA-AES256-SHA
 
