@@ -8,7 +8,7 @@ set +o errexit
 
 PORT2=$(($RANDOM + 1024))
 
-$HITCH $HITCH_ARGS --backend=[hyse.org]:80 \
+$HITCH $HITCH_ARGS --backend=[hitch-tls.org]:80 \
 	"--frontend=[${LISTENADDR}]:$LISTENPORT+certs/site1.example.com" \
 	"--frontend=[${LISTENADDR}]:$PORT2+certs/site2.example.com" \
 	certs/default.example.com

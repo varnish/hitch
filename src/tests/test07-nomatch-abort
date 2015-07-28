@@ -7,7 +7,7 @@ set +o errexit
 
 #PORT2=$(($RANDOM + 1024))
 
-$HITCH $HITCH_ARGS --backend=[hyse.org]:80 --frontend=[${LISTENADDR}]:$LISTENPORT \
+$HITCH $HITCH_ARGS --backend=[hitch-tls.org]:80 --frontend=[${LISTENADDR}]:$LISTENPORT \
 	certs/site1.example.com certs/site2.example.com certs/default.example.com \
 	--sni-nomatch-abort
 test "$?" = "0" || die "Hitch did not start."
