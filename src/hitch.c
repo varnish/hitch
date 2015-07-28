@@ -35,6 +35,8 @@
   *
   **/
 
+#include "config.h"
+
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -1864,7 +1866,12 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 	struct sockaddr_storage addr;
 	proxystate *ps;
 	socklen_t sl = sizeof(addr);
+
+#if HAVE_ACCEPT4==1
+	int client = accept4(w->fd, (struct sockaddr *) &addr, &sl, SOCK_NONBLOCK);
+#else
 	int client = accept(w->fd, (struct sockaddr *) &addr, &sl);
+#endif
 	if (client == -1) {
 		switch (errno) {
 		case EMFILE:
@@ -1901,11 +1908,13 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 	}
 #endif
 
+#if HAVE_ACCEPT4==0
 	if (setnonblocking(client) < 0) {
 		SOCKERR("{client} setnonblocking failed");
 		(void) close(client);
 		return;
 	}
+#endif
 
 	settcpkeepalive(client);
 
