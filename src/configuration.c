@@ -47,6 +47,7 @@
 #define CFG_DAEMON "daemon"
 #define CFG_WRITE_IP "write-ip"
 #define CFG_WRITE_PROXY "write-proxy"
+#define CFG_WRITE_PROXY_V1 "write-proxy-v1"
 #define CFG_WRITE_PROXY_V2 "write-proxy-v2"
 #define CFG_PEM_FILE "pem-file"
 #define CFG_PROXY_PROXY "proxy-proxy"
@@ -133,7 +134,7 @@ config_new(void)
 	r->ETYPE              = ENC_TLS;
 	r->PMODE              = SSL_SERVER;
 	r->WRITE_IP_OCTET     = 0;
-	r->WRITE_PROXY_LINE   = 0;
+	r->WRITE_PROXY_LINE_V1= 0;
 	r->WRITE_PROXY_LINE_V2= 0;
 	r->PROXY_PROXY_LINE   = 0;
 	r->CHROOT             = NULL;
@@ -690,7 +691,9 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 	} else if (strcmp(k, CFG_WRITE_IP) == 0) {
 		r = config_param_val_bool(v, &cfg->WRITE_IP_OCTET);
 	} else if (strcmp(k, CFG_WRITE_PROXY) == 0) {
-		r = config_param_val_bool(v, &cfg->WRITE_PROXY_LINE);
+		r = config_param_val_bool(v, &cfg->WRITE_PROXY_LINE_V2);
+	} else if (strcmp(k, CFG_WRITE_PROXY_V1) == 0) {
+		r = config_param_val_bool(v, &cfg->WRITE_PROXY_LINE_V1);
 	} else if (strcmp(k, CFG_WRITE_PROXY_V2) == 0) {
 		r = config_param_val_bool(v, &cfg->WRITE_PROXY_LINE_V2);
 	} else if (strcmp(k, CFG_PROXY_PROXY) == 0) {
@@ -964,14 +967,16 @@ config_print_usage_fd(char *prog, hitch_config *cfg, FILE *out)
 	fprintf(out, "                             address in 4 (IPv4) or 16 (IPv6) octets little-endian\n");
 	fprintf(out, "                             to backend before the actual data\n");
 	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->WRITE_IP_OCTET));
-	fprintf(out, "      --write-proxy          Write HaProxy's PROXY (IPv4 or IPv6) protocol line\n" );
+	fprintf(out, "      --write-proxy-v1       Write HaProxy's PROXY v1 (IPv4 or IPv6) protocol line\n" );
 	fprintf(out, "                             before actual data\n");
-	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->WRITE_PROXY_LINE));
+	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->WRITE_PROXY_LINE_V1));
 	fprintf(out, "      --write-proxy-v2       Write HaProxy's PROXY v2 binary (IPv4 or IPv6)  protocol line\n" );
 	fprintf(out, "                             before actual data\n");
 	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->WRITE_PROXY_LINE_V2));
+	fprintf(out, "      --write-proxy          Equivalent to --write-proxy-v2. For PROXY version 1 use\n");
+	fprintf(out, "                              --write-proxy-v1 explicitly\n");
 	fprintf(out, "      --proxy-proxy          Proxy HaProxy's PROXY (IPv4 or IPv6) protocol line\n" );
-	fprintf(out, "                             before actual data\n");
+	fprintf(out, "                             before actual data (PROXY v1 only)\n");
 	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->PROXY_PROXY_LINE));
 	fprintf(out, "      --sni-nomatch-abort    Abort handshake when client "
 			"submits an unrecognized SNI server name\n" );
@@ -1029,8 +1034,9 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 		{ CFG_SYSLOG_FACILITY, 1, NULL, CFG_PARAM_SYSLOG_FACILITY },
 		{ CFG_DAEMON, 0, &cfg->DAEMONIZE, 1 },
 		{ CFG_WRITE_IP, 0, &cfg->WRITE_IP_OCTET, 1 },
-		{ CFG_WRITE_PROXY, 0, &cfg->WRITE_PROXY_LINE, 1 },
+		{ CFG_WRITE_PROXY_V1, 0, &cfg->WRITE_PROXY_LINE_V1, 1 },
 		{ CFG_WRITE_PROXY_V2, 0, &cfg->WRITE_PROXY_LINE_V2, 1 },
+		{ CFG_WRITE_PROXY, 0, &cfg->WRITE_PROXY_LINE_V2, 1 },
 		{ CFG_PROXY_PROXY, 0, &cfg->PROXY_PROXY_LINE, 1 },
 		{ CFG_SNI_NOMATCH_ABORT, 0, &cfg->SNI_NOMATCH_ABORT, 1 },
 		{ "test", 0, NULL, 't' },
@@ -1153,9 +1159,9 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 		cfg->PMODE = SSL_CLIENT;
 
 	if ((!!cfg->WRITE_IP_OCTET + !!cfg->PROXY_PROXY_LINE +
-	    !!cfg->WRITE_PROXY_LINE + !!cfg->WRITE_PROXY_LINE_V2) >= 2)
+	    !!cfg->WRITE_PROXY_LINE_V1 + !!cfg->WRITE_PROXY_LINE_V2) >= 2)
 		config_die("Options --write-ip, --write-proxy-proxy,"
-		    " --write-proxy and --write-proxy-v2 are mutually exclusive.");
+		    " --write-proxy-v1 and --write-proxy-v2 are mutually exclusive.");
 
 	if (cfg->DAEMONIZE) {
 		cfg->SYSLOG = 1;

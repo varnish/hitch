@@ -1567,12 +1567,13 @@ static void end_handshake(proxystate *ps) {
 
 	/* Check if clear side is connected */
 	if (!ps->clear_connected) {
-		if (CONFIG->WRITE_PROXY_LINE_V2 || CONFIG->WRITE_PROXY_LINE) {
+		if (CONFIG->WRITE_PROXY_LINE_V1 ||
+		    CONFIG->WRITE_PROXY_LINE_V2) {
 			struct sockaddr_storage local;
 			socklen_t slen = sizeof local;
 			AZ(getsockname(ps->fd_up, (struct sockaddr *) &local,
 				&slen));
-			if (CONFIG->WRITE_PROXY_LINE)
+			if (CONFIG->WRITE_PROXY_LINE_V1)
 				write_proxy_v1(ps, (struct sockaddr *) &local,
 				    slen);
 			else
