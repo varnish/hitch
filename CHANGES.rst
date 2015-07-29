@@ -4,6 +4,12 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.0.0-beta5 (unreleased)
+-----------------------
+
+* --write-proxy now defaults to PROXY v2. For PROXY v1, use --write-proxy-v1 explicitly.
+
+
 hitch 1.0.0-beta4 (2015-07-08)
 ------------------------------
 
