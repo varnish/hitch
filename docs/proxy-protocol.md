@@ -9,7 +9,7 @@ one is useful if Hitch is listening to more than one IP or port.
 
 PROXY exists in two different versions; PROXY1 with is a simple text header,
 and PROXY2 which is a binary representation. Hitch supports both through the
-global `--write-proxy` and `--write-proxy-v2`` configuration keys.
+global `--write-proxy-v1` and `--write-proxy-v2` configuration keys.
 
 Backend servers that support PROXY will read this first and most likely use
 it instead of the Hitch IP/port for when writing access logs. If Hitch is

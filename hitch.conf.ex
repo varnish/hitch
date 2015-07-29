@@ -108,20 +108,20 @@ write-ip = off
 # NOTE: This option is mutually exclusive with option write-proxy-v2, write-ip and proxy-proxy.
 #
 # type: boolean
-write-proxy = off
+write-proxy-v1 = off
 
 # Report client address using SENDPROXY v2 binary protocol, see
 # http://haproxy.1wt.eu/download/1.5/doc/proxy-protocol.txt
 # for details.
 #
-# NOTE: This option is mutually exclusive with option write-ip, write-proxy and proxy-proxy.
+# NOTE: This option is mutually exclusive with option write-ip, write-proxy-v1 and proxy-proxy.
 #
 # type: boolean
 write-proxy-v2 = off
 
 # Proxy an existing SENDPROXY protocol header through this request.
 #
-# NOTE: This option is mutually exclusive with option write-proxy-v2, write-ip and write-proxy.
+# NOTE: This option is mutually exclusive with option write-proxy-v2, write-ip and write-proxy-v1.
 #
 # type: boolean
 proxy-proxy = off
