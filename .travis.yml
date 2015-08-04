@@ -1,9 +1,12 @@
 language: c
 
-before_install:
-  - sudo apt-get update -q
-  - sudo apt-get install -qq libev-dev libssl-dev automake
+sudo: false
 
+addons:
+  apt:
+    packages:
+      - libev-dev
+      - libssl-dev
 
 before_script:
   - ./bootstrap
