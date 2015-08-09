@@ -73,7 +73,6 @@
 	#define FMT_QSTR "%s = \"%s\"\n"
 	#define FMT_ISTR "%s = %d\n"
 
-	#define CONFIG_MAX_LINES 10000
 	#define CONFIG_BUF_SIZE 1024
 	#define CFG_PARAM_CFGFILE 10000
 
@@ -776,7 +775,7 @@ config_file_parse(char *file, hitch_config *cfg)
 		    file, strerror(errno));
 
 	int i = 0;
-	while (i < CONFIG_MAX_LINES) {
+	while (1) {
 		if (fgets(line, sizeof(line)-1, fd) == NULL)
 			break;
 		i++;
