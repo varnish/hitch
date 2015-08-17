@@ -73,6 +73,7 @@
 #include <openssl/asn1.h>
 #include <ev.h>
 
+#include "uthash.h"
 #include "vqueue.h"
 #include "ringbuffer.h"
 #include "miniobj.h"
@@ -175,12 +176,11 @@ typedef struct ctx_list {
 	int			is_wildcard;
 	char			*filename;
 	SSL_CTX			*ctx;
-	VTAILQ_ENTRY(ctx_list)	list;
+	UT_hash_handle		hh;
 } ctx_list;
 
+static struct ctx_list *sni_ctxs;
 
-VTAILQ_HEAD(ctx_list_head, ctx_list);
-static struct ctx_list_head sni_ctxs;
 #endif /* OPENSSL_NO_TLSEXT */
 
 
@@ -798,7 +798,7 @@ sni_match(const struct ctx_list *cl, const char *srvname)
 		char *s = strchr(srvname, '.');
 		if (s == NULL)
 			return 0;
-		return (strcasecmp(s, cl->servername + 1) == 0);
+		return (strcasecmp(s, cl->servername) == 0);
 	}
 }
 
@@ -818,7 +818,17 @@ sni_switch_ctx(SSL *ssl, int *al, void *data)
 	if (!servername)
 		return SSL_TLSEXT_ERR_NOACK;
 
-	VTAILQ_FOREACH(cl, &sni_ctxs, list) {
+	HASH_FIND_STR(sni_ctxs, servername, cl);
+	if (cl == NULL) {
+		char *s;
+		/* attempt another lookup for wildcard matches */
+		s = strchr(servername, '.');
+		if (s != NULL) {
+			HASH_FIND_STR(sni_ctxs, s, cl);
+		}
+	}
+
+	if (cl != NULL) {
 		CHECK_OBJ_NOTNULL(cl, CTX_LIST_MAGIC);
 		if (sni_match(cl, servername)) {
 			SSL_set_SSL_CTX(ssl, cl->ctx);
@@ -935,6 +945,7 @@ load_cert_ctx(SSL_CTX *ctx, const char *file)
 #define PUSH_CTX(asn1_str, ctx)						\
 	do {								\
 		struct ctx_list *cl;					\
+		char *key;						\
 		ALLOC_OBJ(cl, CTX_LIST_MAGIC);				\
 		ASN1_STRING_to_UTF8(					\
 			(unsigned char **)&cl->servername, asn1_str);	\
@@ -942,7 +953,10 @@ load_cert_ctx(SSL_CTX *ctx, const char *file)
 		    (strstr(cl->servername, "*.") == cl->servername);	\
 		cl->filename = strdup(file);				\
 		cl->ctx = ctx;						\
-		VTAILQ_INSERT_TAIL(&sni_ctxs, cl, list);		\
+		key = cl->servername;					\
+		if (cl->is_wildcard)					\
+			key = cl->servername + 1;			\
+		HASH_ADD_KEYPTR(hh, sni_ctxs, key, strlen(key), cl);	\
 	} while (0)
 
 	f = BIO_new(BIO_s_file());
@@ -992,8 +1006,9 @@ load_cert_ctx(SSL_CTX *ctx, const char *file)
 static SSL_CTX *
 find_ctx(const char *file)
 {
-	struct ctx_list *cl;
-	VTAILQ_FOREACH(cl, &sni_ctxs, list) {
+	struct ctx_list *cl, *tmp;
+
+	HASH_ITER(hh, sni_ctxs, cl, tmp) {
 		if (strcmp(cl->filename, file) == 0)
 			return (cl->ctx);
 	}
@@ -2214,7 +2229,6 @@ init_globals(void)
 	struct addrinfo hints;
 
 	VTAILQ_INIT(&listen_socks);
-	VTAILQ_INIT(&sni_ctxs);
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
