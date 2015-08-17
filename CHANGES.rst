@@ -4,7 +4,7 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
-hitch-1.0.0-beta5 (unreleased)
+hitch-1.0.0-beta5 (2015-08-17)
 ------------------------------
 
 * #37: Fixes a bug related to a varargs buffer that was consumed twice
@@ -12,8 +12,8 @@ hitch-1.0.0-beta5 (unreleased)
 * --default-config retired and replaced by rather shipping a sample
   configuration file.
 * Use accept4() where supported.
-* --write-proxy now defaults to PROXY v2. For PROXY v1,
-  use --write-proxy-v1 explicitly.
+* --write-proxy now defaults to PROXY v2. This is a BREAKING CHANGE if PROXY1
+  is used. For PROXY v1, use --write-proxy-v1 explicitly.
 * Various minor error handling fixes.
 
 
