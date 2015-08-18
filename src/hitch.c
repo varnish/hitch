@@ -164,11 +164,8 @@ typedef enum _SHUTDOWN_REQUESTOR {
 } SHUTDOWN_REQUESTOR;
 
 #ifndef OPENSSL_NO_TLSEXT
-/*
- * SSL context linked list. Someday it might be nice to have a more clever data
- * structure here, but assuming the number of SNI certs is small it probably
- * doesn't matter.
- */
+
+/* SSL contexts. */
 typedef struct ctx_list {
 	unsigned		magic;
 #define CTX_LIST_MAGIC		0xc179597c
