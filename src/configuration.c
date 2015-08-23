@@ -20,9 +20,9 @@
 #include <sys/stat.h>
 #include <syslog.h>
 
+#include "config.h"
 #include "miniobj.h"
 #include "configuration.h"
-#include "version.h"
 
 #define ADDR_LEN 150
 #define PORT_LEN 6
@@ -1130,7 +1130,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 				test_only = 1;
 				break;
 			case 'V':
-				printf("%s %s\n", basename(argv[0]), HITCH_VERSION);
+				printf("%s %s\n", basename(argv[0]), VERSION);
 				exit(0);
 				break;
 			case 'h':
