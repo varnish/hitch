@@ -109,10 +109,28 @@
 static struct ev_loop *loop;
 static struct addrinfo *backaddr;
 static pid_t master_pid;
-static int child_num;
-static pid_t *child_pids;
+static int core_id;
 static SSL_CTX *default_ctx;
 static SSL_SESSION *client_session;
+
+/* Current generation of child processes. Bumped after a sighup prior
+ * to launching new children. */
+static unsigned child_gen;
+
+struct child_proc {
+	unsigned			magic;
+#define CHILD_PROC_MAGIC		0xbc7fe9e6
+
+	/* Writer end of pipe(2) for mgt -> child ipc */
+	int				pfd;
+	pid_t				pid;
+	unsigned			gen;
+	int				core_id;
+	VTAILQ_ENTRY(child_proc)	list;
+};
+
+VTAILQ_HEAD(child_proc_head, child_proc);
+static struct child_proc_head child_procs;
 
 struct listen_sock {
 	unsigned			magic;
@@ -2015,7 +2033,7 @@ check_ppid(struct ev_loop *loop, ev_timer *w, int revents)
 	pid_t ppid = getppid();
 	if (ppid != master_pid) {
 		ERR("{core} Process %d detected parent death, "
-		    "closing listener sockets.\n", child_num);
+		    "closing listener sockets.\n", core_id);
 		ev_timer_stop(loop, w);
 		VTAILQ_FOREACH(ls, &listen_socks, list) {
 			CHECK_OBJ_NOTNULL(ls, LISTEN_SOCK_MAGIC);
@@ -2149,11 +2167,12 @@ handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents)
 /* Set up the child (worker) process including libev event loop, read event
  * on the bound sockets, etc */
 static void
-handle_connections(void)
+handle_connections(int mgt_fd)
 {
 	struct listen_sock *ls;
-	LOG("{core} Process %d online\n", child_num);
+	LOG("{core} Process %d online\n", core_id);
 
+	(void) mgt_fd;
 	/* child cannot create new children... */
 	create_workers = 0;
 
@@ -2161,14 +2180,14 @@ handle_connections(void)
 	cpu_set_t cpus;
 
 	CPU_ZERO(&cpus);
-	CPU_SET(child_num, &cpus);
+	CPU_SET(core_id, &cpus);
 
 	int res = sched_setaffinity(0, sizeof(cpus), &cpus);
 	if (!res)
-		LOG("{core} Successfully attached to CPU #%d\n", child_num);
+		LOG("{core} Successfully attached to CPU #%d\n", core_id);
 	else
 		ERR("{core-warning} Unable to attach to CPU #%d; "
-		    "do you have that many cores?\n", child_num);
+		    "do you have that many cores?\n", core_id);
 #endif
 
 	loop = ev_default_loop(EVFLAG_AUTO);
@@ -2190,7 +2209,7 @@ handle_connections(void)
 	}
 
 	ev_loop(loop, 0);
-	ERR("{core} Child %d exiting.\n", child_num);
+	ERR("{core} Child %d (gen: %d) exiting.\n", core_id, child_gen);
 	exit(1);
 }
 
@@ -2226,6 +2245,7 @@ init_globals(void)
 	struct addrinfo hints;
 
 	VTAILQ_INIT(&listen_socks);
+	VTAILQ_INIT(&child_procs);
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
@@ -2262,37 +2282,43 @@ init_globals(void)
 		}
 	}
 #endif
-	/* child_pids */
-	if ((child_pids = calloc(CONFIG->NCORES, sizeof(pid_t))) == NULL)
-		fail("calloc");
-
 	if (CONFIG->SYSLOG)
 		openlog("hitch", LOG_CONS | LOG_PID | LOG_NDELAY,
 		    CONFIG->SYSLOG_FACILITY);
 }
 
-/* Forks COUNT children starting with START_INDEX.
- * Each child's index is stored in child_num and its pid is stored in
- * child_pids[child_num] so the parent can manage it later. */
+/* Forks COUNT children starting with START_INDEX.  We keep a struct
+ * child_proc per child so the parent can manage it later. */
 void
 start_children(int start_index, int count)
 {
+	struct child_proc *c;
+	int pfd[2];
+
 	/* don't do anything if we're not allowed to create new children */
 	if (!create_workers)
 		return;
 
-	for (child_num = start_index;
-	    child_num < start_index + count; child_num++) {
-		int pid = fork();
-		if (pid == -1) {
+	for (core_id = start_index;
+	    core_id < start_index + count; core_id++) {
+		ALLOC_OBJ(c, CHILD_PROC_MAGIC);
+		AZ(pipe(pfd));
+		c->pfd = pfd[1];
+		c->gen = child_gen;
+		c->pid = fork();
+		c->core_id = core_id;
+		if (c->pid == -1) {
 			ERR("{core} fork() failed: %s; Goodbye cruel world!\n",
 			    strerror(errno));
 			exit(1);
-		} else if (pid == 0) { /* child */
-			handle_connections();
+		} else if (c->pid == 0) { /* child */
+			close(pfd[1]);
+			FREE_OBJ(c);
+			handle_connections(pfd[0]);
 			exit(0);
 		} else { /* parent. Track new child. */
-			child_pids[child_num] = pid;
+			close(pfd[0]);
+			VTAILQ_INSERT_TAIL(&child_procs, c, list);
 		}
 	}
 }
@@ -2301,12 +2327,16 @@ start_children(int start_index, int count)
 void
 replace_child_with_pid(pid_t pid)
 {
-	int i;
+	struct child_proc *c, *cp;
 
 	/* find old child's slot and put a new child there */
-	for (i = 0; i < CONFIG->NCORES; i++) {
-		if (child_pids[i] == pid) {
-			start_children(i, 1);
+	VTAILQ_FOREACH_SAFE(c, &child_procs, list, cp) {
+		if (c->pid == pid) {
+			VTAILQ_REMOVE(&child_procs, c, list);
+			/* Only replace if it matches current generation. */
+			if (c->gen == child_gen)
+				start_children(c->core_id, 1);
+			FREE_OBJ(c);
 			return;
 		}
 	}
@@ -2333,12 +2363,12 @@ do_wait(int __attribute__ ((unused)) signo)
 		}
 	} else {
 		if (WIFEXITED(status)) {
-			ERR("{core} Child %d exited with status %d. "
-			    "Replacing...\n", pid, WEXITSTATUS(status));
+			ERR("{core} Child %d exited with status %d.\n", pid,
+			    WEXITSTATUS(status));
 			replace_child_with_pid(pid);
 		} else if (WIFSIGNALED(status)) {
-			ERR("{core} Child %d was terminated by signal %d. "
-			    "Replacing...\n", pid, WTERMSIG(status));
+			ERR("{core} Child %d was terminated by signal %d.\n",
+			    pid, WTERMSIG(status));
 			replace_child_with_pid(pid);
 		}
 	}
@@ -2347,6 +2377,7 @@ do_wait(int __attribute__ ((unused)) signo)
 static void
 sigh_terminate (int __attribute__ ((unused)) signo)
 {
+	struct child_proc *c;
 	/* don't create any more children */
 	create_workers = 0;
 
@@ -2355,13 +2386,12 @@ sigh_terminate (int __attribute__ ((unused)) signo)
 		LOG("{core} Received signal %d, shutting down.\n", signo);
 
 		/* kill all children */
-		int i;
-		for (i = 0; i < CONFIG->NCORES; i++) {
-			/* LOG("Stopping worker pid %d.\n", child_pids[i]); */
-			if (child_pids[i] > 1 &&
-			    kill(child_pids[i], SIGTERM) != 0) {
+		VTAILQ_FOREACH(c, &child_procs, list) {
+			/* LOG("Stopping worker pid %d.\n", c->pid); */
+			if (c->pid > 1 &&
+			    kill(c->pid, SIGTERM) != 0) {
 				ERR("{core} Unable to send SIGTERM to worker "
-				    "pid %d: %s\n", child_pids[i],
+				    "pid %d: %s\n", c->pid,
 				    strerror(errno));
 			}
 		}
