@@ -107,15 +107,29 @@
 
 /* Globals */
 static struct ev_loop *loop;
+
+/* Child proc's read side of mgt->child pipe(2) */
+static ev_io mgt_rd;
+
 static struct addrinfo *backaddr;
 static pid_t master_pid;
 static int core_id;
 static SSL_CTX *default_ctx;
 static SSL_SESSION *client_session;
 
+/* The current number of active client connections. */
+static uint64_t n_conns;
+
 /* Current generation of child processes. Bumped after a sighup prior
  * to launching new children. */
 static unsigned child_gen;
+
+enum child_state_e {
+	CHILD_ACTIVE,
+	CHILD_EXITING
+};
+
+static enum child_state_e child_state;
 
 struct child_proc {
 	unsigned			magic;
@@ -1235,6 +1249,16 @@ safe_enable_io(proxystate *ps, ev_io *w)
 		ev_io_start(loop, w);
 }
 
+static void
+check_exit_state(void)
+{
+	if (child_state == CHILD_EXITING && n_conns == 0) {
+		LOG("Child %d (gen: %d) in state EXITING "
+		    "is now exiting.\n", core_id, child_gen);
+		_exit(0);
+	}
+}
+
 /* Only enable a libev ev_io event if the proxied connection still
  * has both up and down connected */
 static void
@@ -1265,6 +1289,9 @@ shutdown_proxy(proxystate *ps, SHUTDOWN_REQUESTOR req)
 		ringbuffer_cleanup(&ps->ring_clear2ssl);
 		ringbuffer_cleanup(&ps->ring_ssl2clear);
 		free(ps);
+
+		n_conns--;
+		check_exit_state();
 	}
 	else {
 		ps->want_shutdown = 1;
@@ -2015,6 +2042,8 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 	/* Link back proxystate to SSL state */
 	SSL_set_app_data(ssl, ps);
 
+	n_conns++;
+
 	LOGPROXY(ps, "proxy connect\n");
 	if (CONFIG->PROXY_PROXY_LINE) {
 		ev_io_start(loop, &ps->ev_proxy);
@@ -2041,6 +2070,44 @@ check_ppid(struct ev_loop *loop, ev_timer *w, int revents)
 			close(ls->sock);
 		}
 	}
+}
+
+static void
+handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
+{
+	unsigned cg;
+	struct listen_sock *ls;
+
+	(void) revents;
+
+	if (read(w->fd, &cg, sizeof(cg)) == -1) {
+		if (errno == EWOULDBLOCK || errno == EAGAIN)
+			return;
+		SOCKERR("Error in mgt->child read operation. "
+		    "Restarting process.");
+		/* If something went wrong here, the process will be
+		 * left in utter limbo as to whether it should keep
+		 * running or not. Kill the process and let the mgt
+		 * process start it back up. */
+		_exit(1);
+	}
+
+	if (cg != child_gen) {
+		/* This means this process has reached its retirement age. */
+		child_state = CHILD_EXITING;
+
+		/* Stop accepting new connections. */
+		VTAILQ_FOREACH(ls, &listen_socks, list) {
+			CHECK_OBJ_NOTNULL(ls, LISTEN_SOCK_MAGIC);
+			ev_io_stop(loop, &ls->listener);
+			close(ls->sock);
+		}
+
+		check_exit_state();
+	}
+
+	LOG("Child %d (gen: %d): State %s\n", core_id, child_gen,
+	    (child_state == CHILD_EXITING) ? "EXITING" : "ACTIVE");
 }
 
 static void
@@ -2160,6 +2227,8 @@ handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents)
 	/* Link back proxystate to SSL state */
 	SSL_set_app_data(ssl, ps);
 
+	n_conns++;
+
 	ev_io_start(loop, &ps->ev_r_clear);
 	start_connect(ps); /* start connect */
 }
@@ -2170,9 +2239,10 @@ static void
 handle_connections(int mgt_fd)
 {
 	struct listen_sock *ls;
+
+	child_state = CHILD_ACTIVE;
 	LOG("{core} Process %d online\n", core_id);
 
-	(void) mgt_fd;
 	/* child cannot create new children... */
 	create_workers = 0;
 
@@ -2208,9 +2278,13 @@ handle_connections(int mgt_fd)
 		ev_io_start(loop, &ls->listener);
 	}
 
+	AZ(setnonblocking(mgt_fd));
+	ev_io_init(&mgt_rd, handle_mgt_rd, mgt_fd, EV_READ);
+	ev_io_start(loop, &mgt_rd);
+
 	ev_loop(loop, 0);
-	ERR("{core} Child %d (gen: %d) exiting.\n", core_id, child_gen);
-	exit(1);
+	ERR("Child %d (gen: %d) exiting.\n", core_id, child_gen);
+	_exit(1);
 }
 
 void
