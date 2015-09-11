@@ -124,6 +124,8 @@ static uint64_t n_conns;
  * to launching new children. */
 static unsigned child_gen;
 
+static unsigned n_sighup;
+
 enum child_state_e {
 	CHILD_ACTIVE,
 	CHILD_EXITING
@@ -2239,12 +2241,19 @@ static void
 handle_connections(int mgt_fd)
 {
 	struct listen_sock *ls;
+	struct sigaction sa;
 
 	child_state = CHILD_ACTIVE;
 	LOG("{core} Process %d online\n", core_id);
 
 	/* child cannot create new children... */
 	create_workers = 0;
+
+	/* nor can they handle SIGHUP */
+	sa.sa_flags = 0;
+	sa.sa_handler = SIG_IGN;
+	sigemptyset(&sa.sa_mask);
+	AZ(sigaction(SIGHUP, &sa, NULL));
 
 #if defined(CPU_ZERO) && defined(CPU_SET)
 	cpu_set_t cpus;
@@ -2422,28 +2431,33 @@ replace_child_with_pid(pid_t pid)
 static void
 do_wait(int __attribute__ ((unused)) signo)
 {
-
+	struct child_proc *c;
 	int status;
-	int pid = wait(&status);
+	int pid;
 
-	if (pid == -1) {
-		if (errno == ECHILD) {
-			ERR("{core} All children have exited! Restarting...\n");
-			start_children(0, CONFIG->NCORES);
-		} else if (errno == EINTR) {
-			ERR("{core} Interrupted wait\n");
-		} else {
-			fail("wait");
+	/* SIGCHLD is not queued: check every child proc to make sure
+	 * we don't lose a signal */
+	VTAILQ_FOREACH(c, &child_procs, list) {
+		pid = waitpid(c->pid, &status, WNOHANG);
+		if (pid == 0) {
+			/* child has not exited */
+			continue;
 		}
-	} else {
-		if (WIFEXITED(status)) {
-			ERR("{core} Child %d exited with status %d.\n", pid,
-			    WEXITSTATUS(status));
-			replace_child_with_pid(pid);
-		} else if (WIFSIGNALED(status)) {
-			ERR("{core} Child %d was terminated by signal %d.\n",
-			    pid, WTERMSIG(status));
-			replace_child_with_pid(pid);
+		else if (pid == -1) {
+			if (errno == EINTR)
+				ERR("{core} Interrupted waitpid\n");
+			else
+				fail("waitpid");
+		} else {
+			if (WIFEXITED(status)) {
+				ERR("{core} Child %d exited with status %d.\n",
+				    pid, WEXITSTATUS(status));
+				replace_child_with_pid(pid);
+			} else if (WIFSIGNALED(status)) {
+				ERR("{core} Child %d was terminated by "
+				    "signal %d.\n", pid, WTERMSIG(status));
+				replace_child_with_pid(pid);
+			}
 		}
 	}
 }
@@ -2474,6 +2488,13 @@ sigh_terminate (int __attribute__ ((unused)) signo)
 
 	/* this is it, we're done... */
 	exit(0);
+}
+
+static void
+sighup_handler(int signum)
+{
+	assert(signum == SIGHUP);
+	n_sighup++;
 }
 
 static void
@@ -2511,6 +2532,14 @@ init_signals()
 		    strerror(errno));
 		exit(1);
 	}
+
+	act.sa_handler = sighup_handler;
+	if (sigaction(SIGHUP, &act, NULL) != 0) {
+		ERR("Unable to register SIGHUP signal handler: %s\n",
+		    strerror(errno));
+		exit(1);
+	}
+
 }
 
 static void
@@ -2604,6 +2633,35 @@ remove_pfh(void)
 {
 	if (pfh && master_pid == getpid()) {
 		VPF_Remove(pfh);
+	}
+}
+
+static void
+reconfigure(void)
+{
+	struct child_proc *c;
+	int i;
+
+	/* XXX: load new configuration */
+
+	child_gen++;
+	start_children(0, CONFIG->NCORES);
+	VTAILQ_FOREACH(c, &child_procs, list) {
+		if (c->gen != child_gen) {
+			errno = 0;
+			do {
+				i = write(c->pfd, &child_gen,
+				    sizeof(child_gen));
+				if (i == -1 && errno != EINTR) {
+					ERR("WARNING: {core} Unable to "
+					    "gracefully reload child %d"
+					    " (%s).\n",
+					    c->pid, strerror(errno));
+					(void)kill(c->pid, SIGTERM);
+					break;
+				}
+			} while (i == -1 && errno == EINTR);
+		}
 	}
 }
 
@@ -2705,6 +2763,11 @@ main(int argc, char **argv)
 		/* Sleep and let the children work.
 		 * Parent will be woken up if a signal arrives */
 		pause();
+
+		if (n_sighup != 0) {
+			n_sighup = 0;
+			reconfigure();
+		}
 	}
 
 	exit(0); /* just a formality; we never get here */
