@@ -125,6 +125,7 @@ static uint64_t n_conns;
 static unsigned child_gen;
 
 static unsigned n_sighup;
+static unsigned n_sigchld;
 
 enum child_state_e {
 	CHILD_ACTIVE,
@@ -2429,14 +2430,13 @@ replace_child_with_pid(pid_t pid)
 
 /* Manage status changes in child processes */
 static void
-do_wait(int __attribute__ ((unused)) signo)
+do_wait(void)
 {
 	struct child_proc *c;
 	int status;
 	int pid;
 
-	/* SIGCHLD is not queued: check every child proc to make sure
-	 * we don't lose a signal */
+
 	VTAILQ_FOREACH(c, &child_procs, list) {
 		pid = waitpid(c->pid, &status, WNOHANG);
 		if (pid == 0) {
@@ -2461,6 +2461,14 @@ do_wait(int __attribute__ ((unused)) signo)
 		}
 	}
 }
+
+static void
+sigchld_handler(int signum)
+{
+	assert(signum == SIGCHLD);
+	n_sigchld++;
+}
+
 
 static void
 sigh_terminate (int __attribute__ ((unused)) signo)
@@ -2513,7 +2521,7 @@ init_signals()
 	/* We don't care if someone stops and starts a child process
 	 * with kill (1) */
 	act.sa_flags = SA_NOCLDSTOP;
-	act.sa_handler = do_wait;
+	act.sa_handler = sigchld_handler;
 
 	/* We do care when child processes change status */
 	if (sigaction(SIGCHLD, &act, NULL) < 0)
@@ -2764,9 +2772,14 @@ main(int argc, char **argv)
 		 * Parent will be woken up if a signal arrives */
 		pause();
 
-		if (n_sighup != 0) {
+		while (n_sighup != 0) {
 			n_sighup = 0;
 			reconfigure();
+		}
+
+		while (n_sigchld != 0) {
+			n_sigchld = 0;
+			do_wait();
 		}
 	}
 
