@@ -8,7 +8,7 @@ handshake decide which certificate to present to the client.
 
 *SNI example*:
 
-	$ ./hitch-openssl --backend=example.com:80 \
+	$ ./hitch --backend=example.com:80 \
 		--frontend=[*]:443 \
 		site1.example.com.pem site2.example.com.pem site3.example.com.pem
 
@@ -30,7 +30,7 @@ means that you need many IP adresses assigned to the hitch server as well.
 
 *Legacy client example:*
 
-	$ ./hitch-openssl --ssl --backend=example.com:80 \
+	$ ./hitch --ssl --backend=example.com:80 \
 		"--frontend=[192.0.2.10]:443+certs/site1.example.com" \
 		"--frontend=[192.0.2.11]:443+certs/site2.example.com" \
         	certs/default.example.com
