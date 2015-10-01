@@ -32,10 +32,12 @@ typedef enum {
     SSL_CLIENT
 } PROXY_MODE;
 
-struct cert_files {
-    char *CERT_FILE;
-    struct cert_files *NEXT;
+struct cfg_cert_file {
+	char 	*filename;
+	VTAILQ_ENTRY(cfg_cert_file) list;
 };
+
+VTAILQ_HEAD(cfg_cert_file_head, cfg_cert_file);
 
 struct front_arg {
 	unsigned		magic;
@@ -64,7 +66,7 @@ struct __hitch_config {
     char *BACK_IP;
     char *BACK_PORT;
     long NCORES;
-    struct cert_files *CERT_FILES;
+    struct cfg_cert_file_head CERT_FILES;
     char *CIPHER_SUITE;
     char *ENGINE;
     int BACKLOG;

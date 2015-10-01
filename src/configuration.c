@@ -142,12 +142,12 @@ config_new(void)
 	r->BACK_IP            = strdup("127.0.0.1");
 	r->BACK_PORT          = strdup("8000");
 	r->NCORES             = 1;
-	r->CERT_FILES         = NULL;
 	r->CIPHER_SUITE       = NULL;
 	r->ENGINE             = NULL;
 	r->BACKLOG            = 100;
 	r->SNI_NOMATCH_ABORT  = 0;
 
+	VTAILQ_INIT(&r->CERT_FILES);
 	VTAILQ_INIT(&r->LISTEN_ARGS);
 	ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
 	fa->port = strdup("8443");
@@ -193,6 +193,7 @@ config_destroy(hitch_config *cfg)
 {
 	// printf("config_destroy() in pid %d: %p\n", getpid(), cfg);
 	struct front_arg *fa, *ftmp;
+	struct cfg_cert_file *cf, *cftmp;
 	if (cfg == NULL)
 		return;
 
@@ -208,13 +209,9 @@ config_destroy(hitch_config *cfg)
 	}
 	free(cfg->BACK_IP);
 	free(cfg->BACK_PORT);
-	if (cfg->CERT_FILES != NULL) {
-		struct cert_files *curr = cfg->CERT_FILES, *next;
-		while (cfg->CERT_FILES != NULL) {
-			next = curr->NEXT;
-			free(curr);
-			curr = next;
-		}
+	VTAILQ_FOREACH_SAFE(cf, &cfg->CERT_FILES, list, cftmp) {
+		VTAILQ_REMOVE(&cfg->CERT_FILES, cf, list);
+		free(cf->filename);
 	}
 	free(cfg->CIPHER_SUITE);
 	free(cfg->ENGINE);
@@ -707,10 +704,10 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 				config_error_set("Invalid x509 certificate PEM file '%s': Not a file.", v);
 				r = 0;
 			} else {
-				struct cert_files *cert = calloc(1, sizeof(*cert));
-				config_assign_str(&cert->CERT_FILE, v);
-				cert->NEXT = cfg->CERT_FILES;
-				cfg->CERT_FILES = cert;
+				struct cfg_cert_file *cert =
+				    calloc(1, sizeof(*cert));
+				config_assign_str(&cert->filename, v);
+				VTAILQ_INSERT_TAIL(&cfg->CERT_FILES, cert, list);
 			}
 		}
 	} else if (strcmp(k, CFG_BACKEND_CONNECT_TIMEOUT) == 0) {
@@ -1178,7 +1175,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 	for (i = 0; i < argc; i++) {
 		config_param_validate(CFG_PEM_FILE, argv[i], cfg, NULL, 0);
 	}
-	if (cfg->PMODE == SSL_SERVER && cfg->CERT_FILES == NULL) {
+	if (cfg->PMODE == SSL_SERVER && VTAILQ_EMPTY(&cfg->CERT_FILES)) {
 		config_die("No x509 certificate PEM file specified!");
 	}
 

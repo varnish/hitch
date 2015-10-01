@@ -74,7 +74,6 @@
 #include <ev.h>
 
 #include "uthash.h"
-#include "vqueue.h"
 #include "ringbuffer.h"
 #include "miniobj.h"
 #include "shctx.h"
@@ -1054,35 +1053,35 @@ find_ctx(const char *file)
 void
 init_openssl(void)
 {
-	struct cert_files *cf;
+	struct cfg_cert_file *cf, *last;
 	struct listen_sock *ls;
 	SSL_CTX *ctx;
 	SSL_library_init();
 	SSL_load_error_strings();
 
-	assert(CONFIG->CERT_FILES != NULL);
+	assert(!(VTAILQ_EMPTY(&CONFIG->CERT_FILES)));
 
-	// The first file (i.e., the last file listed in config) is always the
-	// "default" cert
-	default_ctx = make_ctx(CONFIG->CERT_FILES->CERT_FILE);
+	/* The last file listed in config is always the "default" cert */
+	last = VTAILQ_LAST(&CONFIG->CERT_FILES, cfg_cert_file_head);
+	default_ctx = make_ctx(last->filename);
 	AN(default_ctx);
 
 #ifndef OPENSSL_NO_TLSEXT
-	load_cert_ctx(default_ctx, CONFIG->CERT_FILES->CERT_FILE);
+	load_cert_ctx(default_ctx, last->filename);
 
 	// Go through the list of PEMs and make some SSL contexts for
 	// them. We also keep track of the names associated with each
 	// cert so we can do SNI on them later
-	for (cf = CONFIG->CERT_FILES->NEXT; cf != NULL; cf = cf->NEXT) {
-		if (find_ctx(cf->CERT_FILE) == NULL) {
-			ctx = make_ctx(cf->CERT_FILE);
+	for (cf = VTAILQ_FIRST(&CONFIG->CERT_FILES); cf != last;
+	     cf = VTAILQ_NEXT(cf, list)) {
+		if (find_ctx(cf->filename) == NULL) {
+			ctx = make_ctx(cf->filename);
 			AN(ctx);
-			load_cert_ctx(ctx, cf->CERT_FILE);
+			load_cert_ctx(ctx, cf->filename);
 		}
 	}
 
-	for (ls = VTAILQ_FIRST(&listen_socks); ls != NULL;
-	    ls = VTAILQ_NEXT(ls, list)) {
+	VTAILQ_FOREACH(ls, &listen_socks, list) {
 		if (ls->cert) {
 			ctx = find_ctx(ls->cert);
 			if (ctx == NULL) {
