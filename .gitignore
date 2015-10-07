@@ -20,3 +20,4 @@ Makefile
 /depcomp
 /install-sh
 /autom4te.cache
+/hitch.8
