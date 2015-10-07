@@ -101,4 +101,4 @@ char * config_error_get (void);
 hitch_config * config_new (void);
 void config_destroy (hitch_config *cfg);
 int config_file_parse (char *file, hitch_config *cfg);
-void config_parse_cli(int argc, char **argv, hitch_config *cfg);
+int config_parse_cli(int argc, char **argv, hitch_config *cfg, int *rv);

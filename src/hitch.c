@@ -2644,12 +2644,14 @@ remove_pfh(void)
 }
 
 static void
-reconfigure(void)
+reconfigure(int argc, char **argv)
 {
 	struct child_proc *c;
-	int i;
+	hitch_config *cfg_new;
+	int i, rv;
 
-	/* XXX: load new configuration */
+	cfg_new = config_new();
+	config_parse_cli(argc, argv, cfg_new, &rv);
 
 	child_gen++;
 	start_children(0, CONFIG->NCORES);
@@ -2679,10 +2681,15 @@ main(int argc, char **argv)
 {
 	// initialize configuration
 	struct front_arg *fa;
+	int rv;
+
 	CONFIG = config_new();
 
 	// parse command line
-	config_parse_cli(argc, argv, CONFIG);
+	if (config_parse_cli(argc, argv, CONFIG, &rv) != 0) {
+		fprintf(stderr, "%s", config_error_get());
+		return (rv);
+	}
 
 	if (CONFIG->LOG_FILENAME) {
 		FILE* f;
@@ -2773,7 +2780,7 @@ main(int argc, char **argv)
 
 		while (n_sighup != 0) {
 			n_sighup = 0;
-			reconfigure();
+			reconfigure(argc, argv);
 		}
 
 		while (n_sigchld != 0) {
