@@ -4,11 +4,12 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
-hitch-1.0.0-beta6 (unreleased)
-------------------------------
+hitch-1.0.0 (2015-10-07)
+------------------------
 
 * A hash table is now used for faster SNI lookups.
 * Hitch binary has been renamed back to `hitch`, previously `hitch-openssl`.
+* Man page is updated.
 
 
 hitch-1.0.0-beta5 (2015-08-17)
