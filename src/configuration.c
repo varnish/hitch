@@ -86,11 +86,6 @@
 static char error_buf[CONFIG_BUF_SIZE];
 static char tmp_buf[150];
 
-// for testing configuration only
-#include <openssl/ssl.h>
-SSL_CTX * init_openssl(void);
-void init_globals(void);
-
 static void
 config_error_set(char *fmt, ...)
 {
@@ -160,6 +155,7 @@ config_new(void)
 	r->TCP_KEEPALIVE_TIME = 3600;
 	r->DAEMONIZE          = 0;
 	r->PREFER_SERVER_CIPHERS = 0;
+	r->TEST	              = 0;
 
 	r->BACKEND_CONNECT_TIMEOUT = 30;
 	r->SSL_HANDSHAKE_TIMEOUT = 30;
@@ -1000,8 +996,6 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 	static int tls = 0, ssl = 0;
 	static int client = 0;
 	int c, i;
-	int test_only = 0;
-	char *prog;
 
 	AN(retval);
 	*retval = 0;
@@ -1134,7 +1128,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 			ret = config_param_validate(CFG_SYSLOG, CFG_BOOL_ON, cfg, NULL, 0);
 			break;
 		case 't':
-			test_only = 1;
+			cfg->TEST = 1;
 			break;
 		case 'V':
 			printf("%s %s\n", basename(argv[0]), VERSION);
@@ -1160,8 +1154,6 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 			return (1);
 		}
 	}
-
-	prog = argv[0];
 
 	if (tls && ssl) {
 		config_error_set("Options --tls and --ssl are mutually"
@@ -1214,16 +1206,6 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 	if (cfg->PMODE == SSL_SERVER && VTAILQ_EMPTY(&cfg->CERT_FILES)) {
 		config_error_set("No x509 certificate PEM file specified!");
 		*retval = 1;
-		return (1);
-	}
-
-	// was this only a test?
-	if (test_only) {
-		fprintf(stderr, "Trying to initialize SSL contexts with your certificates\n");
-		init_globals();
-		init_openssl();
-		fprintf(stderr, "%s configuration looks ok.\n", basename(prog));
-		*retval = 0;
 		return (1);
 	}
 

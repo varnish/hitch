@@ -2691,6 +2691,16 @@ main(int argc, char **argv)
 		return (rv);
 	}
 
+	if (CONFIG->TEST) {
+		fprintf(stderr, "Trying to initialize SSL contexts with your"
+		    " certificates\n");
+		init_globals();
+		init_openssl();
+		fprintf(stderr, "%s configuration looks ok.\n",
+		    basename(argv[0]));
+		return (0);
+	}
+
 	if (CONFIG->LOG_FILENAME) {
 		FILE* f;
 		if ((f = fopen(CONFIG->LOG_FILENAME, "a")) == NULL) {
