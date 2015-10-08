@@ -572,7 +572,6 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 	} else if (strcmp(k, CFG_BACKEND) == 0) {
 		r = config_param_host_port(v, &cfg->BACK_IP, &cfg->BACK_PORT);
 	} else if (strcmp(k, CFG_WORKERS) == 0) {
-		fprintf(stderr, "wrk: %s\n", v);
 		r = config_param_val_long(v, &cfg->NCORES, 1);
 	} else if (strcmp(k, CFG_BACKLOG) == 0) {
 		r = config_param_val_int(v, &cfg->BACKLOG, 0);
@@ -1001,6 +1000,8 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 	static int tls = 0, ssl = 0;
 	static int client = 0;
 	int c, i;
+
+	optind = 1;
 
 	AN(retval);
 	*retval = 0;
