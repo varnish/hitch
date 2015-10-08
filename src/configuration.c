@@ -269,7 +269,7 @@ config_parse_content(char *line, char **key, char **value)
 	while (*line != '\0' && *line != '"' && *line != '\'' && !isspace(*line)) line++;
 	*line = '\0';  // value end.
 
-	if (strlen(*key) <= 1 || strlen(*value) <= 1)
+	if (strlen(*key) <= 1 || strlen(*value) < 1)
 		return -1;
 
 	return(0);
@@ -583,6 +583,7 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 	} else if (strcmp(k, CFG_BACKEND) == 0) {
 		r = config_param_host_port(v, &cfg->BACK_IP, &cfg->BACK_PORT);
 	} else if (strcmp(k, CFG_WORKERS) == 0) {
+		fprintf(stderr, "wrk: %s\n", v);
 		r = config_param_val_long(v, &cfg->NCORES, 1);
 	} else if (strcmp(k, CFG_BACKLOG) == 0) {
 		r = config_param_val_int(v, &cfg->BACKLOG, 0);
@@ -786,9 +787,6 @@ config_file_parse(char *file, hitch_config *cfg)
 		if (r != 0)
 			continue;
 		// printf("File '%s', line %d, key: '%s', value: '%s'\n", file, i, key, value);
-		//
-		if (strlen(key) < 2)
-			continue;
 
 		config_param_validate(key, value, cfg, file, i);
 	}
