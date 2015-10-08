@@ -71,16 +71,15 @@
 	#define CFG_SHARED_CACHE_MCASTIF "shared-cache-if"
 #endif
 
-#ifndef NO_CONFIG_FILE
-	#define FMT_STR "%s = %s\n"
-	#define FMT_QSTR "%s = \"%s\"\n"
-	#define FMT_ISTR "%s = %d\n"
+#define FMT_STR "%s = %s\n"
+#define FMT_QSTR "%s = \"%s\"\n"
+#define FMT_ISTR "%s = %d\n"
 
-	#define CONFIG_BUF_SIZE 1024
-	#define CFG_PARAM_CFGFILE 10000
+#define CONFIG_BUF_SIZE 1024
+#define CFG_PARAM_CFGFILE 10000
 
-	#define CFG_CONFIG "config"
-#endif
+#define CFG_CONFIG "config"
+
 // END: configuration parameters
 
 static char error_buf[CONFIG_BUF_SIZE];
@@ -752,7 +751,6 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 	return (0);
 }
 
-#ifndef NO_CONFIG_FILE
 int
 config_file_parse(char *file, hitch_config *cfg)
 {
@@ -796,7 +794,6 @@ config_file_parse(char *file, hitch_config *cfg)
 	fclose(fd);
 	return (0);
 }
-#endif /* NO_CONFIG_FILE */
 
 char *
 config_disp_str(char *str)
@@ -903,12 +900,10 @@ config_print_usage_fd(char *prog, hitch_config *cfg, FILE *out)
 		out = stderr;
 	fprintf(out, "Usage: %s [OPTIONS] PEM\n\n", basename(prog));
 	fprintf(out, "This is hitch, The Scalable TLS Unwrapping Daemon.\n\n");
-#ifndef NO_CONFIG_FILE
 	fprintf(out, "CONFIGURATION:\n");
 	fprintf(out, "\n");
 	fprintf(out, "        --config=FILE      Load configuration from specified file.\n");
 	fprintf(out, "\n");
-#endif
 	fprintf(out, "ENCRYPTION METHODS:\n");
 	fprintf(out, "\n");
 	fprintf(out, "      --tls                   TLSv1 (default. No SSLv3)\n");
@@ -1007,10 +1002,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 	*retval = 0;
 
 	struct option long_options[] = {
-#ifndef NO_CONFIG_FILE
 		{ CFG_CONFIG, 1, NULL, CFG_PARAM_CFGFILE },
-#endif
-
 		{ "tls", 0, &tls, 1},
 		{ "ssl", 0, &ssl, 1},
 		{ "client", 0, &client, 1},
@@ -1066,14 +1058,12 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		switch (c) {
 		case 0:
 			break;
-#ifndef NO_CONFIG_FILE
 		case CFG_PARAM_CFGFILE:
 			if (config_file_parse(optarg, cfg) != 0) {
 				*retval = 1;
 				return (1);
 			}
 			break;
-#endif
 		case CFG_PARAM_SYSLOG_FACILITY:
 			ret = config_param_validate(CFG_SYSLOG_FACILITY, optarg, cfg, NULL, 0);
 			break;
