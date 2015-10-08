@@ -89,11 +89,15 @@ static char tmp_buf[150];
 static void
 config_error_set(char *fmt, ...)
 {
-	memset(error_buf, '\0', sizeof(error_buf));
+	int len;
+	char buf[CONFIG_BUF_SIZE] = "";
+
 	va_list args;
 	va_start(args, fmt);
-	vsnprintf(error_buf, (sizeof(error_buf) - 1), fmt, args);
+	len = vsnprintf(buf, (sizeof(buf) - 1), fmt, args);
 	va_end(args);
+
+	memcpy(error_buf, buf, len + 1);
 }
 
 char *
