@@ -97,7 +97,10 @@ config_error_set(char *fmt, ...)
 	len = vsnprintf(buf, (sizeof(buf) - 1), fmt, args);
 	va_end(args);
 
-	memcpy(error_buf, buf, len + 1);
+	len += 1;
+	if (len > CONFIG_BUF_SIZE)
+		len = CONFIG_BUF_SIZE;
+	memcpy(error_buf, buf, len);
 }
 
 char *
