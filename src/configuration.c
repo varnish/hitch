@@ -637,41 +637,15 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 	} else if (strcmp(k, CFG_SYSLOG) == 0) {
 		r = config_param_val_bool(v, &cfg->SYSLOG);
 	} else if (strcmp(k, CFG_SYSLOG_FACILITY) == 0) {
+		int facility = -1;
 		r = 1;
-		if (!strcmp(v, "auth") || !strcmp(v, "authpriv"))
-			cfg->SYSLOG_FACILITY = LOG_AUTHPRIV;
-		else if (!strcmp(v, "cron"))
-			cfg->SYSLOG_FACILITY = LOG_CRON;
-		else if (!strcmp(v, "daemon"))
-			cfg->SYSLOG_FACILITY = LOG_DAEMON;
-		else if (!strcmp(v, "ftp"))
-			cfg->SYSLOG_FACILITY = LOG_FTP;
-		else if (!strcmp(v, "local0"))
-			cfg->SYSLOG_FACILITY = LOG_LOCAL0;
-		else if (!strcmp(v, "local1"))
-			cfg->SYSLOG_FACILITY = LOG_LOCAL1;
-		else if (!strcmp(v, "local2"))
-			cfg->SYSLOG_FACILITY = LOG_LOCAL2;
-		else if (!strcmp(v, "local3"))
-			cfg->SYSLOG_FACILITY = LOG_LOCAL3;
-		else if (!strcmp(v, "local4"))
-			cfg->SYSLOG_FACILITY = LOG_LOCAL4;
-		else if (!strcmp(v, "local5"))
-			cfg->SYSLOG_FACILITY = LOG_LOCAL5;
-		else if (!strcmp(v, "local6"))
-			cfg->SYSLOG_FACILITY = LOG_LOCAL6;
-		else if (!strcmp(v, "local7"))
-			cfg->SYSLOG_FACILITY = LOG_LOCAL7;
-		else if (!strcmp(v, "lpr"))
-			cfg->SYSLOG_FACILITY = LOG_LPR;
-		else if (!strcmp(v, "mail"))
-			cfg->SYSLOG_FACILITY = LOG_MAIL;
-		else if (!strcmp(v, "news"))
-			cfg->SYSLOG_FACILITY = LOG_NEWS;
-		else if (!strcmp(v, "user"))
-			cfg->SYSLOG_FACILITY = LOG_USER;
-		else if (!strcmp(v, "uucp"))
-			cfg->SYSLOG_FACILITY = LOG_UUCP;
+#define SYSLOG_FAC(m, s)				\
+		if (!strcmp(v, s))			\
+			facility = m;
+#include "sysl_tbl.h"
+#undef SYSLOG_FAC
+		if (facility != -1)
+			cfg->SYSLOG_FACILITY = facility;
 		else {
 			config_error_set("Invalid facility '%s'.", v);
 			r = 0;
@@ -854,40 +828,11 @@ config_disp_log_facility (int facility)
 {
 	switch (facility)
 	{
-		case LOG_AUTHPRIV:
-			return "authpriv";
-		case LOG_CRON:
-			return "cron";
-		case LOG_DAEMON:
-			return "daemon";
-		case LOG_FTP:
-			return "ftp";
-		case LOG_LOCAL0:
-			return "local0";
-		case LOG_LOCAL1:
-			return "local1";
-		case LOG_LOCAL2:
-			return "local2";
-		case LOG_LOCAL3:
-			return "local3";
-		case LOG_LOCAL4:
-			return "local4";
-		case LOG_LOCAL5:
-			return "local5";
-		case LOG_LOCAL6:
-			return "local6";
-		case LOG_LOCAL7:
-			return "local7";
-		case LOG_LPR:
-			return "lpr";
-		case LOG_MAIL:
-			return "mail";
-		case LOG_NEWS:
-			return "news";
-		case LOG_USER:
-			return "user";
-		case LOG_UUCP:
-			return "uucp";
+#define SYSLOG_FAC(m, s)			\
+		case m:				\
+			return (s);
+#include "sysl_tbl.h"
+#undef SYSLOG_FAC
 		default:
 			return "UNKNOWN";
 	}
