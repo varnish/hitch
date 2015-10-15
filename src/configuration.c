@@ -567,7 +567,9 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 				FREE_OBJ(def);
 			}
 			VTAILQ_INSERT_TAIL(&cfg->LISTEN_ARGS, fa, list);
-	  	}
+		} else {
+			FREE_OBJ(fa);
+		}
 	} else if (strcmp(k, CFG_BACKEND) == 0) {
 		r = config_param_host_port(v, &cfg->BACK_IP, &cfg->BACK_PORT);
 	} else if (strcmp(k, CFG_WORKERS) == 0) {
