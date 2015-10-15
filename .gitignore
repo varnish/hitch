@@ -7,7 +7,7 @@ core.*
 **.in~
 .deps
 **.sw[op]
-/src/hitch-*
+/src/hitch
 Makefile
 /stamp-h1
 /aclocal.m4
