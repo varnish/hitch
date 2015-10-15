@@ -290,10 +290,10 @@ config_param_val_bool(char *val, int *res)
 }
 
 int
-config_param_host_port_wildcard(char *str, char **addr,
+config_param_host_port_wildcard(const char *str, char **addr,
     char **port, char **cert, int wildcard_okay)
 {
-	char *cert_ptr = NULL;
+	const char *cert_ptr = NULL;
 
 	if (str == NULL) {
 		config_error_set("Invalid/unset host/port string.");
@@ -314,8 +314,8 @@ config_param_host_port_wildcard(char *str, char **addr,
 
 	// NEW FORMAT: [address]:port
 	if (*str == '[') {
-		char *ptr = str + 1;
-		char *x = strrchr(ptr, ']');
+		const char *ptr = str + 1;
+		const char *x = strrchr(ptr, ']');
 		if (x == NULL) {
 			config_error_set("Invalid address '%s'.", str);
 			return 0;
