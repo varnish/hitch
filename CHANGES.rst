@@ -5,7 +5,7 @@ This file contains the running log of changes applied to each released hitch
 version.
 
 
-hitch-1.0.1 (unreleased)
+hitch-1.0.1 (2015-10-15)
 ------------------------
 
 * Fix configuration parsing bug skipping short values, typically "workers = 1".
