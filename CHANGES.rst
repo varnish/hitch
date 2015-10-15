@@ -10,6 +10,8 @@ hitch-1.0.1 (2015-10-15)
 
 * Fix configuration parsing bug skipping short values, typically "workers = 1".
 
+* Tarball now contains an example configuration file.
+
 
 hitch-1.0.0 (2015-10-07)
 ------------------------
