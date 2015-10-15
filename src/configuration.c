@@ -293,6 +293,7 @@ int
 config_param_host_port_wildcard(char *str, char **addr,
     char **port, char **cert, int wildcard_okay)
 {
+	char *cert_ptr = NULL;
 
 	if (str == NULL) {
 		config_error_set("Invalid/unset host/port string.");
@@ -341,7 +342,7 @@ config_param_host_port_wildcard(char *str, char **addr,
 
 		// cert
 		if (cert && x) {
-			*cert = strdup(x + 1);
+			cert_ptr = x + 1;
 		}
 	}
 	// OLD FORMAT: address,port
@@ -366,11 +367,11 @@ config_param_host_port_wildcard(char *str, char **addr,
 			return 0;
 		}
 	} else {
-		//if (*addr != NULL) free(*addr);
 		*addr = strdup(addr_buf);
 	}
-	// if (**port != NULL) free(*port);
 	*port = strdup(port_buf);
+	if (cert_ptr != NULL)
+		*cert = strdup(cert_ptr);
 
 	/* printf("ADDR FINAL: '%s', '%s', '%s'\n", *addr, *port, */
 	/*     cert ? *cert : ""); */
