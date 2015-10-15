@@ -1,6 +1,8 @@
 
 sbin_PROGRAMS = hitch
 
+EXTRA_DIST = tests
+
 AM_CPPFLAGS = -I/usr/include/libev/
 AM_CFLAGS = -O2 -g -std=c99 -fno-strict-aliasing -Wall -W -D_GNU_SOURCE
 
