@@ -157,6 +157,7 @@ struct listen_sock {
 	const char			*name;
 	const char			*cert;
 	SSL_CTX				*sctx;
+	const char			*pspec;
 	struct sockaddr_storage		addr;
 };
 
@@ -1207,6 +1208,7 @@ create_listen_sock(const struct front_arg *fa)
 		ls->name = strdup(buf);
 		AN(ls->name);
 		ls->cert = fa->cert;
+		ls->pspec = strdup(fa->pspec);
 
 		VTAILQ_INSERT_TAIL(&listen_socks, ls, list);
 		nlisten_socks++;
@@ -2651,7 +2653,12 @@ reconfigure(int argc, char **argv)
 	int i, rv;
 
 	cfg_new = config_new();
-	config_parse_cli(argc, argv, cfg_new, &rv);
+	AN(cfg_new);
+	if (config_parse_cli(argc, argv, cfg_new, &rv) != 0) {
+		ERR("Config reload failed: %s\n", config_error_get());
+		config_destroy(cfg_new);
+		return;
+	}
 
 	child_gen++;
 	start_children(0, CONFIG->NCORES);
@@ -2680,7 +2687,7 @@ int
 main(int argc, char **argv)
 {
 	// initialize configuration
-	struct front_arg *fa;
+	struct front_arg *fa, *ftmp;
 	int rv;
 
 	CONFIG = config_new();
@@ -2728,7 +2735,7 @@ main(int argc, char **argv)
 
 	init_globals();
 
-	VTAILQ_FOREACH(fa, &CONFIG->LISTEN_ARGS, list)
+	HASH_ITER(hh, CONFIG->LISTEN_ARGS, fa, ftmp)
 		create_listen_sock(fa);
 
 #ifdef USE_SHARED_CACHE

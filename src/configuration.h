@@ -7,6 +7,7 @@
 
 #include <sys/types.h>
 #include "vqueue.h"
+#include "uthash.h"
 
 #ifdef USE_SHARED_CACHE
   #include "shctx.h"
@@ -45,10 +46,9 @@ struct front_arg {
 	char			*ip;
 	char			*port;
 	char			*cert;
-	VTAILQ_ENTRY(front_arg)	list;
+	char			*pspec;
+	UT_hash_handle		hh;
 };
-
-VTAILQ_HEAD(front_arg_head, front_arg);
 
 /* configuration structure */
 struct __hitch_config {
@@ -61,7 +61,7 @@ struct __hitch_config {
     char *CHROOT;
     int UID;
     int GID;
-    struct front_arg_head LISTEN_ARGS;
+    struct front_arg *LISTEN_ARGS;
     struct front_arg *LISTEN_DEFAULT;
     char *BACK_IP;
     char *BACK_PORT;

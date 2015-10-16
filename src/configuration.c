@@ -137,10 +137,11 @@ config_new(void)
 	r->SNI_NOMATCH_ABORT  = 0;
 
 	VTAILQ_INIT(&r->CERT_FILES);
-	VTAILQ_INIT(&r->LISTEN_ARGS);
+	r->LISTEN_ARGS = NULL;
 	ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
 	fa->port = strdup("8443");
-	VTAILQ_INSERT_HEAD(&r->LISTEN_ARGS, fa, list);
+	fa->pspec = strdup("default");
+	HASH_ADD_KEYPTR(hh, r->LISTEN_ARGS, fa->pspec, strlen(fa->pspec), fa);
 	r->LISTEN_DEFAULT = fa;
 
 #ifdef USE_SHARED_CACHE
@@ -189,12 +190,13 @@ config_destroy(hitch_config *cfg)
 
 	// free all members!
 	free(cfg->CHROOT);
-	VTAILQ_FOREACH_SAFE(fa, &cfg->LISTEN_ARGS, list, ftmp) {
+	HASH_ITER(hh, cfg->LISTEN_ARGS, fa, ftmp) {
 		CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
-		VTAILQ_REMOVE(&cfg->LISTEN_ARGS, fa, list);
+		HASH_DEL(cfg->LISTEN_ARGS, fa);
 		free(fa->ip);
 		free(fa->port);
 		free(fa->cert);
+		free(fa->pspec);
 		FREE_OBJ(fa);
 	}
 	free(cfg->BACK_IP);
@@ -557,17 +559,22 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		r = config_param_host_port_wildcard(v,
 		    &fa->ip, &fa->port, &fa->cert, 1);
 		if (r != 0) {
-			if (VTAILQ_FIRST(&cfg->LISTEN_ARGS)
-			    == cfg->LISTEN_DEFAULT) {
+			if (cfg->LISTEN_DEFAULT != NULL) {
 				/* drop default listen arg. */
-				struct front_arg *def = cfg->LISTEN_DEFAULT;
-				VTAILQ_REMOVE(&cfg->LISTEN_ARGS, def, list);
+				struct front_arg *def = NULL;
+				HASH_FIND_STR(cfg->LISTEN_ARGS, "default", def);
+				AN(def);
+				HASH_DEL(cfg->LISTEN_ARGS, def);
 				free(def->ip);
 				free(def->port);
 				free(def->cert);
+				free(def->pspec);
 				FREE_OBJ(def);
+				cfg->LISTEN_DEFAULT = NULL;
 			}
-			VTAILQ_INSERT_TAIL(&cfg->LISTEN_ARGS, fa, list);
+			fa->pspec = strdup(v);
+			HASH_ADD_KEYPTR(hh, cfg->LISTEN_ARGS, fa->pspec,
+			    strlen(fa->pspec), fa);
 		} else {
 			FREE_OBJ(fa);
 		}
@@ -864,7 +871,7 @@ config_print_usage_fd(char *prog, hitch_config *cfg, FILE *out)
 	fprintf(out, "\n");
 	fprintf(out, "  --client                      Enable client proxy mode\n");
 	fprintf(out, "  -b  --backend=[HOST]:PORT     Backend [connect] (default is \"%s\")\n", config_disp_hostport(cfg->BACK_IP, cfg->BACK_PORT));
-	fprintf(out, "  -f  --frontend=[HOST]:PORT[+CERT]    Frontend [bind] (default is \"%s\")\n", config_disp_hostport(VTAILQ_FIRST(&cfg->LISTEN_ARGS)->ip, VTAILQ_FIRST(&cfg->LISTEN_ARGS)->port));
+	fprintf(out, "  -f  --frontend=[HOST]:PORT[+CERT]    Frontend [bind] (default is \"%s\")\n", config_disp_hostport(cfg->LISTEN_DEFAULT->ip, cfg->LISTEN_DEFAULT->port));
 	fprintf(out, "                                (Note: brackets are mandatory in endpoint specifiers.)");
 
 #ifdef USE_SHARED_CACHE
