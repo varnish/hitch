@@ -592,7 +592,7 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 	}
 #ifdef USE_SHARED_CACHE
 	else if (strcmp(k, CFG_SHARED_CACHE) == 0) {
-		r = config_param_val_int(v, &cfg->SHARED_CACHE);
+		r = config_param_val_int(v, &cfg->SHARED_CACHE, 1);
 	} else if (strcmp(k, CFG_SHARED_CACHE_LISTEN) == 0) {
 		if (strlen(v) > 0)
 			r = config_param_host_port_wildcard(v, &cfg->SHCUPD_IP,
