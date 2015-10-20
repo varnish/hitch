@@ -147,7 +147,6 @@ static unsigned char shared_secret[SHA_DIGEST_LENGTH];
 #define AN(foo)		do { assert((foo) != 0); } while (0)
 #define NULL_DEV "/dev/null"
 
-long openssl_version;
 int create_workers;
 hitch_config *CONFIG;
 static struct vpf_fh *pfh = NULL;
@@ -2479,7 +2478,7 @@ static void
 openssl_check_version()
 {
 	/* detect OpenSSL version in runtime */
-	openssl_version = SSLeay();
+	long openssl_version = SSLeay();
 
 	/* check if we're running the same openssl that we were */
 	/* compiled with */
