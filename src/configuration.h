@@ -47,6 +47,7 @@ struct front_arg {
 	char			*port;
 	char			*cert;
 	char			*pspec;
+	int			mark;
 	UT_hash_handle		hh;
 };
 

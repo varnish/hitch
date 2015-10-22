@@ -158,6 +158,7 @@ struct listen_sock {
 	const char			*cert;
 	SSL_CTX				*sctx;
 	const char			*pspec;
+	int				mark;
 	struct sockaddr_storage		addr;
 };
 
@@ -2684,13 +2685,156 @@ remove_pfh(void)
 	}
 }
 
+struct cfg_tpc_obj;
+
+enum cfg_tpc_type {
+	CFG_LISTEN_ADDR,
+	CFG_CERT
+
+	/* ... */
+};
+
+/* Commit/rollback handling:
+   - KEEP:
+	- commit: reuse
+	- rollback: do nothing
+   - NEW:
+	- commit: use as new
+	- rollback: drop
+
+   - DROP:
+	- commit: drop
+	- rollback: do nothing
+ */
+enum cfg_tpc_handling {
+	CFG_TPC_KEEP,
+	CFG_TPC_NEW,
+	CFG_TPC_DROP
+};
+
+typedef void cfg_tpc_rollback_f(struct cfg_tpc_obj *o);
+typedef void cfg_tpc_commit_f(struct cfg_tpc_obj *o);
+
+struct cfg_tpc_obj {
+	unsigned		magic;
+#define CFG_TPC_OBJ_MAGIC	0xd6953e5f
+	enum cfg_tpc_type	type;
+	enum cfg_tpc_handling	handling;
+	void			*p;
+	cfg_tpc_rollback_f	*rollback;
+	cfg_tpc_commit_f	*commit;
+	VTAILQ_ENTRY(cfg_tpc_obj) list;
+};
+
+VTAILQ_HEAD(cfg_tpc_obj_head, cfg_tpc_obj);
+static void
+ls_rollback(struct cfg_tpc_obj *o)
+{
+	struct listen_sock *ls;
+
+	if (o->handling == CFG_TPC_NEW) {
+		CAST_OBJ_NOTNULL(ls, o->p, LISTEN_SOCK_MAGIC);
+		AN(ls->sock);
+		(void) close(ls->sock);
+		free((void *) ls->name);
+		free((void *) ls->pspec);
+	}
+
+	/* KEEP/DROP: ignore */
+}
+
+static void
+ls_commit(struct cfg_tpc_obj *o)
+{
+	struct listen_sock *ls;
+	CAST_OBJ_NOTNULL(ls, o->p, LISTEN_SOCK_MAGIC);
+
+	switch (o->handling) {
+	case CFG_TPC_NEW:
+		VTAILQ_INSERT_TAIL(&listen_socks, ls, list);
+		break;
+	case CFG_TPC_KEEP:
+		/* XXX: revisit after cert reload code is in place */
+		break;
+	case CFG_TPC_DROP:
+		VTAILQ_REMOVE(&listen_socks, ls, list);
+		break;
+	}
+}
+
+/* Query reload of listen sockets.
+   Returns -1 on failure.
+   Failure: Caller calls .rollback() on the objects added in cfg_objs.
+   Success: Caller calls .commit()
+*/
+static int
+ls_query(struct front_arg *new_set, struct cfg_tpc_obj_head *cfg_objs)
+{
+	struct listen_sock *ls, *lstmp;
+	struct front_arg *fa, *ftmp;
+	struct cfg_tpc_obj *o;
+	struct listen_sock_head lsocks;
+	int n;
+
+	VTAILQ_INIT(&lsocks);
+
+	VTAILQ_FOREACH(ls, &listen_socks, list) {
+		ALLOC_OBJ(o, CFG_TPC_OBJ_MAGIC);
+		o->type = CFG_LISTEN_ADDR;
+		o->p = ls;
+		o->commit = ls_commit;
+		o->rollback = ls_rollback;
+
+		HASH_FIND_STR(new_set, ls->pspec, fa);
+		if (fa != NULL) {
+			fa->mark = 1;
+			ls->mark = 1;
+			o->handling = CFG_TPC_KEEP;
+		} else
+			o->handling = CFG_TPC_DROP;
+		VTAILQ_INSERT_TAIL(cfg_objs, o, list);
+	}
+
+	VTAILQ_FOREACH(ls, &listen_socks, list) {
+		ls->mark = 0;
+	}
+
+	HASH_ITER(hh, new_set, fa, ftmp) {
+		if (!fa->mark) {
+			n = create_listen_sock(fa, &lsocks);
+			if (n <= 0)
+				return (-1);
+			VTAILQ_FOREACH_SAFE(ls, &lsocks, list, lstmp) {
+				VTAILQ_REMOVE(&lsocks, ls, list);
+				ALLOC_OBJ(o, CFG_TPC_OBJ_MAGIC);
+				o->type = CFG_LISTEN_ADDR;
+				o->handling = CFG_TPC_NEW;
+				o->p = ls;
+				o->commit = ls_commit;
+				o->rollback = ls_rollback;
+				VTAILQ_INSERT_TAIL(cfg_objs, o, list);
+			}
+		}
+	}
+
+	return (0);
+}
+
 static void
 reconfigure(int argc, char **argv)
 {
 	struct child_proc *c;
 	hitch_config *cfg_new;
 	int i, rv;
+	struct cfg_tpc_obj_head cfg_objs;
+	struct cfg_tpc_obj *cto, *cto_tmp;
+	struct timeval tv;
+	double t0, t1;
 
+	AZ(gettimeofday(&tv, NULL));
+	t0 = tv.tv_sec + 1e-6 * tv.tv_usec;
+
+	VTAILQ_INIT(&cfg_objs);
 	cfg_new = config_new();
 	AN(cfg_new);
 	if (config_parse_cli(argc, argv, cfg_new, &rv) != 0) {
@@ -2698,6 +2842,30 @@ reconfigure(int argc, char **argv)
 		config_destroy(cfg_new);
 		return;
 	}
+
+	if (ls_query(cfg_new->LISTEN_ARGS, &cfg_objs) < 0) {
+		VTAILQ_FOREACH_SAFE(cto, &cfg_objs, list, cto_tmp) {
+			VTAILQ_REMOVE(&cfg_objs, cto, list);
+			AN(cto->rollback);
+			cto->rollback(cto);
+			FREE_OBJ(cto);
+		}
+		LOG("{core} Config reload failed.\n");
+		return;
+	} else {
+		VTAILQ_FOREACH_SAFE(cto, &cfg_objs, list, cto_tmp) {
+			VTAILQ_REMOVE(&cfg_objs, cto, list);
+			AN(cto->commit);
+			cto->commit(cto);
+			FREE_OBJ(cto);
+		}
+	}
+
+	AZ(gettimeofday(&tv, NULL));
+	t1 = tv.tv_sec + 1e-6 * tv.tv_usec;
+
+	LOG("{core} Config reloaded in %.2lf seconds. "
+	    "Starting new child processes.\n", t1 - t0);
 
 	child_gen++;
 	start_children(0, CONFIG->NCORES);
