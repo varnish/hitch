@@ -1119,17 +1119,20 @@ init_openssl(void)
 
 /* Create the bound socket in the parent process */
 static int
-create_listen_sock(const struct front_arg *fa)
+create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 {
 	struct addrinfo *ai, hints, *it;
-	struct listen_sock *ls;
+	struct listen_sock *ls, *lstmp;
 	char buf[INET6_ADDRSTRLEN+20];
 	char abuf[INET6_ADDRSTRLEN];
 	char pbuf[8];
 	int n, r;
+	int count = 0;
+	struct listen_sock_head tmp_list;
 
 	CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
 
+	VTAILQ_INIT(&tmp_list);
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
@@ -1138,66 +1141,84 @@ create_listen_sock(const struct front_arg *fa)
 	    &hints, &ai);
 	if (gai_err != 0) {
 		ERR("{getaddrinfo}: [%s]\n", gai_strerror(gai_err));
-		exit(1);
+		return (-1);
 	}
 
 	for (it = ai; it != NULL; it = it->ai_next) {
 		ALLOC_OBJ(ls, LISTEN_SOCK_MAGIC);
-		int s = socket(it->ai_family, SOCK_STREAM, IPPROTO_TCP);
-		if (s == -1)
-			fail("{socket: main}");
+		ls->sock = socket(it->ai_family, SOCK_STREAM, IPPROTO_TCP);
+		if (ls->sock == -1) {
+			ERR("{socket: main}");
+			goto creat_ls_err;
+		}
 
 		int t = 1;
-		if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(int))
-		    < 0)
-			fail("{setsockopt-reuseaddr}");
+		if (setsockopt(ls->sock, SOL_SOCKET, SO_REUSEADDR,
+			&t, sizeof(int))
+		    < 0) {
+			ERR("{setsockopt-reuseaddr}");
+			goto creat_ls_err;
+		}
 #ifdef SO_REUSEPORT
-		if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &t, sizeof(int))
-		    < 0)
-			fail("{setsockopt-reuseport}");
+		if (setsockopt(ls->sock, SOL_SOCKET, SO_REUSEPORT,
+			&t, sizeof(int))
+		    < 0) {
+			ERR("{setsockopt-reuseport}");
+			goto creat_ls_err;
+		}
 #endif
-		if(setnonblocking(s) < 0)
-			fail("{listen sock: setnonblocking}");
+		if(setnonblocking(ls->sock) < 0) {
+			ERR("{listen sock: setnonblocking}");
+			goto creat_ls_err;
+		}
 
 		if (CONFIG->RECV_BUFSIZE > 0) {
-			r = setsockopt(s, SOL_SOCKET, SO_RCVBUF,
+			r = setsockopt(ls->sock, SOL_SOCKET, SO_RCVBUF,
 			    &CONFIG->RECV_BUFSIZE,
 			    sizeof(CONFIG->RECV_BUFSIZE));
-			if (r < 0)
-				fail("{setsockopt-rcvbuf}");
+			if (r < 0) {
+				ERR("{setsockopt-rcvbuf}");
+				goto creat_ls_err;
+			}
 		}
 		if (CONFIG->SEND_BUFSIZE > 0) {
-			r = setsockopt(s, SOL_SOCKET, SO_SNDBUF,
+			r = setsockopt(ls->sock, SOL_SOCKET, SO_SNDBUF,
 			    &CONFIG->SEND_BUFSIZE,
 			    sizeof(CONFIG->SEND_BUFSIZE));
-			if (r < 0)
-				fail("{setsockopt-sndbuf}");
+			if (r < 0) {
+				ERR("{setsockopt-sndbuf}");
+				goto creat_ls_err;
+			}
 		}
 
-		if (bind(s, it->ai_addr, it->ai_addrlen)) {
-			fail("{bind-socket}");
+		if (bind(ls->sock, it->ai_addr, it->ai_addrlen)) {
+			ERR("{bind-socket}");
+			goto creat_ls_err;
 		}
 
 #ifndef NO_DEFER_ACCEPT
 #if TCP_DEFER_ACCEPT
 		int timeout = 1;
-		if (setsockopt(s, IPPROTO_TCP, TCP_DEFER_ACCEPT,
-		    &timeout, sizeof(int)) < 0)
-			fail("{setsockopt-defer_accept}");
+		if (setsockopt(ls->sock, IPPROTO_TCP, TCP_DEFER_ACCEPT,
+			&timeout, sizeof(int)) < 0) {
+			ERR("{setsockopt-defer_accept}");
+			goto creat_ls_err;
+		}
 #endif /* TCP_DEFER_ACCEPT */
 #endif
-		if (listen(s, CONFIG->BACKLOG) != 0) {
-			fail("{listen-socket}");
+		if (listen(ls->sock, CONFIG->BACKLOG) != 0) {
+			ERR("{listen-socket}");
+			goto creat_ls_err;
 		}
 
-		ls->sock = s;
 		memcpy(&ls->addr, it->ai_addr, it->ai_addrlen);
 
 		n = getnameinfo(it->ai_addr, it->ai_addrlen, abuf,
 		    sizeof abuf, pbuf, sizeof pbuf,
 		    NI_NUMERICHOST | NI_NUMERICSERV);
 		if (n != 0) {
-			fail("{getnameinfo}");
+			ERR("{getnameinfo}");
+			goto creat_ls_err;
 		}
 
 		if (it->ai_addr->sa_family == AF_INET6) {
@@ -1210,14 +1231,32 @@ create_listen_sock(const struct front_arg *fa)
 		ls->cert = fa->cert;
 		ls->pspec = strdup(fa->pspec);
 
-		VTAILQ_INSERT_TAIL(&listen_socks, ls, list);
-		nlisten_socks++;
+		VTAILQ_INSERT_TAIL(&tmp_list, ls, list);
+		count++;
 
 		LOG("{core} Listening on %s\n", ls->name);
 	}
 
+	VTAILQ_FOREACH_SAFE(ls, &tmp_list, list, lstmp) {
+		VTAILQ_REMOVE(&tmp_list, ls, list);
+		VTAILQ_INSERT_TAIL(socks, ls, list);
+	}
+
 	freeaddrinfo(ai);
-	return (0);
+	return (count);
+
+creat_ls_err:
+	freeaddrinfo(ai);
+	VTAILQ_FOREACH_SAFE(ls, &tmp_list, list, lstmp) {
+		VTAILQ_REMOVE(&tmp_list, ls, list);
+		if (ls->sock > 0)
+			(void) close(ls->sock);
+		free((void *)ls->name);
+		free((void *)ls->pspec);
+		FREE_OBJ(ls);
+	}
+
+	return (-1);
 }
 
 /* Initiate a clear-text nonblocking connect() to the backend IP on behalf
@@ -2735,8 +2774,12 @@ main(int argc, char **argv)
 
 	init_globals();
 
-	HASH_ITER(hh, CONFIG->LISTEN_ARGS, fa, ftmp)
-		create_listen_sock(fa);
+	HASH_ITER(hh, CONFIG->LISTEN_ARGS, fa, ftmp) {
+		int c = create_listen_sock(fa, &listen_socks);
+		if (c <= 0)
+			exit(1);
+		nlisten_socks += c;
+	}
 
 #ifdef USE_SHARED_CACHE
 	if (CONFIG->SHCUPD_PORT) {
