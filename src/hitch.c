@@ -1141,7 +1141,8 @@ create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 	const int gai_err = getaddrinfo(fa->ip, fa->port,
 	    &hints, &ai);
 	if (gai_err != 0) {
-		ERR("{getaddrinfo}: [%s]\n", gai_strerror(gai_err));
+		ERR("{getaddrinfo}: %s: [%s]\n", fa->pspec,
+		    gai_strerror(gai_err));
 		return (-1);
 	}
 
@@ -1149,7 +1150,7 @@ create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 		ALLOC_OBJ(ls, LISTEN_SOCK_MAGIC);
 		ls->sock = socket(it->ai_family, SOCK_STREAM, IPPROTO_TCP);
 		if (ls->sock == -1) {
-			ERR("{socket: main}");
+			ERR("{socket: main}: %s\n", fa->pspec);
 			goto creat_ls_err;
 		}
 
@@ -1157,19 +1158,19 @@ create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 		if (setsockopt(ls->sock, SOL_SOCKET, SO_REUSEADDR,
 			&t, sizeof(int))
 		    < 0) {
-			ERR("{setsockopt-reuseaddr}");
+			ERR("{setsockopt-reuseaddr}: %s\n", fa->pspec);
 			goto creat_ls_err;
 		}
 #ifdef SO_REUSEPORT
 		if (setsockopt(ls->sock, SOL_SOCKET, SO_REUSEPORT,
 			&t, sizeof(int))
 		    < 0) {
-			ERR("{setsockopt-reuseport}");
+			ERR("{setsockopt-reuseport}: %s\n", fa->pspec);
 			goto creat_ls_err;
 		}
 #endif
 		if(setnonblocking(ls->sock) < 0) {
-			ERR("{listen sock: setnonblocking}");
+			ERR("{listen sock: setnonblocking}: %s\n", fa->pspec);
 			goto creat_ls_err;
 		}
 
@@ -1178,7 +1179,7 @@ create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 			    &CONFIG->RECV_BUFSIZE,
 			    sizeof(CONFIG->RECV_BUFSIZE));
 			if (r < 0) {
-				ERR("{setsockopt-rcvbuf}");
+				ERR("{setsockopt-rcvbuf}: %s\n", fa->pspec);
 				goto creat_ls_err;
 			}
 		}
@@ -1187,13 +1188,13 @@ create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 			    &CONFIG->SEND_BUFSIZE,
 			    sizeof(CONFIG->SEND_BUFSIZE));
 			if (r < 0) {
-				ERR("{setsockopt-sndbuf}");
+				ERR("{setsockopt-sndbuf}: %s\n", fa->pspec);
 				goto creat_ls_err;
 			}
 		}
 
 		if (bind(ls->sock, it->ai_addr, it->ai_addrlen)) {
-			ERR("{bind-socket}");
+			ERR("{bind-socket}: %s\n", fa->pspec);
 			goto creat_ls_err;
 		}
 
@@ -1202,13 +1203,13 @@ create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 		int timeout = 1;
 		if (setsockopt(ls->sock, IPPROTO_TCP, TCP_DEFER_ACCEPT,
 			&timeout, sizeof(int)) < 0) {
-			ERR("{setsockopt-defer_accept}");
+			ERR("{setsockopt-defer_accept}: %s\n", fa->pspec);
 			goto creat_ls_err;
 		}
 #endif /* TCP_DEFER_ACCEPT */
 #endif
 		if (listen(ls->sock, CONFIG->BACKLOG) != 0) {
-			ERR("{listen-socket}");
+			ERR("{listen-socket}: %s\n", fa->pspec);
 			goto creat_ls_err;
 		}
 
@@ -1218,7 +1219,7 @@ create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 		    sizeof abuf, pbuf, sizeof pbuf,
 		    NI_NUMERICHOST | NI_NUMERICSERV);
 		if (n != 0) {
-			ERR("{getnameinfo}");
+			ERR("{getnameinfo}: %s\n", fa->pspec);
 			goto creat_ls_err;
 		}
 
