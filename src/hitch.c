@@ -113,7 +113,6 @@ static ev_io mgt_rd;
 static struct addrinfo *backaddr;
 static pid_t master_pid;
 static int core_id;
-static SSL_CTX *default_ctx;
 static SSL_SESSION *client_session;
 
 /* The current number of active client connections. */
@@ -147,6 +146,7 @@ struct child_proc {
 
 VTAILQ_HEAD(child_proc_head, child_proc);
 static struct child_proc_head child_procs;
+struct sslctx_s;
 
 struct listen_sock {
 	unsigned			magic;
@@ -156,7 +156,7 @@ struct listen_sock {
 	int				sock;
 	const char			*name;
 	const char			*cert;
-	SSL_CTX				*sctx;
+	struct sslctx_s			*sctx;
 	const char			*pspec;
 	int				mark;
 	struct sockaddr_storage		addr;
@@ -201,18 +201,33 @@ typedef enum _SHUTDOWN_REQUESTOR {
 
 #ifndef OPENSSL_NO_TLSEXT
 
+struct sni_name_s;
+VTAILQ_HEAD(sni_name_head, sni_name_s);
+
 /* SSL contexts. */
-typedef struct ctx_list {
+typedef struct sslctx_s {
 	unsigned		magic;
-#define CTX_LIST_MAGIC		0xc179597c
-	char			*servername;
-	int			is_wildcard;
+#define SSLCTX_MAGIC		0xcd1ce5ff
 	char			*filename;
 	SSL_CTX			*ctx;
+	struct sni_name_head	sni_list;
 	UT_hash_handle		hh;
-} ctx_list;
+} sslctx;
 
-static struct ctx_list *sni_ctxs;
+/* SNI lookup objects */
+typedef struct sni_name_s {
+	unsigned		magic;
+#define SNI_NAME_MAGIC		0xb0626581
+	char			*servername;
+	sslctx			*sctx;
+	int			is_wildcard;
+	VTAILQ_ENTRY(sni_name_s)	list;
+	UT_hash_handle		hh;
+} sni_name;
+
+static sni_name *sni_names;
+static sslctx *ssl_ctxs;
+static sslctx *default_ctx;
 
 #endif /* OPENSSL_NO_TLSEXT */
 
@@ -823,15 +838,15 @@ load_rsa_privatekey(SSL_CTX *ctx, const char *file)
 
 #ifndef OPENSSL_NO_TLSEXT
 static int
-sni_match(const struct ctx_list *cl, const char *srvname)
+sni_match(const sni_name *sn, const char *srvname)
 {
-	if (!cl->is_wildcard)
-		return (strcasecmp(srvname, cl->servername) == 0);
+	if (!sn->is_wildcard)
+		return (strcasecmp(srvname, sn->servername) == 0);
 	else {
 		char *s = strchr(srvname, '.');
 		if (s == NULL)
-			return 0;
-		return (strcasecmp(s, cl->servername) == 0);
+			return (0);
+		return (strcasecmp(s, sn->servername + 1) == 0);
 	}
 }
 
@@ -845,26 +860,27 @@ sni_switch_ctx(SSL *ssl, int *al, void *data)
 	(void)data;
 	(void)al;
 	const char *servername;
-	const ctx_list *cl;
+	const sni_name *sn;
 
 	servername = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
 	if (!servername)
 		return SSL_TLSEXT_ERR_NOACK;
 
-	HASH_FIND_STR(sni_ctxs, servername, cl);
-	if (cl == NULL) {
+	HASH_FIND_STR(sni_names, servername, sn);
+	if (sn == NULL) {
 		char *s;
 		/* attempt another lookup for wildcard matches */
 		s = strchr(servername, '.');
 		if (s != NULL) {
-			HASH_FIND_STR(sni_ctxs, s, cl);
+			HASH_FIND_STR(sni_names, s, sn);
 		}
 	}
 
-	if (cl != NULL) {
-		CHECK_OBJ_NOTNULL(cl, CTX_LIST_MAGIC);
-		if (sni_match(cl, servername)) {
-			SSL_set_SSL_CTX(ssl, cl->ctx);
+	if (sn != NULL) {
+		CHECK_OBJ_NOTNULL(sn, SNI_NAME_MAGIC);
+		if (sni_match(sn, servername)) {
+			CHECK_OBJ_NOTNULL(sn->sctx, SSLCTX_MAGIC);
+			SSL_set_SSL_CTX(ssl, sn->sctx->ctx);
 			return SSL_TLSEXT_ERR_OK;
 		}
 	}
@@ -879,10 +895,11 @@ sni_switch_ctx(SSL *ssl, int *al, void *data)
 
 
 /* Initialize an SSL context */
-SSL_CTX *
+sslctx *
 make_ctx(const char *pemfile)
 {
 	SSL_CTX *ctx;
+	sslctx *sobj;
 	RSA *rsa;
 
 	long ssloptions = SSL_OP_NO_SSLv2 | SSL_OP_ALL |
@@ -908,8 +925,14 @@ make_ctx(const char *pemfile)
 	if (CONFIG->PREFER_SERVER_CIPHERS)
 		SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
 
+	ALLOC_OBJ(sobj, SSLCTX_MAGIC);
+	AN(sobj);
+	sobj->filename = strdup(pemfile);
+	sobj->ctx = ctx;
+	VTAILQ_INIT(&sobj->sni_list);
+
 	if (CONFIG->PMODE == SSL_CLIENT)
-		return ctx;
+		return (sobj);
 
 	/* SSL_SERVER Mode stuff */
 	if (SSL_CTX_use_certificate_chain_file(ctx, pemfile) <= 0) {
@@ -963,12 +986,12 @@ make_ctx(const char *pemfile)
 	}
 #endif
 	RSA_free(rsa);
-	return (ctx);
+	return (sobj);
 }
 
 #ifndef OPENSSL_NO_TLSEXT
 static int
-load_cert_ctx(SSL_CTX *ctx, const char *file)
+load_cert_ctx(sslctx *so)
 {
 	X509 *x509;
 	X509_NAME *x509_name;
@@ -980,25 +1003,25 @@ load_cert_ctx(SSL_CTX *ctx, const char *file)
 
 #define PUSH_CTX(asn1_str, ctx)						\
 	do {								\
-		struct ctx_list *cl;					\
+		sni_name *sn;						\
 		char *key;						\
-		ALLOC_OBJ(cl, CTX_LIST_MAGIC);				\
+		ALLOC_OBJ(sn, SNI_NAME_MAGIC);				\
 		ASN1_STRING_to_UTF8(					\
-			(unsigned char **)&cl->servername, asn1_str);	\
-		cl->is_wildcard =					\
-		    (strstr(cl->servername, "*.") == cl->servername);	\
-		cl->filename = strdup(file);				\
-		cl->ctx = ctx;						\
-		key = cl->servername;					\
-		if (cl->is_wildcard)					\
-			key = cl->servername + 1;			\
-		HASH_ADD_KEYPTR(hh, sni_ctxs, key, strlen(key), cl);	\
+			(unsigned char **)&sn->servername, asn1_str);	\
+		sn->is_wildcard =					\
+		    (strstr(sn->servername, "*.") == sn->servername);	\
+		sn->sctx = so;						\
+		key = sn->servername;					\
+		if (sn->is_wildcard)					\
+			key = sn->servername + 1;			\
+		HASH_ADD_KEYPTR(hh, sni_names, key, strlen(key), sn);	\
+		VTAILQ_INSERT_TAIL(&so->sni_list, sn, list);		\
 	} while (0)
 
 	f = BIO_new(BIO_s_file());
 	// TODO: error checking
-	if (!BIO_read_filename(f, file)) {
-		ERR("Could not read cert '%s'\n", file);
+	if (!BIO_read_filename(f, so->filename)) {
+		ERR("Could not read cert '%s'\n", so->filename);
 		return (1);
 	}
 	x509 = PEM_read_bio_X509_AUX(f, NULL, NULL, NULL);
@@ -1026,7 +1049,7 @@ load_cert_ctx(SSL_CTX *ctx, const char *file)
 	i = X509_NAME_get_index_by_NID(x509_name, NID_commonName, -1);
 	if (i < 0) {
 		ERR("Could not find Subject Alternative Names"
-		    " or a CN on cert %s\n", file);
+		    " or a CN on cert %s\n", so->filename);
 		X509_free(x509);
 		return (1);
 	}
@@ -1039,17 +1062,12 @@ load_cert_ctx(SSL_CTX *ctx, const char *file)
 #endif /* OPENSSL_NO_TLSEXT */
 
 /* Check that we don't needlessly load a cert that's already loaded. */
-static SSL_CTX *
+static sslctx *
 find_ctx(const char *file)
 {
-	struct ctx_list *cl, *tmp;
-
-	HASH_ITER(hh, sni_ctxs, cl, tmp) {
-		if (strcmp(cl->filename, file) == 0)
-			return (cl->ctx);
-	}
-
-	return (NULL);
+	sslctx *so;
+	HASH_FIND_STR(ssl_ctxs, file, so);
+	return (so);
 }
 
 /* Init library and load specified certificate.
@@ -1060,7 +1078,8 @@ init_openssl(void)
 {
 	struct cfg_cert_file *cf, *last;
 	struct listen_sock *ls;
-	SSL_CTX *ctx;
+	sslctx *so;
+
 	SSL_library_init();
 	SSL_load_error_strings();
 
@@ -1073,7 +1092,7 @@ init_openssl(void)
 		exit(1);
 
 #ifndef OPENSSL_NO_TLSEXT
-	load_cert_ctx(default_ctx, last->filename);
+	load_cert_ctx(default_ctx);
 
 	// Go through the list of PEMs and make some SSL contexts for
 	// them. We also keep track of the names associated with each
@@ -1081,22 +1100,26 @@ init_openssl(void)
 	for (cf = VTAILQ_FIRST(&CONFIG->CERT_FILES); cf != last;
 	     cf = VTAILQ_NEXT(cf, list)) {
 		if (find_ctx(cf->filename) == NULL) {
-			ctx = make_ctx(cf->filename);
-			if (ctx == NULL)
+			so = make_ctx(cf->filename);
+			if (so == NULL)
 				exit(1);
-			load_cert_ctx(ctx, cf->filename);
+			HASH_ADD_KEYPTR(hh, ssl_ctxs, cf->filename,
+			    strlen(cf->filename), so);
+			load_cert_ctx(so);
 		}
 	}
 
 	VTAILQ_FOREACH(ls, &listen_socks, list) {
 		if (ls->cert) {
-			ctx = find_ctx(ls->cert);
-			if (ctx == NULL) {
-				ctx = make_ctx(ls->cert);
-				AN(ctx);
-				load_cert_ctx(ctx, ls->cert);
+			so = find_ctx(ls->cert);
+			if (so == NULL) {
+				so = make_ctx(ls->cert);
+				AN(so);
+				HASH_ADD_KEYPTR(hh, ssl_ctxs, ls->cert,
+				    strlen(ls->cert), so);
+				load_cert_ctx(so);
 			}
-			ls->sctx = ctx;
+			ls->sctx = so;
 		}
 	}
 
@@ -1972,6 +1995,7 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 	(void)revents;
 	(void)loop;
 	struct sockaddr_storage addr;
+	sslctx *so;
 	proxystate *ps;
 	socklen_t sl = sizeof(addr);
 
@@ -2033,8 +2057,8 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 		return;
 	}
 
-	SSL_CTX * ctx = (SSL_CTX *)w->data;
-	SSL *ssl = SSL_new(ctx);
+	CAST_OBJ_NOTNULL(so, w->data, SSLCTX_MAGIC);
+	SSL *ssl = SSL_new(so->ctx);
 	long mode = SSL_MODE_ENABLE_PARTIAL_WRITE;
 #ifdef SSL_MODE_RELEASE_BUFFERS
 	mode |= SSL_MODE_RELEASE_BUFFERS;
@@ -2166,6 +2190,7 @@ handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents)
 	(void)revents;
 	(void)loop;
 	struct sockaddr_storage addr;
+	sslctx *so;
 	proxystate *ps;
 	socklen_t sl = sizeof(addr);
 	int client = accept(w->fd, (struct sockaddr *) &addr, &sl);
@@ -2222,8 +2247,8 @@ handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents)
 		return;
 	}
 
-	SSL_CTX * ctx = (SSL_CTX *)w->data;
-	SSL *ssl = SSL_new(ctx);
+	CAST_OBJ_NOTNULL(so, w->data, SSLCTX_MAGIC);
+	SSL *ssl = SSL_new(so->ctx);
 	long mode = SSL_MODE_ENABLE_PARTIAL_WRITE;
 #ifdef SSL_MODE_RELEASE_BUFFERS
 	mode |= SSL_MODE_RELEASE_BUFFERS;
