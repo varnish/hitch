@@ -685,8 +685,8 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 				    "PEM file '%s': Not a file.", v);
 				r = 0;
 			} else {
-				struct cfg_cert_file *cert =
-				    calloc(1, sizeof(*cert));
+				struct cfg_cert_file *cert;
+				ALLOC_OBJ(cert, CFG_CERT_FILE_MAGIC);
 				config_assign_str(&cert->filename, v);
 				VTAILQ_INSERT_TAIL(&cfg->CERT_FILES,
 				    cert,list);

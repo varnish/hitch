@@ -34,7 +34,10 @@ typedef enum {
 } PROXY_MODE;
 
 struct cfg_cert_file {
-	char 	*filename;
+	unsigned	magic;
+#define CFG_CERT_FILE_MAGIC 0x58c280d2
+	char 		*filename;
+	int		mark;
 	VTAILQ_ENTRY(cfg_cert_file) list;
 };
 
