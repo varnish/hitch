@@ -38,10 +38,8 @@ struct cfg_cert_file {
 #define CFG_CERT_FILE_MAGIC 0x58c280d2
 	char 		*filename;
 	int		mark;
-	VTAILQ_ENTRY(cfg_cert_file) list;
+	UT_hash_handle	hh;
 };
-
-VTAILQ_HEAD(cfg_cert_file_head, cfg_cert_file);
 
 struct front_arg {
 	unsigned		magic;
@@ -70,7 +68,8 @@ struct __hitch_config {
     char *BACK_IP;
     char *BACK_PORT;
     long NCORES;
-    struct cfg_cert_file_head CERT_FILES;
+    struct cfg_cert_file *CERT_FILES;
+    struct cfg_cert_file *CERT_DEFAULT;
     char *CIPHER_SUITE;
     char *ENGINE;
     int BACKLOG;

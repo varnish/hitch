@@ -1076,18 +1076,17 @@ find_ctx(const char *file)
 void
 init_openssl(void)
 {
-	struct cfg_cert_file *cf, *last;
+	struct cfg_cert_file *cf, *cftmp;
 	struct listen_sock *ls;
 	sslctx *so;
 
 	SSL_library_init();
 	SSL_load_error_strings();
 
-	assert(!(VTAILQ_EMPTY(&CONFIG->CERT_FILES)));
+	assert(HASH_COUNT(CONFIG->CERT_FILES) != 0);
 
-	/* The last file listed in config is always the "default" cert */
-	last = VTAILQ_LAST(&CONFIG->CERT_FILES, cfg_cert_file_head);
-	default_ctx = make_ctx(last->filename);
+	/* The last file listed in config is the "default" cert */
+	default_ctx = make_ctx(CONFIG->CERT_DEFAULT->filename);
 	if (default_ctx == NULL)
 		exit(1);
 
@@ -1097,8 +1096,7 @@ init_openssl(void)
 	// Go through the list of PEMs and make some SSL contexts for
 	// them. We also keep track of the names associated with each
 	// cert so we can do SNI on them later
-	for (cf = VTAILQ_FIRST(&CONFIG->CERT_FILES); cf != last;
-	     cf = VTAILQ_NEXT(cf, list)) {
+	HASH_ITER(hh, CONFIG->CERT_FILES, cf, cftmp) {
 		if (find_ctx(cf->filename) == NULL) {
 			so = make_ctx(cf->filename);
 			if (so == NULL)

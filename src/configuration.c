@@ -136,7 +136,7 @@ config_new(void)
 	r->BACKLOG            = 100;
 	r->SNI_NOMATCH_ABORT  = 0;
 
-	VTAILQ_INIT(&r->CERT_FILES);
+	r->CERT_FILES = NULL;
 	r->LISTEN_ARGS = NULL;
 	ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
 	fa->port = strdup("8443");
@@ -201,9 +201,11 @@ config_destroy(hitch_config *cfg)
 	}
 	free(cfg->BACK_IP);
 	free(cfg->BACK_PORT);
-	VTAILQ_FOREACH_SAFE(cf, &cfg->CERT_FILES, list, cftmp) {
-		VTAILQ_REMOVE(&cfg->CERT_FILES, cf, list);
+	HASH_ITER(hh, cfg->CERT_FILES, cf, cftmp) {
+		CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
+		HASH_DEL(cfg->CERT_FILES, cf);
 		free(cf->filename);
+		FREE_OBJ(cf);
 	}
 	free(cfg->CIPHER_SUITE);
 	free(cfg->ENGINE);
@@ -688,8 +690,10 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 				struct cfg_cert_file *cert;
 				ALLOC_OBJ(cert, CFG_CERT_FILE_MAGIC);
 				config_assign_str(&cert->filename, v);
-				VTAILQ_INSERT_TAIL(&cfg->CERT_FILES,
-				    cert,list);
+				HASH_ADD_KEYPTR(hh, cfg->CERT_FILES,
+				    cert->filename, strlen(cert->filename),
+				    cert);
+				cfg->CERT_DEFAULT = cert;
 			}
 		}
 	} else if (strcmp(k, CFG_BACKEND_CONNECT_TIMEOUT) == 0) {
@@ -1154,7 +1158,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 			return (1);
 		}
 	}
-	if (cfg->PMODE == SSL_SERVER && VTAILQ_EMPTY(&cfg->CERT_FILES)) {
+	if (cfg->PMODE == SSL_SERVER && HASH_COUNT(cfg->CERT_FILES) == 0) {
 		config_error_set("No x509 certificate PEM file specified!");
 		*retval = 1;
 		return (1);
