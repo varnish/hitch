@@ -797,7 +797,7 @@ sni_match(const struct ctx_list *cl, const char *srvname)
 		char *s = strchr(srvname, '.');
 		if (s == NULL)
 			return 0;
-		return (strcasecmp(s, cl->servername) == 0);
+		return (strcasecmp(s, cl->servername + 1) == 0);
 	}
 }
 
