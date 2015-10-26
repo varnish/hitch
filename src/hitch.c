@@ -914,18 +914,19 @@ make_ctx(const char *pemfile)
 	/* SSL_SERVER Mode stuff */
 	if (SSL_CTX_use_certificate_chain_file(ctx, pemfile) <= 0) {
 		ERR_print_errors_fp(stderr);
-		exit(1);
+		return (NULL);
 	}
 
 	rsa = load_rsa_privatekey(ctx, pemfile);
 	if (!rsa) {
 		ERR("Error loading RSA private key\n");
-		exit(1);
+		return (NULL);
 	}
 
 	if (SSL_CTX_use_RSAPrivateKey(ctx, rsa) <= 0) {
 		ERR_print_errors_fp(stderr);
-		exit(1);
+		RSA_free(rsa);
+		return (NULL);
 	}
 
 #ifndef OPENSSL_NO_DH
@@ -942,12 +943,14 @@ make_ctx(const char *pemfile)
 	if (CONFIG->SHARED_CACHE) {
 		if (shared_context_init(ctx, CONFIG->SHARED_CACHE) < 0) {
 			ERR("Unable to alloc memory for shared cache.\n");
-			exit(1);
+			RSA_free(rsa);
+			return (NULL);
 		}
 		if (CONFIG->SHCUPD_PORT) {
 			if (compute_secret(rsa, shared_secret) < 0) {
 				ERR("Unable to compute shared secret.\n");
-				exit(1);
+				RSA_free(rsa);
+				return (NULL);
 			}
 
 			/* Force tls tickets cause keys differs */
@@ -960,7 +963,7 @@ make_ctx(const char *pemfile)
 	}
 #endif
 	RSA_free(rsa);
-	return ctx;
+	return (ctx);
 }
 
 #ifndef OPENSSL_NO_TLSEXT
@@ -1066,7 +1069,8 @@ init_openssl(void)
 	/* The last file listed in config is always the "default" cert */
 	last = VTAILQ_LAST(&CONFIG->CERT_FILES, cfg_cert_file_head);
 	default_ctx = make_ctx(last->filename);
-	AN(default_ctx);
+	if (default_ctx == NULL)
+		exit(1);
 
 #ifndef OPENSSL_NO_TLSEXT
 	load_cert_ctx(default_ctx, last->filename);
@@ -1078,7 +1082,8 @@ init_openssl(void)
 	     cf = VTAILQ_NEXT(cf, list)) {
 		if (find_ctx(cf->filename) == NULL) {
 			ctx = make_ctx(cf->filename);
-			AN(ctx);
+			if (ctx == NULL)
+				exit(1);
 			load_cert_ctx(ctx, cf->filename);
 		}
 	}
