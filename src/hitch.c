@@ -2944,8 +2944,7 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 	 * order to not wreak havoc in commit().  */
 	HASH_ITER(hh, ssl_ctxs, sc, sctmp) {
 		HASH_FIND_STR(cfg->CERT_FILES, sc->filename, cf);
-		if (cf != NULL) {
-			/* TODO: check file modification time */
+		if (cf != NULL && cf->mtim <= sc->mtim) {
 			cf->mark = 1;
 			cf->priv = sc;
 			o = make_cfg_obj(CFG_CERT, CFG_TPC_KEEP,
