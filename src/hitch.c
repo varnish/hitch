@@ -3076,6 +3076,9 @@ reconfigure(int argc, char **argv)
 			} while (i == -1 && errno == EINTR);
 		}
 	}
+
+	config_destroy(CONFIG);
+	CONFIG = cfg_new;
 }
 
 /* Process command line args, create the bound socket,
