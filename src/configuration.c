@@ -424,6 +424,39 @@ config_param_val_long(char *str, long *dst, int positive_only)
 	return 1;
 }
 
+int
+config_param_pem_file(char *filename, struct cfg_cert_file **cfptr)
+{
+	struct stat st;
+	struct cfg_cert_file *cert;
+
+	*cfptr = NULL;
+
+	if (strlen(filename) <= 0)
+		return (0);
+
+	if (stat(filename, &st) != 0) {
+		config_error_set("Unable to stat x509 "
+		    "certificate PEM file '%s': ", filename,
+		    strerror(errno));
+		return (0);
+	}
+	if (! S_ISREG(st.st_mode)) {
+		config_error_set("Invalid x509 certificate "
+		    "PEM file '%s': Not a file.", filename);
+		return (0);
+	}
+
+	ALLOC_OBJ(cert, CFG_CERT_FILE_MAGIC);
+	AN(cert);
+	config_assign_str(&cert->filename, filename);
+	cert->mtim = st.st_mtim.tv_sec
+	    + st.st_mtim.tv_nsec * 1e-9;
+
+	*cfptr = cert;
+	return (1);
+
+}
 #ifdef USE_SHARED_CACHE
 /* Parse mcast and ttl options */
 int
@@ -557,9 +590,12 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		r = config_param_val_bool(v, &cfg->PREFER_SERVER_CIPHERS);
 	} else if (strcmp(k, CFG_FRONTEND) == 0) {
 		struct front_arg *fa;
+		struct cfg_cert_file *cert;
+		char *certfile = NULL;
+
 		ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
 		r = config_param_host_port_wildcard(v,
-		    &fa->ip, &fa->port, &fa->cert, 1);
+		    &fa->ip, &fa->port, &certfile, 1);
 		if (r != 0) {
 			if (cfg->LISTEN_DEFAULT != NULL) {
 				/* drop default listen arg. */
@@ -577,6 +613,13 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 			fa->pspec = strdup(v);
 			HASH_ADD_KEYPTR(hh, cfg->LISTEN_ARGS, fa->pspec,
 			    strlen(fa->pspec), fa);
+			if (certfile != NULL) {
+				r = config_param_pem_file(certfile, &cert);
+				if (r != 0) {
+					AN(cert);
+					fa->cert = cert;
+				}
+			}
 		} else {
 			FREE_OBJ(fa);
 		}
@@ -675,26 +718,14 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 	} else if (strcmp(k, CFG_PROXY_PROXY) == 0) {
 		r = config_param_val_bool(v, &cfg->PROXY_PROXY_LINE);
 	} else if (strcmp(k, CFG_PEM_FILE) == 0) {
-		if (strlen(v) > 0) {
-			if (stat(v, &st) != 0) {
-				config_error_set("Unable to stat x509 "
-				    "certificate PEM file '%s': ", v,
-				    strerror(errno));
-				r = 0;
-			}
-			else if (! S_ISREG(st.st_mode)) {
-				config_error_set("Invalid x509 certificate "
-				    "PEM file '%s': Not a file.", v);
-				r = 0;
-			} else {
-				struct cfg_cert_file *cert;
-				ALLOC_OBJ(cert, CFG_CERT_FILE_MAGIC);
-				config_assign_str(&cert->filename, v);
-				HASH_ADD_KEYPTR(hh, cfg->CERT_FILES,
-				    cert->filename, strlen(cert->filename),
-				    cert);
-				cfg->CERT_DEFAULT = cert;
-			}
+		struct cfg_cert_file *cert;
+		r = config_param_pem_file(v, &cert);
+		if (r != 0) {
+			AN(cert);
+			HASH_ADD_KEYPTR(hh, cfg->CERT_FILES,
+			    cert->filename, strlen(cert->filename),
+			    cert);
+			cfg->CERT_DEFAULT = cert;
 		}
 	} else if (strcmp(k, CFG_BACKEND_CONNECT_TIMEOUT) == 0) {
 		r = config_param_val_int(v, &cfg->BACKEND_CONNECT_TIMEOUT, 1);

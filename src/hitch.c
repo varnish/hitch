@@ -155,7 +155,7 @@ struct listen_sock {
 	ev_io				listener;
 	int				sock;
 	const char			*name;
-	const char			*cert;
+	struct cfg_cert_file		*cert;
 	struct sslctx_s			*sctx;
 	const char			*pspec;
 	struct sockaddr_storage		addr;
@@ -208,6 +208,7 @@ typedef struct sslctx_s {
 #define SSLCTX_MAGIC		0xcd1ce5ff
 	char			*filename;
 	SSL_CTX			*ctx;
+	double			mtim;
 	struct sni_name_head	sni_list;
 	UT_hash_handle		hh;
 } sslctx;
@@ -896,7 +897,7 @@ sni_switch_ctx(SSL *ssl, int *al, void *data)
 
 /* Initialize an SSL context */
 sslctx *
-make_ctx(const char *pemfile)
+make_ctx(const struct cfg_cert_file *cf)
 {
 	SSL_CTX *ctx;
 	sslctx *sobj;
@@ -927,7 +928,8 @@ make_ctx(const char *pemfile)
 
 	ALLOC_OBJ(sobj, SSLCTX_MAGIC);
 	AN(sobj);
-	sobj->filename = strdup(pemfile);
+	sobj->filename = strdup(cf->filename);
+	sobj->mtim = cf->mtim;
 	sobj->ctx = ctx;
 	VTAILQ_INIT(&sobj->sni_list);
 
@@ -935,12 +937,12 @@ make_ctx(const char *pemfile)
 		return (sobj);
 
 	/* SSL_SERVER Mode stuff */
-	if (SSL_CTX_use_certificate_chain_file(ctx, pemfile) <= 0) {
+	if (SSL_CTX_use_certificate_chain_file(ctx, cf->filename) <= 0) {
 		ERR_print_errors_fp(stderr);
 		return (NULL);
 	}
 
-	rsa = load_rsa_privatekey(ctx, pemfile);
+	rsa = load_rsa_privatekey(ctx, cf->filename);
 	if (!rsa) {
 		ERR("Error loading RSA private key\n");
 		return (NULL);
@@ -953,7 +955,7 @@ make_ctx(const char *pemfile)
 	}
 
 #ifndef OPENSSL_NO_DH
-	init_dh(ctx, pemfile);
+	init_dh(ctx, cf->filename);
 #endif /* OPENSSL_NO_DH */
 
 #ifndef OPENSSL_NO_TLSEXT
@@ -1097,7 +1099,7 @@ init_openssl(void)
 	assert(HASH_COUNT(CONFIG->CERT_FILES) != 0);
 
 	/* The last file listed in config is the "default" cert */
-	default_ctx = make_ctx(CONFIG->CERT_DEFAULT->filename);
+	default_ctx = make_ctx(CONFIG->CERT_DEFAULT);
 	if (default_ctx == NULL)
 		exit(1);
 
@@ -1110,7 +1112,7 @@ init_openssl(void)
 	// cert so we can do SNI on them later
 	HASH_ITER(hh, CONFIG->CERT_FILES, cf, cftmp) {
 		if (find_ctx(cf->filename) == NULL) {
-			so = make_ctx(cf->filename);
+			so = make_ctx(cf);
 			if (so == NULL)
 				exit(1);
 			HASH_ADD_KEYPTR(hh, ssl_ctxs, cf->filename,
@@ -1122,12 +1124,13 @@ init_openssl(void)
 
 	VTAILQ_FOREACH(ls, &listen_socks, list) {
 		if (ls->cert) {
-			so = find_ctx(ls->cert);
+			so = find_ctx(ls->cert->filename);
 			if (so == NULL) {
 				so = make_ctx(ls->cert);
 				AN(so);
-				HASH_ADD_KEYPTR(hh, ssl_ctxs, ls->cert,
-				    strlen(ls->cert), so);
+				HASH_ADD_KEYPTR(hh, ssl_ctxs,
+				    ls->cert->filename,
+				    strlen(ls->cert->filename), so);
 				load_cert_ctx(so);
 				insert_sni_names(so);
 			}
@@ -2956,7 +2959,7 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 	HASH_ITER(hh, cfg->CERT_FILES, cf, cftmp) {
 		if (cf->mark)
 			continue;
-		sc = make_ctx(cf->filename);
+		sc = make_ctx(cf);
 		if (sc == NULL)
 			return (-1);
 		if (load_cert_ctx(sc) != 0) {
@@ -2982,7 +2985,7 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 		CAST_OBJ_NOTNULL(ls, o->p[0], LISTEN_SOCK_MAGIC);
 		if (ls->cert == NULL)
 			continue;
-		HASH_FIND_STR(cfg->CERT_FILES, ls->cert, cf);
+		HASH_FIND_STR(cfg->CERT_FILES, ls->cert->filename, cf);
 		if (cf != NULL) {
 			CAST_OBJ_NOTNULL(sc, cf->priv, SSLCTX_MAGIC);
 			o->p[1] = sc;
