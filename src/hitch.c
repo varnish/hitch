@@ -2165,11 +2165,12 @@ static void
 handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 {
 	unsigned cg;
+	ssize_t r;
 	struct listen_sock *ls;
 
 	(void) revents;
-
-	if (read(w->fd, &cg, sizeof(cg)) == -1) {
+	r = read(w->fd, &cg, sizeof(cg));
+	if (r  == -1) {
 		if (errno == EWOULDBLOCK || errno == EAGAIN)
 			return;
 		SOCKERR("Error in mgt->child read operation. "
@@ -2178,6 +2179,9 @@ handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 		 * left in utter limbo as to whether it should keep
 		 * running or not. Kill the process and let the mgt
 		 * process start it back up. */
+		_exit(1);
+	} else if (r == 0) {
+		/* Parent died .. */
 		_exit(1);
 	}
 
