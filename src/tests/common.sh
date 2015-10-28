@@ -8,7 +8,7 @@ PIDFILE="$(mktemp -u)"
 CONFFILE="$(mktemp -u)"
 DUMPFILE="$(mktemp -u)"
 
-HITCH=../hitch-openssl
+HITCH=../hitch
 HITCH_ARGS="--pidfile=$PIDFILE --daemon --quiet"
 
 if [ "$USER" == "root" ]; then

@@ -4,13 +4,29 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+
+hitch-1.0.1 (2015-10-15)
+------------------------
+
+* Fix configuration parsing bug skipping short values, typically "workers = 1".
+
+* Tarball now contains an example configuration file.
+
+
+hitch-1.0.0 (2015-10-07)
+------------------------
+
+* A hash table is now used for faster SNI lookups.
+* Hitch binary has been renamed back to `hitch`, previously `hitch-openssl`.
+* Man page is updated.
+
+
 hitch-1.0.0-beta5 (2015-08-17)
 ------------------------------
 
 * #37: Fixes a bug related to a varargs buffer that was consumed twice
   with syslog logging enabled.
-* --default-config retired and replaced by rather shipping a sample
-  configuration file.
+* --default-config retired and replaced by shipping a sample configuration file.
 * Use accept4() where supported.
 * --write-proxy now defaults to PROXY v2. This is a BREAKING CHANGE if PROXY1
   is used. For PROXY v1, use --write-proxy-v1 explicitly.

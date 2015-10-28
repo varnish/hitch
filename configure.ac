@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.59])
-AC_INIT([hitch], [1.0.0-beta5], [support@varnish-software.com])
+AC_INIT([hitch], [1.0.1], [support@varnish-software.com])
 AC_CONFIG_SRCDIR([src/configuration.c])
 AC_CONFIG_HEADERS([config.h])
 
@@ -18,6 +18,17 @@ AM_MAINTAINER_MODE([disable])
 # Checks for libraries.
 AC_CHECK_LIB([ev], [ev_default_loop], [], AC_MSG_ERROR([Cannot find libev headers.]))
 AC_CHECK_LIB([ssl], [SSL_CTX_free], [], AC_MSG_ERROR([Cannot find libssl headers.]))
+
+AC_ARG_ENABLE(sessioncache,
+    AC_HELP_STRING([--enable-sessioncache],
+		   [Enable TLS session cache. (default is off)]),
+    [use_shctx="$withval"],
+    [use_shctx=no])
+
+if test xno != x"$use_shctx"; then
+	CFLAGS="-DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX $CFLAGS"
+fi
+AM_CONDITIONAL(USE_SHCTX, test xno != x"$use_shctx")
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdlib.h unistd.h])

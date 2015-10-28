@@ -1,5 +1,5 @@
 /**
-  * Copyright 2015 Varnish Software AB
+  * Copyright 2015 Varnish Software
   * Copyright 2011 Bump Technologies, Inc. All rights reserved.
   *
   * Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@
   * interpreted as representing official policies, either expressed or
   * implied, of Bump Technologies, Inc.
   *
-  **/
+  */
 
 #include "config.h"
 
@@ -182,7 +182,6 @@ static unsigned char shared_secret[SHA_DIGEST_LENGTH];
 #define AN(foo)		do { assert((foo) != 0); } while (0)
 #define NULL_DEV "/dev/null"
 
-long openssl_version;
 int create_workers;
 hitch_config *CONFIG;
 static struct vpf_fh *pfh = NULL;
@@ -504,7 +503,10 @@ init_dh(SSL_CTX *ctx, const char *cert)
 	SSL_CTX_set_tmp_dh(ctx, dh);
 	LOG("{core} DH initialized with %d bit key\n", 8*DH_size(dh));
 	DH_free(dh);
+	return (0);
+}
 
+static int init_ecdh(SSL_CTX *ctx) {
 #ifndef OPENSSL_NO_EC
 #ifdef NID_X9_62_prime256v1
 	EC_KEY *ecdh = NULL;
@@ -956,11 +958,12 @@ make_ctx(const struct cfg_cert_file *cf)
 
 #ifndef OPENSSL_NO_DH
 	init_dh(ctx, cf->filename);
+	init_ecdh(ctx);
 #endif /* OPENSSL_NO_DH */
 
 #ifndef OPENSSL_NO_TLSEXT
 	if (!SSL_CTX_set_tlsext_servername_callback(ctx, sni_switch_ctx)) {
-		ERR("Error setting up SNI support\n");
+		ERR("Error setting up SNI support.\n");
 	}
 #endif /* OPENSSL_NO_TLSEXT */
 
@@ -978,7 +981,7 @@ make_ctx(const struct cfg_cert_file *cf)
 				return (NULL);
 			}
 
-			/* Force tls tickets cause keys differs */
+			/* Force TLS tickets because keys differs. */
 			SSL_CTX_set_options(ctx, SSL_OP_NO_TICKET);
 
 			if (*shcupd_peers) {
@@ -1033,14 +1036,15 @@ load_cert_ctx(sslctx *so)
 
 	f = BIO_new(BIO_s_file());
 	// TODO: error checking
+
 	if (!BIO_read_filename(f, so->filename)) {
-		ERR("Could not read cert '%s'\n", so->filename);
+		ERR("Could not read certificate '%s'\n", so->filename);
 		return (1);
 	}
 	x509 = PEM_read_bio_X509_AUX(f, NULL, NULL, NULL);
 	BIO_free(f);
 
-	// First, look for Subject Alternative Names
+	/* First, look for Subject Alternative Names. */
 	names = X509_get_ext_d2i(x509, NID_subject_alt_name, NULL, NULL);
 	for (i = 0; i < sk_GENERAL_NAME_num(names); i++) {
 		name = sk_GENERAL_NAME_value(names, i);
@@ -1050,14 +1054,14 @@ load_cert_ctx(sslctx *so)
 	}
 	if (sk_GENERAL_NAME_num(names) > 0) {
 		sk_GENERAL_NAME_pop_free(names, GENERAL_NAME_free);
-		// If we actally found some, don't bother looking any further
+		/* If we found some, don't bother looking any further. */
 		X509_free(x509);
 		return (0);
 	} else if (names != NULL) {
 		sk_GENERAL_NAME_pop_free(names, GENERAL_NAME_free);
 	}
 
-	// Now we're left looking at the CN on the cert
+	/* Now we're left looking at the CN on the cert. */
 	x509_name = X509_get_subject_name(x509);
 	i = X509_NAME_get_index_by_NID(x509_name, NID_commonName, -1);
 	if (i < 0) {
@@ -1305,7 +1309,7 @@ creat_ls_err:
 }
 
 /* Initiate a clear-text nonblocking connect() to the backend IP on behalf
- * of a newly connected upstream (encrypted) client*/
+ * of a newly connected upstream (encrypted) client */
 static int
 create_back_socket()
 {
@@ -1316,15 +1320,15 @@ create_back_socket()
 
 	int flag = 1;
 	int ret = setsockopt(s, IPPROTO_TCP, TCP_NODELAY,
-	    (char *)&flag,sizeof(flag));
+	    (char *)&flag, sizeof(flag));
 	if (ret == -1)
 		ERR("Couldn't setsockopt to backend (TCP_NODELAY): %s\n",
 		    strerror(errno));
 	if (setnonblocking(s) < 0) {
-		(void) close(s);
+		(void)close(s);
 		return (-1);
 	}
-	return s;
+	return (s);
 }
 
 /* Only enable a libev ev_io event if the proxied connection still
@@ -2707,7 +2711,7 @@ static void
 openssl_check_version()
 {
 	/* detect OpenSSL version in runtime */
-	openssl_version = SSLeay();
+	long openssl_version = SSLeay();
 
 	/* check if we're running the same openssl that we were */
 	/* compiled with */
@@ -2715,8 +2719,8 @@ openssl_check_version()
 		ERR(
 			"WARNING: {core} OpenSSL version mismatch; "
 			    "hitch was compiled with %lx, now using %lx.\n",
-			(unsigned long int) OPENSSL_VERSION_NUMBER,
-			(unsigned long int) openssl_version
+			(unsigned long int)OPENSSL_VERSION_NUMBER,
+			(unsigned long int)openssl_version
 		);
 		/* now what? exit now? */
 		/* exit(1); */
