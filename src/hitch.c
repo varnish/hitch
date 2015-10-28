@@ -158,7 +158,6 @@ struct listen_sock {
 	const char			*cert;
 	struct sslctx_s			*sctx;
 	const char			*pspec;
-	int				mark;
 	struct sockaddr_storage		addr;
 };
 
@@ -189,7 +188,6 @@ hitch_config *CONFIG;
 static struct vpf_fh *pfh = NULL;
 
 static char tcp_proxy_line[128] = "";
-
 
 /* What agent/state requests the shutdown--for proper half-closed
  * handling */
@@ -229,6 +227,8 @@ static sni_name *sni_names;
 static sslctx *ssl_ctxs;
 static sslctx *default_ctx;
 
+static void insert_sni_names(sslctx *sc);
+static int load_cert_ctx(sslctx *so);
 #endif /* OPENSSL_NO_TLSEXT */
 
 
@@ -989,6 +989,22 @@ make_ctx(const char *pemfile)
 	return (sobj);
 }
 
+static void
+insert_sni_names(sslctx *sc)
+{
+	sni_name *sn;
+	char *key;
+	CHECK_OBJ_NOTNULL(sc, SSLCTX_MAGIC);
+
+	VTAILQ_FOREACH(sn, &sc->sni_list, list) {
+		CHECK_OBJ_NOTNULL(sn, SNI_NAME_MAGIC);
+		key = sn->servername;
+		if (sn->is_wildcard)
+			key = sn->servername + 1;
+		HASH_ADD_KEYPTR(hh, sni_names, key, strlen(key), sn);
+	}
+}
+
 #ifndef OPENSSL_NO_TLSEXT
 static int
 load_cert_ctx(sslctx *so)
@@ -1004,17 +1020,12 @@ load_cert_ctx(sslctx *so)
 #define PUSH_CTX(asn1_str, ctx)						\
 	do {								\
 		sni_name *sn;						\
-		char *key;						\
 		ALLOC_OBJ(sn, SNI_NAME_MAGIC);				\
 		ASN1_STRING_to_UTF8(					\
 			(unsigned char **)&sn->servername, asn1_str);	\
 		sn->is_wildcard =					\
 		    (strstr(sn->servername, "*.") == sn->servername);	\
 		sn->sctx = so;						\
-		key = sn->servername;					\
-		if (sn->is_wildcard)					\
-			key = sn->servername + 1;			\
-		HASH_ADD_KEYPTR(hh, sni_names, key, strlen(key), sn);	\
 		VTAILQ_INSERT_TAIL(&so->sni_list, sn, list);		\
 	} while (0)
 
@@ -1092,6 +1103,7 @@ init_openssl(void)
 
 #ifndef OPENSSL_NO_TLSEXT
 	load_cert_ctx(default_ctx);
+	insert_sni_names(default_ctx);
 
 	// Go through the list of PEMs and make some SSL contexts for
 	// them. We also keep track of the names associated with each
@@ -1104,6 +1116,7 @@ init_openssl(void)
 			HASH_ADD_KEYPTR(hh, ssl_ctxs, cf->filename,
 			    strlen(cf->filename), so);
 			load_cert_ctx(so);
+			insert_sni_names(so);
 		}
 	}
 
@@ -1116,6 +1129,7 @@ init_openssl(void)
 				HASH_ADD_KEYPTR(hh, ssl_ctxs, ls->cert,
 				    strlen(ls->cert), so);
 				load_cert_ctx(so);
+				insert_sni_names(so);
 			}
 			ls->sctx = so;
 		}
@@ -2749,20 +2763,38 @@ struct cfg_tpc_obj {
 #define CFG_TPC_OBJ_MAGIC	0xd6953e5f
 	enum cfg_tpc_type	type;
 	enum cfg_tpc_handling	handling;
-	void			*p;
+	void			*p[2];
 	cfg_tpc_rollback_f	*rollback;
 	cfg_tpc_commit_f	*commit;
 	VTAILQ_ENTRY(cfg_tpc_obj) list;
 };
 
 VTAILQ_HEAD(cfg_tpc_obj_head, cfg_tpc_obj);
+
+static struct cfg_tpc_obj *
+make_cfg_obj(enum cfg_tpc_type type, enum cfg_tpc_handling handling,
+    void *priv, cfg_tpc_rollback_f *rollback, cfg_tpc_commit_f *commit)
+{
+	struct cfg_tpc_obj *o;
+
+	ALLOC_OBJ(o, CFG_TPC_OBJ_MAGIC);
+	AN(o);
+	o->type = type;
+	o->handling = handling;
+	o->p[0] = priv;
+	o->rollback = rollback;
+	o->commit = commit;
+
+	return (o);
+}
+
 static void
 ls_rollback(struct cfg_tpc_obj *o)
 {
 	struct listen_sock *ls;
 
 	if (o->handling == CFG_TPC_NEW) {
-		CAST_OBJ_NOTNULL(ls, o->p, LISTEN_SOCK_MAGIC);
+		CAST_OBJ_NOTNULL(ls, o->p[0], LISTEN_SOCK_MAGIC);
 		AN(ls->sock);
 		(void) close(ls->sock);
 		free((void *) ls->name);
@@ -2776,14 +2808,18 @@ static void
 ls_commit(struct cfg_tpc_obj *o)
 {
 	struct listen_sock *ls;
-	CAST_OBJ_NOTNULL(ls, o->p, LISTEN_SOCK_MAGIC);
+	sslctx *sc;
+	CAST_OBJ_NOTNULL(ls, o->p[0], LISTEN_SOCK_MAGIC);
 
 	switch (o->handling) {
 	case CFG_TPC_NEW:
 		VTAILQ_INSERT_TAIL(&listen_socks, ls, list);
-		break;
+		/* FALL-THROUGH */
 	case CFG_TPC_KEEP:
-		/* XXX: revisit after cert reload code is in place */
+		if (o->p[1]) {
+			CAST_OBJ_NOTNULL(sc, o->p[1], SSLCTX_MAGIC);
+			ls->sctx = sc;
+		}
 		break;
 	case CFG_TPC_DROP:
 		VTAILQ_REMOVE(&listen_socks, ls, list);
@@ -2808,24 +2844,15 @@ ls_query(struct front_arg *new_set, struct cfg_tpc_obj_head *cfg_objs)
 	VTAILQ_INIT(&lsocks);
 
 	VTAILQ_FOREACH(ls, &listen_socks, list) {
-		ALLOC_OBJ(o, CFG_TPC_OBJ_MAGIC);
-		o->type = CFG_LISTEN_ADDR;
-		o->p = ls;
-		o->commit = ls_commit;
-		o->rollback = ls_rollback;
-
 		HASH_FIND_STR(new_set, ls->pspec, fa);
 		if (fa != NULL) {
 			fa->mark = 1;
-			ls->mark = 1;
-			o->handling = CFG_TPC_KEEP;
+			o = make_cfg_obj(CFG_LISTEN_ADDR, CFG_TPC_KEEP, ls,
+			    ls_rollback, ls_commit);
 		} else
-			o->handling = CFG_TPC_DROP;
+			o = make_cfg_obj(CFG_LISTEN_ADDR, CFG_TPC_DROP, ls,
+			    ls_rollback, ls_commit);
 		VTAILQ_INSERT_TAIL(cfg_objs, o, list);
-	}
-
-	VTAILQ_FOREACH(ls, &listen_socks, list) {
-		ls->mark = 0;
 	}
 
 	HASH_ITER(hh, new_set, fa, ftmp) {
@@ -2835,17 +2862,146 @@ ls_query(struct front_arg *new_set, struct cfg_tpc_obj_head *cfg_objs)
 				return (-1);
 			VTAILQ_FOREACH_SAFE(ls, &lsocks, list, lstmp) {
 				VTAILQ_REMOVE(&lsocks, ls, list);
-				ALLOC_OBJ(o, CFG_TPC_OBJ_MAGIC);
-				o->type = CFG_LISTEN_ADDR;
-				o->handling = CFG_TPC_NEW;
-				o->p = ls;
-				o->commit = ls_commit;
-				o->rollback = ls_rollback;
+				o = make_cfg_obj(CFG_LISTEN_ADDR, CFG_TPC_NEW,
+				    ls, ls_rollback, ls_commit);
 				VTAILQ_INSERT_TAIL(cfg_objs, o, list);
 			}
 		}
 	}
 
+	return (0);
+}
+
+static void
+cert_rollback(struct cfg_tpc_obj *o)
+{
+	sslctx *sc;
+	sni_name *sn, *sntmp;
+
+	if (o->handling != CFG_TPC_NEW)
+		return;
+
+	CAST_OBJ_NOTNULL(sc, o->p[0], SSLCTX_MAGIC);
+	VTAILQ_FOREACH_SAFE(sn, &sc->sni_list, list, sntmp) {
+		CHECK_OBJ_NOTNULL(sn, SNI_NAME_MAGIC);
+		VTAILQ_REMOVE(&sc->sni_list, sn, list);
+		free(sn->servername);
+		FREE_OBJ(sn);
+	}
+
+	free(sc->filename);
+	SSL_CTX_free(sc->ctx);
+	FREE_OBJ(sc);
+}
+
+static void
+cert_commit(struct cfg_tpc_obj *o)
+{
+	sslctx *sc;
+	sni_name *sn, *sntmp;
+
+	CAST_OBJ_NOTNULL(sc, o->p[0], SSLCTX_MAGIC);
+
+	switch (o->handling) {
+	case CFG_TPC_NEW:
+		HASH_ADD_KEYPTR(hh, ssl_ctxs, sc->filename,
+		    strlen(sc->filename), sc);
+		insert_sni_names(sc);
+		break;
+	case CFG_TPC_KEEP:
+		/* ignore */
+		break;
+	case CFG_TPC_DROP:
+		VTAILQ_FOREACH_SAFE(sn, &sc->sni_list, list, sntmp) {
+			CHECK_OBJ_NOTNULL(sn, SNI_NAME_MAGIC);
+			HASH_DEL(sni_names, sn);
+			VTAILQ_REMOVE(&sc->sni_list, sn, list);
+			free(sn->servername);
+			FREE_OBJ(sn);
+		}
+		HASH_DEL(ssl_ctxs, sc);
+		free(sc->filename);
+		SSL_CTX_free(sc->ctx);
+		FREE_OBJ(sc);
+		break;
+	}
+}
+
+/* Query reload of certificate files */
+static int
+cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
+{
+	struct cfg_cert_file *cf, *cftmp;
+	sslctx *sc, *sctmp;
+	struct cfg_tpc_obj *o;
+	struct listen_sock *ls;
+
+	/* NB: The ordering here is significant. It is imperative that
+	 * all DROP objects are inserted before any NEW objects, in
+	 * order to not wreak havoc in commit().  */
+	HASH_ITER(hh, ssl_ctxs, sc, sctmp) {
+		HASH_FIND_STR(cfg->CERT_FILES, sc->filename, cf);
+		if (cf != NULL) {
+			/* TODO: check file modification time */
+			cf->mark = 1;
+			cf->priv = sc;
+			o = make_cfg_obj(CFG_CERT, CFG_TPC_KEEP,
+			    sc, cert_rollback, cert_commit);
+		} else
+			o = make_cfg_obj(CFG_CERT, CFG_TPC_DROP,
+			    sc, cert_rollback, cert_commit);
+		VTAILQ_INSERT_TAIL(cfg_objs, o, list);
+	}
+
+	HASH_ITER(hh, cfg->CERT_FILES, cf, cftmp) {
+		if (cf->mark)
+			continue;
+		sc = make_ctx(cf->filename);
+		if (sc == NULL)
+			return (-1);
+		if (load_cert_ctx(sc) != 0) {
+			free(sc->filename);
+			SSL_CTX_free(sc->ctx);
+			FREE_OBJ(sc);
+			return (-1);
+		}
+		cf->priv = sc;
+		o = make_cfg_obj(CFG_CERT, CFG_TPC_NEW,
+		    sc, cert_rollback, cert_commit);
+		VTAILQ_INSERT_TAIL(cfg_objs, o, list);
+	}
+
+	/* This is a little hacky, but we need to also initialize any
+	 * new certs specific to the already queried listen
+	 * endpoints. */
+	VTAILQ_FOREACH(o, cfg_objs, list) {
+		if (o->type != CFG_LISTEN_ADDR)
+			break;
+		if (o->handling == CFG_TPC_DROP)
+			continue;
+		CAST_OBJ_NOTNULL(ls, o->p[0], LISTEN_SOCK_MAGIC);
+		if (ls->cert == NULL)
+			continue;
+		HASH_FIND_STR(cfg->CERT_FILES, ls->cert, cf);
+		if (cf != NULL) {
+			CAST_OBJ_NOTNULL(sc, cf->priv, SSLCTX_MAGIC);
+			o->p[1] = sc;
+		} else {
+			sc = make_ctx(ls->cert);
+			if (sc == NULL)
+				return (-1);
+			if (load_cert_ctx(sc) != 0) {
+				free(sc->filename);
+				SSL_CTX_free(sc->ctx);
+				FREE_OBJ(sc);
+				return (-1);
+			}
+			o = make_cfg_obj(CFG_CERT, CFG_TPC_NEW,
+			    sc, cert_rollback, cert_commit);
+			VTAILQ_INSERT_TAIL(cfg_objs, o, list);
+			o->p[1] = sc;
+		}
+	}
 	return (0);
 }
 
@@ -2872,7 +3028,10 @@ reconfigure(int argc, char **argv)
 		return;
 	}
 
-	if (ls_query(cfg_new->LISTEN_ARGS, &cfg_objs) < 0) {
+	/* NB: the ordering of the foo_query() calls here are
+	 * significant. */
+	if (ls_query(cfg_new->LISTEN_ARGS, &cfg_objs) < 0
+	    || cert_query(cfg_new, &cfg_objs) < 0) {
 		VTAILQ_FOREACH_SAFE(cto, &cfg_objs, list, cto_tmp) {
 			VTAILQ_REMOVE(&cfg_objs, cto, list);
 			AN(cto->rollback);
