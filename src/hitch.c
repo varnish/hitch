@@ -2527,12 +2527,12 @@ replace_child_with_pid(pid_t pid)
 static void
 do_wait(void)
 {
-	struct child_proc *c;
+	struct child_proc *c, *ctmp;
 	int status;
 	int pid;
 
 
-	VTAILQ_FOREACH(c, &child_procs, list) {
+	VTAILQ_FOREACH_SAFE(c, &child_procs, list, ctmp) {
 		pid = waitpid(c->pid, &status, WNOHANG);
 		if (pid == 0) {
 			/* child has not exited */
