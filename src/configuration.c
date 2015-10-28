@@ -195,9 +195,10 @@ config_destroy(hitch_config *cfg)
 		HASH_DEL(cfg->LISTEN_ARGS, fa);
 		free(fa->ip);
 		free(fa->port);
-		free(fa->cert);
 		free(fa->pspec);
 		FREE_OBJ(fa);
+		/* fa->cert is handed off to struct listen_sock, which
+		 * is responsible for its cleanup. */
 	}
 	free(cfg->BACK_IP);
 	free(cfg->BACK_PORT);

@@ -154,10 +154,10 @@ struct listen_sock {
 	VTAILQ_ENTRY(listen_sock)	list;
 	ev_io				listener;
 	int				sock;
-	const char			*name;
+	char				*name;
 	struct cfg_cert_file		*cert;
 	struct sslctx_s			*sctx;
-	const char			*pspec;
+	char				*pspec;
 	struct sockaddr_storage		addr;
 };
 
@@ -1165,6 +1165,22 @@ init_openssl(void)
 	}
 }
 
+static void
+destroy_listen_sock(struct listen_sock *ls)
+{
+	CHECK_OBJ_NOTNULL(ls, LISTEN_SOCK_MAGIC);
+	if (ls->sock > 0)
+		(void) close(ls->sock);
+	free(ls->name);
+	free(ls->pspec);
+	if (ls->cert) {
+		CHECK_OBJ_NOTNULL(ls->cert, CFG_CERT_FILE_MAGIC);
+		free(ls->cert->filename);
+		FREE_OBJ(ls->cert);
+	}
+	FREE_OBJ(ls);
+}
+
 /* Create the bound socket in the parent process */
 static int
 create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
@@ -1298,11 +1314,7 @@ creat_ls_err:
 	freeaddrinfo(ai);
 	VTAILQ_FOREACH_SAFE(ls, &tmp_list, list, lstmp) {
 		VTAILQ_REMOVE(&tmp_list, ls, list);
-		if (ls->sock > 0)
-			(void) close(ls->sock);
-		free((void *)ls->name);
-		free((void *)ls->pspec);
-		FREE_OBJ(ls);
+		destroy_listen_sock(ls);
 	}
 
 	return (-1);
@@ -2806,10 +2818,7 @@ ls_rollback(struct cfg_tpc_obj *o)
 
 	if (o->handling == CFG_TPC_NEW) {
 		CAST_OBJ_NOTNULL(ls, o->p[0], LISTEN_SOCK_MAGIC);
-		AN(ls->sock);
-		(void) close(ls->sock);
-		free((void *) ls->name);
-		free((void *) ls->pspec);
+		destroy_listen_sock(ls);
 	}
 
 	/* KEEP/DROP: ignore */
@@ -2834,6 +2843,7 @@ ls_commit(struct cfg_tpc_obj *o)
 		break;
 	case CFG_TPC_DROP:
 		VTAILQ_REMOVE(&listen_socks, ls, list);
+		destroy_listen_sock(ls);
 		break;
 	}
 }
@@ -2992,6 +3002,7 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 		CAST_OBJ_NOTNULL(ls, o->p[0], LISTEN_SOCK_MAGIC);
 		if (ls->cert == NULL)
 			continue;
+		CHECK_OBJ_NOTNULL(ls->cert, CFG_CERT_FILE_MAGIC);
 		HASH_FIND_STR(cfg->CERT_FILES, ls->cert->filename, cf);
 		if (cf != NULL) {
 			CAST_OBJ_NOTNULL(sc, cf->priv, SSLCTX_MAGIC);
