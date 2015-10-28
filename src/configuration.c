@@ -620,11 +620,14 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 					AN(cert);
 					fa->cert = cert;
 				}
+				free(certfile);
 			}
 		} else {
 			FREE_OBJ(fa);
 		}
 	} else if (strcmp(k, CFG_BACKEND) == 0) {
+		free(cfg->BACK_PORT);
+		free(cfg->BACK_IP);
 		r = config_param_host_port(v, &cfg->BACK_IP, &cfg->BACK_PORT);
 	} else if (strcmp(k, CFG_WORKERS) == 0) {
 		fprintf(stderr, "wrk: %s\n", v);
