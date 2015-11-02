@@ -495,7 +495,7 @@ init_dh(SSL_CTX *ctx, const char *cert)
 	dh = PEM_read_bio_DHparams(bio, NULL, NULL, NULL);
 	BIO_free(bio);
 	if (!dh) {
-		ERR("{core} Note: no DH parameters found in %s\n", cert);
+		LOG("{core} Note: no DH parameters found in %s\n", cert);
 		return -1;
 	}
 
@@ -940,13 +940,14 @@ make_ctx(const struct cfg_cert_file *cf)
 
 	/* SSL_SERVER Mode stuff */
 	if (SSL_CTX_use_certificate_chain_file(ctx, cf->filename) <= 0) {
+		ERR("Error loading certificate file %s\n", cf->filename);
 		ERR_print_errors_fp(stderr);
 		return (NULL);
 	}
 
 	rsa = load_rsa_privatekey(ctx, cf->filename);
 	if (!rsa) {
-		ERR("Error loading RSA private key\n");
+		ERR("Error loading RSA private key (%s)\n", cf->filename);
 		return (NULL);
 	}
 
