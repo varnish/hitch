@@ -2945,7 +2945,7 @@ cert_commit(struct cfg_tpc_obj *o)
 		insert_sni_names(sc);
 		break;
 	case CFG_TPC_KEEP:
-		/* ignore */
+		assert(0);
 		break;
 	case CFG_TPC_DROP:
 		HASH_DEL(ssl_ctxs, sc);
@@ -2974,8 +2974,7 @@ dcert_commit(struct cfg_tpc_obj *o)
 		insert_sni_names(sc);
 		break;
 	case CFG_TPC_KEEP:
-		/* ignore */
-		break;
+		/* FALL-THROUGH */
 	case CFG_TPC_DROP:
 		/* We always have a default cert. This should not
 		 * happen. */
@@ -3001,12 +3000,11 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 		if (cf != NULL && cf->mtim <= sc->mtim) {
 			cf->mark = 1;
 			cf->priv = sc;
-			o = make_cfg_obj(CFG_CERT, CFG_TPC_KEEP,
-			    sc, cert_rollback, cert_commit);
-		} else
+		} else {
 			o = make_cfg_obj(CFG_CERT, CFG_TPC_DROP,
 			    sc, cert_rollback, cert_commit);
-		VTAILQ_INSERT_TAIL(cfg_objs, o, list);
+			VTAILQ_INSERT_TAIL(cfg_objs, o, list);
+		}
 	}
 
 	/* handle default cert. Default cert has its own
@@ -3065,9 +3063,7 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 			if (sc == NULL)
 				return (-1);
 			if (load_cert_ctx(sc) != 0) {
-				free(sc->filename);
-				SSL_CTX_free(sc->ctx);
-				FREE_OBJ(sc);
+				sctx_free(sc, NULL);
 				return (-1);
 			}
 			o = make_cfg_obj(CFG_CERT, CFG_TPC_NEW,
