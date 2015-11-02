@@ -2438,26 +2438,18 @@ daemonize()
 		exit(0);
 	}
 
-	/* close standard streams */
-	fclose(stdin);
-	fclose(stdout);
-	fclose(stderr);
-
 	/* reopen standard streams to null device */
-	stdin = fopen(NULL_DEV, "r");
-	if (stdin == NULL) {
+	if (freopen(NULL_DEV, "r", stdin) == NULL) {
 		ERR("Unable to reopen stdin to %s: %s\n",
 		    NULL_DEV, strerror(errno));
 		exit(1);
 	}
-	stdout = fopen(NULL_DEV, "w");
-	if (stdout == NULL) {
+	if (freopen(NULL_DEV, "w", stdout) == NULL) {
 		ERR("Unable to reopen stdout to %s: %s\n",
 		    NULL_DEV, strerror(errno));
 		exit(1);
 	}
-	stderr = fopen(NULL_DEV, "w");
-	if (stderr == NULL) {
+	if (freopen(NULL_DEV, "w", stderr) == NULL) {
 		ERR("Unable to reopen stderr to %s: %s\n",
 		    NULL_DEV, strerror(errno));
 		exit(1);
