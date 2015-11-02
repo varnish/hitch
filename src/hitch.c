@@ -1106,7 +1106,7 @@ init_openssl(void)
 	SSL_library_init();
 	SSL_load_error_strings();
 
-	assert(HASH_COUNT(CONFIG->CERT_FILES) != 0);
+	assert(CONFIG->CERT_DEFAULT != NULL);
 
 	/* The last file listed in config is the "default" cert */
 	default_ctx = make_ctx(CONFIG->CERT_DEFAULT);
@@ -2900,18 +2900,16 @@ ls_query(struct front_arg *new_set, struct cfg_tpc_obj_head *cfg_objs)
 }
 
 static void
-cert_rollback(struct cfg_tpc_obj *o)
+sctx_free(sslctx *sc, sni_name *sn_tab)
 {
-	sslctx *sc;
 	sni_name *sn, *sntmp;
 
-	if (o->handling != CFG_TPC_NEW)
-		return;
-
-	CAST_OBJ_NOTNULL(sc, o->p[0], SSLCTX_MAGIC);
+	CHECK_OBJ_NOTNULL(sc, SSLCTX_MAGIC);
 	VTAILQ_FOREACH_SAFE(sn, &sc->sni_list, list, sntmp) {
 		CHECK_OBJ_NOTNULL(sn, SNI_NAME_MAGIC);
 		VTAILQ_REMOVE(&sc->sni_list, sn, list);
+		if (sn_tab != NULL)
+			HASH_DEL(sn_tab, sn);
 		free(sn->servername);
 		FREE_OBJ(sn);
 	}
@@ -2922,10 +2920,21 @@ cert_rollback(struct cfg_tpc_obj *o)
 }
 
 static void
+cert_rollback(struct cfg_tpc_obj *o)
+{
+	sslctx *sc;
+
+	if (o->handling != CFG_TPC_NEW)
+		return;
+
+	CAST_OBJ_NOTNULL(sc, o->p[0], SSLCTX_MAGIC);
+	sctx_free(sc, NULL);
+}
+
+static void
 cert_commit(struct cfg_tpc_obj *o)
 {
 	sslctx *sc;
-	sni_name *sn, *sntmp;
 
 	CAST_OBJ_NOTNULL(sc, o->p[0], SSLCTX_MAGIC);
 
@@ -2939,17 +2948,38 @@ cert_commit(struct cfg_tpc_obj *o)
 		/* ignore */
 		break;
 	case CFG_TPC_DROP:
-		VTAILQ_FOREACH_SAFE(sn, &sc->sni_list, list, sntmp) {
-			CHECK_OBJ_NOTNULL(sn, SNI_NAME_MAGIC);
-			HASH_DEL(sni_names, sn);
-			VTAILQ_REMOVE(&sc->sni_list, sn, list);
-			free(sn->servername);
-			FREE_OBJ(sn);
-		}
 		HASH_DEL(ssl_ctxs, sc);
-		free(sc->filename);
-		SSL_CTX_free(sc->ctx);
-		FREE_OBJ(sc);
+		sctx_free(sc, sni_names);
+		break;
+	}
+}
+
+static void
+dcert_rollback(struct cfg_tpc_obj *o)
+{
+	cert_rollback(o);
+}
+
+static void
+dcert_commit(struct cfg_tpc_obj *o)
+{
+	sslctx *sc;
+
+	CAST_OBJ_NOTNULL(sc, o->p[0], SSLCTX_MAGIC);
+
+	switch (o->handling) {
+	case CFG_TPC_NEW:
+		sctx_free(default_ctx, sni_names);
+		default_ctx = sc;
+		insert_sni_names(sc);
+		break;
+	case CFG_TPC_KEEP:
+		/* ignore */
+		break;
+	case CFG_TPC_DROP:
+		/* We always have a default cert. This should not
+		 * happen. */
+		assert(0);
 		break;
 	}
 }
@@ -2965,7 +2995,7 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 
 	/* NB: The ordering here is significant. It is imperative that
 	 * all DROP objects are inserted before any NEW objects, in
-	 * order to not wreak havoc in commit().  */
+	 * order to not wreak havoc in cert_commit().  */
 	HASH_ITER(hh, ssl_ctxs, sc, sctmp) {
 		HASH_FIND_STR(cfg->CERT_FILES, sc->filename, cf);
 		if (cf != NULL && cf->mtim <= sc->mtim) {
@@ -2979,6 +3009,25 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 		VTAILQ_INSERT_TAIL(cfg_objs, o, list);
 	}
 
+	/* handle default cert. Default cert has its own
+	 * rollback/commit functions. */
+	assert(cfg->CERT_DEFAULT != NULL);
+	cf = cfg->CERT_DEFAULT;
+	CHECK_OBJ_NOTNULL(default_ctx, SSLCTX_MAGIC);
+	if (strcmp(default_ctx->filename, cf->filename) != 0
+	    || cf->mtim > default_ctx->mtim) {
+		sc = make_ctx(cf);
+		if (sc == NULL)
+			return (-1);
+		if (load_cert_ctx(sc) != 0) {
+			sctx_free(sc, NULL);
+			return (-1);
+		}
+		o = make_cfg_obj(CFG_CERT, CFG_TPC_NEW,
+		    sc, dcert_rollback, dcert_commit);
+		VTAILQ_INSERT_TAIL(cfg_objs, o, list);
+	}
+
 	HASH_ITER(hh, cfg->CERT_FILES, cf, cftmp) {
 		if (cf->mark)
 			continue;
@@ -2986,9 +3035,7 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 		if (sc == NULL)
 			return (-1);
 		if (load_cert_ctx(sc) != 0) {
-			free(sc->filename);
-			SSL_CTX_free(sc->ctx);
-			FREE_OBJ(sc);
+			sctx_free(sc, NULL);
 			return (-1);
 		}
 		cf->priv = sc;

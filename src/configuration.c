@@ -135,7 +135,7 @@ config_new(void)
 	r->ENGINE             = NULL;
 	r->BACKLOG            = 100;
 	r->SNI_NOMATCH_ABORT  = 0;
-
+	r->CERT_DEFAULT = NULL;
 	r->CERT_FILES = NULL;
 	r->LISTEN_ARGS = NULL;
 	ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
@@ -208,8 +208,11 @@ config_destroy(hitch_config *cfg)
 		free(cf->filename);
 		FREE_OBJ(cf);
 	}
+	free(cfg->CERT_DEFAULT->filename);
+	FREE_OBJ(cfg->CERT_DEFAULT);
 	free(cfg->CIPHER_SUITE);
 	free(cfg->ENGINE);
+	free(cfg->PIDFILE);
 
 #ifdef USE_SHARED_CACHE
 	free(cfg->SHCUPD_IP);
@@ -726,9 +729,12 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		r = config_param_pem_file(v, &cert);
 		if (r != 0) {
 			AN(cert);
-			HASH_ADD_KEYPTR(hh, cfg->CERT_FILES,
-			    cert->filename, strlen(cert->filename),
-			    cert);
+			if (cfg->CERT_DEFAULT != NULL) {
+				struct cfg_cert_file *tmp = cfg->CERT_DEFAULT;
+				HASH_ADD_KEYPTR(hh, cfg->CERT_FILES,
+				    tmp->filename, strlen(tmp->filename),
+				    tmp);
+			}
 			cfg->CERT_DEFAULT = cert;
 		}
 	} else if (strcmp(k, CFG_BACKEND_CONNECT_TIMEOUT) == 0) {
@@ -1193,7 +1199,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 			return (1);
 		}
 	}
-	if (cfg->PMODE == SSL_SERVER && HASH_COUNT(cfg->CERT_FILES) == 0) {
+	if (cfg->PMODE == SSL_SERVER && cfg->CERT_DEFAULT == NULL) {
 		config_error_set("No x509 certificate PEM file specified!");
 		*retval = 1;
 		return (1);
