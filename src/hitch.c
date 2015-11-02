@@ -997,7 +997,7 @@ make_ctx(const struct cfg_cert_file *cf)
 static void
 insert_sni_names(sslctx *sc)
 {
-	sni_name *sn;
+	sni_name *sn, *sn2;
 	char *key;
 	CHECK_OBJ_NOTNULL(sc, SSLCTX_MAGIC);
 
@@ -1006,6 +1006,12 @@ insert_sni_names(sslctx *sc)
 		key = sn->servername;
 		if (sn->is_wildcard)
 			key = sn->servername + 1;
+		HASH_FIND_STR(sni_names, key, sn2);
+		if (sn2 != NULL) {
+			ERR("Warning: SNI name '%s' from '%s' overriden"
+			    " by '%s'\n",
+			    key, sn2->sctx->filename, sn->sctx->filename);
+		}
 		HASH_ADD_KEYPTR(hh, sni_names, key, strlen(key), sn);
 	}
 }
