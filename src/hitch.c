@@ -2902,16 +2902,18 @@ ls_query(struct front_arg *new_set, struct cfg_tpc_obj_head *cfg_objs)
 }
 
 static void
-sctx_free(sslctx *sc, sni_name *sn_tab)
+sctx_free(sslctx *sc, sni_name **sn_tab)
 {
 	sni_name *sn, *sntmp;
 
+	if (sn_tab != NULL)
+		CHECK_OBJ_NOTNULL(*sn_tab, SNI_NAME_MAGIC);
 	CHECK_OBJ_NOTNULL(sc, SSLCTX_MAGIC);
 	VTAILQ_FOREACH_SAFE(sn, &sc->sni_list, list, sntmp) {
 		CHECK_OBJ_NOTNULL(sn, SNI_NAME_MAGIC);
 		VTAILQ_REMOVE(&sc->sni_list, sn, list);
 		if (sn_tab != NULL)
-			HASH_DEL(sn_tab, sn);
+			HASH_DEL(*sn_tab, sn);
 		free(sn->servername);
 		FREE_OBJ(sn);
 	}
@@ -2951,7 +2953,7 @@ cert_commit(struct cfg_tpc_obj *o)
 		break;
 	case CFG_TPC_DROP:
 		HASH_DEL(ssl_ctxs, sc);
-		sctx_free(sc, sni_names);
+		sctx_free(sc, &sni_names);
 		break;
 	}
 }
@@ -2968,10 +2970,11 @@ dcert_commit(struct cfg_tpc_obj *o)
 	sslctx *sc;
 
 	CAST_OBJ_NOTNULL(sc, o->p[0], SSLCTX_MAGIC);
+	CHECK_OBJ_NOTNULL(sni_names, SNI_NAME_MAGIC);
 
 	switch (o->handling) {
 	case CFG_TPC_NEW:
-		sctx_free(default_ctx, sni_names);
+		sctx_free(default_ctx, &sni_names);
 		default_ctx = sc;
 		insert_sni_names(sc);
 		break;
