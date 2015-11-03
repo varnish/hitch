@@ -367,6 +367,7 @@ WLOG(int level, const char *fmt, ...)
 	} while (0)
 #define ERR(...)	WLOG(LOG_ERR, __VA_ARGS__ )
 
+#define LOGL(...) WLOG(LOG_INFO, __VA_ARGS__)
 
 #define SOCKERR(msg)						\
 	do {							\
@@ -1364,7 +1365,7 @@ static void
 check_exit_state(void)
 {
 	if (child_state == CHILD_EXITING && n_conns == 0) {
-		LOG("Child %d (gen: %d) in state EXITING "
+		LOGL("Child %d (gen: %d) in state EXITING "
 		    "is now exiting.\n", core_id, child_gen);
 		_exit(0);
 	}
@@ -2222,7 +2223,7 @@ handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 		check_exit_state();
 	}
 
-	LOG("Child %d (gen: %d): State %s\n", core_id, child_gen,
+	LOGL("Child %d (gen: %d): State %s\n", core_id, child_gen,
 	    (child_state == CHILD_EXITING) ? "EXITING" : "ACTIVE");
 }
 
@@ -2359,7 +2360,7 @@ handle_connections(int mgt_fd)
 	struct sigaction sa;
 
 	child_state = CHILD_ACTIVE;
-	LOG("{core} Process %d online\n", core_id);
+	LOGL("{core} Process %d online\n", core_id);
 
 	/* child cannot create new children... */
 	create_workers = 0;
@@ -2593,7 +2594,7 @@ sigh_terminate (int __attribute__ ((unused)) signo)
 
 	/* are we the master? */
 	if (getpid() == master_pid) {
-		LOG("{core} Received signal %d, shutting down.\n", signo);
+		LOGL("{core} Received signal %d, shutting down.\n", signo);
 
 		/* kill all children */
 		VTAILQ_FOREACH(c, &child_procs, list) {
@@ -2686,7 +2687,7 @@ daemonize()
 
 	/* am i the parent? */
 	if (pid != 0) {
-		LOG("{core} Daemonized as pid %d.\n", pid);
+		LOGL("{core} Daemonized as pid %d.\n", pid);
 		exit(0);
 	}
 
@@ -3087,6 +3088,7 @@ reconfigure(int argc, char **argv)
 	struct timeval tv;
 	double t0, t1;
 
+	LOGL("Received SIGHUP: Initiating configuration reload.\n");
 	AZ(gettimeofday(&tv, NULL));
 	t0 = tv.tv_sec + 1e-6 * tv.tv_usec;
 
@@ -3109,7 +3111,7 @@ reconfigure(int argc, char **argv)
 			cto->rollback(cto);
 			FREE_OBJ(cto);
 		}
-		LOG("{core} Config reload failed.\n");
+		ERR("{core} Config reload failed.\n");
 		return;
 	} else {
 		VTAILQ_FOREACH_SAFE(cto, &cfg_objs, list, cto_tmp) {
@@ -3123,7 +3125,7 @@ reconfigure(int argc, char **argv)
 	AZ(gettimeofday(&tv, NULL));
 	t1 = tv.tv_sec + 1e-6 * tv.tv_usec;
 
-	LOG("{core} Config reloaded in %.2lf seconds. "
+	LOGL("{core} Config reloaded in %.2lf seconds. "
 	    "Starting new child processes.\n", t1 - t0);
 
 	child_gen++;
@@ -3196,6 +3198,7 @@ main(int argc, char **argv)
 	}
 	AZ(setvbuf(logf, NULL, _IONBF, BUFSIZ));
 
+	LOGL("{core} %s starting\n", PACKAGE_STRING);
 	create_workers = 1;
 
 	openssl_check_version();
@@ -3220,6 +3223,8 @@ main(int argc, char **argv)
 #endif /* USE_SHARED_CACHE */
 
 	/* load certificates, pass to handle_connections */
+	LOGL("{core} Loading certificate pem files (%d)\n",
+	    HASH_COUNT(CONFIG->CERT_FILES) + 1);
 	init_openssl();
 
 	if (CONFIG->CHROOT && CONFIG->CHROOT[0])
@@ -3263,6 +3268,7 @@ main(int argc, char **argv)
 	}
 #endif /* USE_SHARED_CACHE */
 
+	LOGL("{core} %s initialization complete\n", PACKAGE_STRING);
 	for (;;) {
 		/* Sleep and let the children work.
 		 * Parent will be woken up if a signal arrives */
