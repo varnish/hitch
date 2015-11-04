@@ -196,9 +196,15 @@ config_destroy(hitch_config *cfg)
 		free(fa->ip);
 		free(fa->port);
 		free(fa->pspec);
+		CHECK_OBJ_ORNULL(fa->cert, CFG_CERT_FILE_MAGIC);
+		if (fa->cert != NULL) {
+			fa->cert->ref--;
+			if (fa->cert->ref == 0) {
+				free(fa->cert->filename);
+				FREE_OBJ(fa->cert);
+			}
+		}
 		FREE_OBJ(fa);
-		/* fa->cert is handed off to struct listen_sock, which
-		 * is responsible for its cleanup. */
 	}
 	free(cfg->BACK_IP);
 	free(cfg->BACK_PORT);
@@ -458,6 +464,7 @@ config_param_pem_file(char *filename, struct cfg_cert_file **cfptr)
 	    + st.st_mtim.tv_nsec * 1e-9;
 
 	*cfptr = cert;
+	cert->ref++;
 	return (1);
 
 }

@@ -39,6 +39,7 @@ struct cfg_cert_file {
 	char 		*filename;
 	void		*priv;
 	int		mark;
+	unsigned	ref;
 	double		mtim;
 	UT_hash_handle	hh;
 };

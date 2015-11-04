@@ -1187,8 +1187,11 @@ destroy_listen_sock(struct listen_sock *ls)
 	free(ls->pspec);
 	if (ls->cert) {
 		CHECK_OBJ_NOTNULL(ls->cert, CFG_CERT_FILE_MAGIC);
-		free(ls->cert->filename);
-		FREE_OBJ(ls->cert);
+		ls->cert->ref--;
+		if (ls->cert->ref == 0) {
+			free(ls->cert->filename);
+			FREE_OBJ(ls->cert);
+		}
 	}
 	FREE_OBJ(ls);
 }
@@ -1305,7 +1308,10 @@ create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 		}
 		ls->name = strdup(buf);
 		AN(ls->name);
-		ls->cert = fa->cert;
+		if (fa->cert != NULL) {
+			ls->cert = fa->cert;
+			fa->cert->ref++;
+		}
 		ls->pspec = strdup(fa->pspec);
 
 		VTAILQ_INSERT_TAIL(&tmp_list, ls, list);
