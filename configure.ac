@@ -26,7 +26,7 @@ AC_ARG_ENABLE(sessioncache,
     [use_shctx=no])
 
 if test xno != x"$use_shctx"; then
-	CFLAGS="-DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX $CFLAGS"
+	CFLAGS += " -DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX"
 fi
 AM_CONDITIONAL(USE_SHCTX, test xno != x"$use_shctx")
 

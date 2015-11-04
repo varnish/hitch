@@ -13,5 +13,5 @@ hitch_LDADD = $(AM_LDFLAGS) -lcrypto
 if USE_SHCTX
 hitch_SOURCES += shctx.c
 hitch_LDADD += ebtree/libebtree.a
-AM_CFLAGS =+ -Iebtree
+AM_CFLAGS += -Iebtree
 endif
