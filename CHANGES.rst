@@ -4,12 +4,17 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.0.2 (unreleased)
+------------------------
+
+* [dist] init.hitch file has been removed, CHANGES.rst is now distributed.
+* [configure] session cache support can now be enabled. (default off)
+
 
 hitch-1.0.1 (2015-10-15)
 ------------------------
 
 * Fix configuration parsing bug skipping short values, typically "workers = 1".
-
 * Tarball now contains an example configuration file.
 
 
