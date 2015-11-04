@@ -73,6 +73,10 @@
 #include <openssl/asn1.h>
 #include <ev.h>
 
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
+
 #include "uthash.h"
 #include "ringbuffer.h"
 #include "miniobj.h"
@@ -2422,20 +2426,28 @@ change_root()
 }
 
 void
-drop_privileges()
+drop_privileges(void)
 {
-	if (geteuid() != 0)
-		LOG("{core} Warning: Dropping privileges when "
-		    "not root may not work.\n");
 
-	if (CONFIG->UID >= 0 && setgroups(0, NULL) < 0)
-		fail("setgroups() failed");
-	if (CONFIG->GID >= 0 && setgid(CONFIG->GID) < 0)
-		fail("setgid failed");
-	if (CONFIG->UID >= 0 && setuid(CONFIG->UID) < 0)
-		fail("setuid failed");
+	if (geteuid() == 0) {
+		if (CONFIG->UID >= 0)
+			AZ(setgroups(0, NULL));
+		if (CONFIG->GID >= 0)
+			AZ(setgid(CONFIG->GID));
+		if (CONFIG->UID >= 0)
+			AZ(setuid(CONFIG->UID));
+	} else {
+		LOG("{core} Not running as root, no priv-sep\n");
+	}
+
+	/* On Linux >= 2.4, you need to set the dumpable flag
+	   to get core dumps after you have done a setuid. */
+
+#ifdef __linux__
+	if (prctl(PR_SET_DUMPABLE, 1) != 0)
+		LOG("Could not set dumpable bit.  Core dumps turned off\n");
+#endif
 }
-
 
 void
 init_globals(void)
@@ -2513,6 +2525,13 @@ start_children(int start_index, int count)
 		} else if (c->pid == 0) { /* child */
 			close(pfd[1]);
 			FREE_OBJ(c);
+			if (CONFIG->UID >= 0 || CONFIG->GID >= 0)
+				drop_privileges();
+			if (geteuid() == 0) {
+				ERR("{core} ERROR: "
+				    "Refusing to run workers as root.\n");
+				_exit(1);
+			}
 			handle_connections(pfd[0]);
 			exit(0);
 		} else { /* parent. Track new child. */
@@ -3233,10 +3252,7 @@ main(int argc, char **argv)
 	if (CONFIG->CHROOT && CONFIG->CHROOT[0])
 		change_root();
 
-	if (CONFIG->UID >= 0 || CONFIG->GID >= 0)
-		drop_privileges();
-
-	if (geteuid() == 0) {
+	if (geteuid() == 0 && CONFIG->UID < 0) {
 		ERR("{core} ERROR: Refusing to run workers as root.\n");
 		exit(1);
 	}
