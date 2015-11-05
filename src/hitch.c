@@ -1228,7 +1228,8 @@ create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 		ALLOC_OBJ(ls, LISTEN_SOCK_MAGIC);
 		ls->sock = socket(it->ai_family, SOCK_STREAM, IPPROTO_TCP);
 		if (ls->sock == -1) {
-			ERR("{socket: main}: %s\n", fa->pspec);
+			ERR("{socket: main}: %s: %s\n", strerror(errno),
+			    fa->pspec);
 			goto creat_ls_err;
 		}
 
@@ -1236,19 +1237,22 @@ create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 		if (setsockopt(ls->sock, SOL_SOCKET, SO_REUSEADDR,
 			&t, sizeof(int))
 		    < 0) {
-			ERR("{setsockopt-reuseaddr}: %s\n", fa->pspec);
+			ERR("{setsockopt-reuseaddr}: %s: %s\n", strerror(errno),
+			    fa->pspec);
 			goto creat_ls_err;
 		}
 #ifdef SO_REUSEPORT
 		if (setsockopt(ls->sock, SOL_SOCKET, SO_REUSEPORT,
 			&t, sizeof(int))
 		    < 0) {
-			ERR("{setsockopt-reuseport}: %s\n", fa->pspec);
+			ERR("{setsockopt-reuseport}: %s: %s\n", strerror(errno),
+			    fa->pspec);
 			goto creat_ls_err;
 		}
 #endif
 		if(setnonblocking(ls->sock) < 0) {
-			ERR("{listen sock: setnonblocking}: %s\n", fa->pspec);
+			ERR("{listen sock: setnonblocking}: %s: %s\n",
+			    strerror(errno), fa->pspec);
 			goto creat_ls_err;
 		}
 #ifdef IPV6_V6ONLY
@@ -1256,7 +1260,8 @@ create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 		if (it->ai_family == AF_INET6 &&
 		    setsockopt(ls->sock, IPPROTO_IPV6, IPV6_V6ONLY, &t,
 			sizeof (t)) != 0) {
-			ERR("{setsockopt-ipv6only}: %s\n", fa->pspec);
+			ERR("{setsockopt-ipv6only}: %s: %s\n", strerror(errno),
+			    fa->pspec);
 			goto creat_ls_err;
 		}
 #endif
@@ -1265,7 +1270,8 @@ create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 			    &CONFIG->RECV_BUFSIZE,
 			    sizeof(CONFIG->RECV_BUFSIZE));
 			if (r < 0) {
-				ERR("{setsockopt-rcvbuf}: %s\n", fa->pspec);
+				ERR("{setsockopt-rcvbuf}: %s: %s\n",
+				    strerror(errno),fa->pspec);
 				goto creat_ls_err;
 			}
 		}
@@ -1274,13 +1280,15 @@ create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 			    &CONFIG->SEND_BUFSIZE,
 			    sizeof(CONFIG->SEND_BUFSIZE));
 			if (r < 0) {
-				ERR("{setsockopt-sndbuf}: %s\n", fa->pspec);
+				ERR("{setsockopt-sndbuf}: %s: %s\n",
+				    strerror(errno), fa->pspec);
 				goto creat_ls_err;
 			}
 		}
 
 		if (bind(ls->sock, it->ai_addr, it->ai_addrlen)) {
-			ERR("{bind-socket}: %s\n", fa->pspec);
+			ERR("{bind-socket}: %s: %s\n", strerror(errno),
+			    fa->pspec);
 			goto creat_ls_err;
 		}
 
@@ -1289,13 +1297,15 @@ create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 		int timeout = 1;
 		if (setsockopt(ls->sock, IPPROTO_TCP, TCP_DEFER_ACCEPT,
 			&timeout, sizeof(int)) < 0) {
-			ERR("{setsockopt-defer_accept}: %s\n", fa->pspec);
+			ERR("{setsockopt-defer_accept}: %s: %s\n",
+			    strerror(errno), fa->pspec);
 			goto creat_ls_err;
 		}
 #endif /* TCP_DEFER_ACCEPT */
 #endif
 		if (listen(ls->sock, CONFIG->BACKLOG) != 0) {
-			ERR("{listen-socket}: %s\n", fa->pspec);
+			ERR("{listen-socket}: %s: %s\n", strerror(errno),
+			    fa->pspec);
 			goto creat_ls_err;
 		}
 
