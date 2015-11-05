@@ -3137,7 +3137,7 @@ reconfigure(int argc, char **argv)
 		return;
 	}
 
-	/* NB: the ordering of the foo_query() calls here are
+	/* NB: the ordering of the foo_query() calls here is
 	 * significant. */
 	if (ls_query(cfg_new->LISTEN_ARGS, &cfg_objs) < 0
 	    || cert_query(cfg_new, &cfg_objs) < 0) {
