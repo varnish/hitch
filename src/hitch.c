@@ -1251,7 +1251,15 @@ create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 			ERR("{listen sock: setnonblocking}: %s\n", fa->pspec);
 			goto creat_ls_err;
 		}
-
+#ifdef IPV6_V6ONLY
+		t = 1;
+		if (it->ai_family == AF_INET6 &&
+		    setsockopt(ls->sock, IPPROTO_IPV6, IPV6_V6ONLY, &t,
+			sizeof (t)) != 0) {
+			ERR("{setsockopt-ipv6only}: %s\n", fa->pspec);
+			goto creat_ls_err;
+		}
+#endif
 		if (CONFIG->RECV_BUFSIZE > 0) {
 			r = setsockopt(ls->sock, SOL_SOCKET, SO_RCVBUF,
 			    &CONFIG->RECV_BUFSIZE,
