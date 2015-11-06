@@ -56,3 +56,21 @@ If you want to use Diffie-Hellman based ciphers for Perfect Forward Secrecy
 Hitch will complain and disable DH unless these parameters are available.
 
 
+## Uninterrupted configuration reload
+
+Issuing a SIGHUP signal to the main Hitch process will initiate a
+reload of Hitch's configuration file.
+
+Adding, updating and removing PEM files (``pem-file``) and frontend
+listen endpoints (``frontend``) is currently supported.
+
+Hitch will load the new configuration in its main process, and spawn a
+new set of child processes with the new configuration in place if
+successful.
+
+The previous set of child processes will finish their handling of any
+live connections, and exit after they are done.
+
+If the new configuration fails to load, an error message will be
+written to syslog. Operation will continue without interruption with
+the current set of worker processes.
