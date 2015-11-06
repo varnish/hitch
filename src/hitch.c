@@ -3244,6 +3244,9 @@ main(int argc, char **argv)
 	}
 	AZ(setvbuf(logf, NULL, _IONBF, BUFSIZ));
 
+	if (CONFIG->DAEMONIZE && (logf == stdout || logf == stderr))
+		logf = NULL;
+
 	LOGL("{core} %s starting\n", PACKAGE_STRING);
 	create_workers = 1;
 
