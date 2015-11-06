@@ -7,6 +7,7 @@
 
 #include <sys/types.h>
 #include "vqueue.h"
+#include "uthash.h"
 
 #ifdef USE_SHARED_CACHE
   #include "shctx.h"
@@ -32,9 +33,15 @@ typedef enum {
     SSL_CLIENT
 } PROXY_MODE;
 
-struct cert_files {
-    char *CERT_FILE;
-    struct cert_files *NEXT;
+struct cfg_cert_file {
+	unsigned	magic;
+#define CFG_CERT_FILE_MAGIC 0x58c280d2
+	char 		*filename;
+	void		*priv;
+	int		mark;
+	unsigned	ref;
+	double		mtim;
+	UT_hash_handle	hh;
 };
 
 struct front_arg {
@@ -42,11 +49,11 @@ struct front_arg {
 #define FRONT_ARG_MAGIC		0x07a16cb5
 	char			*ip;
 	char			*port;
-	char			*cert;
-	VTAILQ_ENTRY(front_arg)	list;
+	struct cfg_cert_file	*cert;
+	char			*pspec;
+	int			mark;
+	UT_hash_handle		hh;
 };
-
-VTAILQ_HEAD(front_arg_head, front_arg);
 
 /* configuration structure */
 struct __hitch_config {
@@ -59,12 +66,13 @@ struct __hitch_config {
     char *CHROOT;
     int UID;
     int GID;
-    struct front_arg_head LISTEN_ARGS;
+    struct front_arg *LISTEN_ARGS;
     struct front_arg *LISTEN_DEFAULT;
     char *BACK_IP;
     char *BACK_PORT;
     long NCORES;
-    struct cert_files *CERT_FILES;
+    struct cfg_cert_file *CERT_FILES;
+    struct cfg_cert_file *CERT_DEFAULT;
     char *CIPHER_SUITE;
     char *ENGINE;
     int BACKLOG;
@@ -91,6 +99,7 @@ struct __hitch_config {
     int RING_DATA_LEN;
     char *PIDFILE;
     int SNI_NOMATCH_ABORT;
+    int TEST;
 };
 
 typedef struct __hitch_config hitch_config;
@@ -99,4 +108,4 @@ char * config_error_get (void);
 hitch_config * config_new (void);
 void config_destroy (hitch_config *cfg);
 int config_file_parse (char *file, hitch_config *cfg);
-void config_parse_cli(int argc, char **argv, hitch_config *cfg);
+int config_parse_cli(int argc, char **argv, hitch_config *cfg, int *rv);

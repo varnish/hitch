@@ -24,6 +24,9 @@
 #include "miniobj.h"
 #include "configuration.h"
 
+#define AZ(foo)		do { assert((foo) == 0); } while (0)
+#define AN(foo)		do { assert((foo) != 0); } while (0)
+
 #define ADDR_LEN 150
 #define PORT_LEN 6
 #define CFG_BOOL_ON "on"
@@ -68,52 +71,41 @@
 	#define CFG_SHARED_CACHE_MCASTIF "shared-cache-if"
 #endif
 
-#ifndef NO_CONFIG_FILE
-	#define FMT_STR "%s = %s\n"
-	#define FMT_QSTR "%s = \"%s\"\n"
-	#define FMT_ISTR "%s = %d\n"
+#define FMT_STR "%s = %s\n"
+#define FMT_QSTR "%s = \"%s\"\n"
+#define FMT_ISTR "%s = %d\n"
 
-	#define CONFIG_BUF_SIZE 1024
-	#define CFG_PARAM_CFGFILE 10000
+#define CONFIG_BUF_SIZE 1024
+#define CFG_PARAM_CFGFILE 10000
 
-	#define CFG_CONFIG "config"
-#endif
+#define CFG_CONFIG "config"
+
 // END: configuration parameters
 
 static char error_buf[CONFIG_BUF_SIZE];
 static char tmp_buf[150];
 
-// for testing configuration only
-#include <openssl/ssl.h>
-SSL_CTX * init_openssl(void);
-void init_globals(void);
-
 static void
 config_error_set(char *fmt, ...)
 {
-	memset(error_buf, '\0', sizeof(error_buf));
+	int len;
+	char buf[CONFIG_BUF_SIZE] = "";
+
 	va_list args;
 	va_start(args, fmt);
-	vsnprintf(error_buf, (sizeof(error_buf) - 1), fmt, args);
+	len = vsnprintf(buf, (sizeof(buf) - 1), fmt, args);
 	va_end(args);
+
+	len += 1;
+	if (len > CONFIG_BUF_SIZE)
+		len = CONFIG_BUF_SIZE;
+	memcpy(error_buf, buf, len);
 }
 
 char *
 config_error_get(void)
 {
 	return error_buf;
-}
-
-void
-config_die(char *fmt, ...)
-{
-	va_list args;
-	va_start(args, fmt);
-	vfprintf(stderr, fmt, args);
-	va_end(args);
-	fprintf(stderr, "\n");
-
-	exit(1);
 }
 
 hitch_config *
@@ -123,10 +115,7 @@ config_new(void)
 	struct front_arg *fa;
 
 	r = malloc(sizeof(hitch_config));
-	if (r == NULL) {
-		config_error_set("Unable to allocate memory for configuration structure: %s", strerror(errno));
-		return NULL;
-	}
+	AN(r);
 
 	// set default values
 
@@ -142,16 +131,17 @@ config_new(void)
 	r->BACK_IP            = strdup("127.0.0.1");
 	r->BACK_PORT          = strdup("8000");
 	r->NCORES             = 1;
-	r->CERT_FILES         = NULL;
 	r->CIPHER_SUITE       = NULL;
 	r->ENGINE             = NULL;
 	r->BACKLOG            = 100;
 	r->SNI_NOMATCH_ABORT  = 0;
-
-	VTAILQ_INIT(&r->LISTEN_ARGS);
+	r->CERT_DEFAULT = NULL;
+	r->CERT_FILES = NULL;
+	r->LISTEN_ARGS = NULL;
 	ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
 	fa->port = strdup("8443");
-	VTAILQ_INSERT_HEAD(&r->LISTEN_ARGS, fa, list);
+	fa->pspec = strdup("default");
+	HASH_ADD_KEYPTR(hh, r->LISTEN_ARGS, fa->pspec, strlen(fa->pspec), fa);
 	r->LISTEN_DEFAULT = fa;
 
 #ifdef USE_SHARED_CACHE
@@ -172,6 +162,7 @@ config_new(void)
 	r->TCP_KEEPALIVE_TIME = 3600;
 	r->DAEMONIZE          = 0;
 	r->PREFER_SERVER_CIPHERS = 0;
+	r->TEST	              = 0;
 
 	r->BACKEND_CONNECT_TIMEOUT = 30;
 	r->SSL_HANDSHAKE_TIMEOUT = 30;
@@ -193,31 +184,41 @@ config_destroy(hitch_config *cfg)
 {
 	// printf("config_destroy() in pid %d: %p\n", getpid(), cfg);
 	struct front_arg *fa, *ftmp;
+	struct cfg_cert_file *cf, *cftmp;
 	if (cfg == NULL)
 		return;
 
 	// free all members!
 	free(cfg->CHROOT);
-	VTAILQ_FOREACH_SAFE(fa, &cfg->LISTEN_ARGS, list, ftmp) {
+	HASH_ITER(hh, cfg->LISTEN_ARGS, fa, ftmp) {
 		CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
-		VTAILQ_REMOVE(&cfg->LISTEN_ARGS, fa, list);
+		HASH_DEL(cfg->LISTEN_ARGS, fa);
 		free(fa->ip);
 		free(fa->port);
-		free(fa->cert);
+		free(fa->pspec);
+		CHECK_OBJ_ORNULL(fa->cert, CFG_CERT_FILE_MAGIC);
+		if (fa->cert != NULL) {
+			fa->cert->ref--;
+			if (fa->cert->ref == 0) {
+				free(fa->cert->filename);
+				FREE_OBJ(fa->cert);
+			}
+		}
 		FREE_OBJ(fa);
 	}
 	free(cfg->BACK_IP);
 	free(cfg->BACK_PORT);
-	if (cfg->CERT_FILES != NULL) {
-		struct cert_files *curr = cfg->CERT_FILES, *next;
-		while (cfg->CERT_FILES != NULL) {
-			next = curr->NEXT;
-			free(curr);
-			curr = next;
-		}
+	HASH_ITER(hh, cfg->CERT_FILES, cf, cftmp) {
+		CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
+		HASH_DEL(cfg->CERT_FILES, cf);
+		free(cf->filename);
+		FREE_OBJ(cf);
 	}
+	free(cfg->CERT_DEFAULT->filename);
+	FREE_OBJ(cfg->CERT_DEFAULT);
 	free(cfg->CIPHER_SUITE);
 	free(cfg->ENGINE);
+	free(cfg->PIDFILE);
 
 #ifdef USE_SHARED_CACHE
 	free(cfg->SHCUPD_IP);
@@ -303,9 +304,10 @@ config_param_val_bool(char *val, int *res)
 }
 
 int
-config_param_host_port_wildcard(char *str, char **addr,
+config_param_host_port_wildcard(const char *str, char **addr,
     char **port, char **cert, int wildcard_okay)
 {
+	const char *cert_ptr = NULL;
 
 	if (str == NULL) {
 		config_error_set("Invalid/unset host/port string.");
@@ -326,8 +328,8 @@ config_param_host_port_wildcard(char *str, char **addr,
 
 	// NEW FORMAT: [address]:port
 	if (*str == '[') {
-		char *ptr = str + 1;
-		char *x = strrchr(ptr, ']');
+		const char *ptr = str + 1;
+		const char *x = strrchr(ptr, ']');
 		if (x == NULL) {
 			config_error_set("Invalid address '%s'.", str);
 			return 0;
@@ -354,7 +356,7 @@ config_param_host_port_wildcard(char *str, char **addr,
 
 		// cert
 		if (cert && x) {
-			*cert = strdup(x + 1);
+			cert_ptr = x + 1;
 		}
 	}
 	// OLD FORMAT: address,port
@@ -379,11 +381,11 @@ config_param_host_port_wildcard(char *str, char **addr,
 			return 0;
 		}
 	} else {
-		//if (*addr != NULL) free(*addr);
 		*addr = strdup(addr_buf);
 	}
-	// if (**port != NULL) free(*port);
 	*port = strdup(port_buf);
+	if (cert_ptr != NULL)
+		*cert = strdup(cert_ptr);
 
 	/* printf("ADDR FINAL: '%s', '%s', '%s'\n", *addr, *port, */
 	/*     cert ? *cert : ""); */
@@ -432,6 +434,40 @@ config_param_val_long(char *str, long *dst, int positive_only)
 	return 1;
 }
 
+int
+config_param_pem_file(char *filename, struct cfg_cert_file **cfptr)
+{
+	struct stat st;
+	struct cfg_cert_file *cert;
+
+	*cfptr = NULL;
+
+	if (strlen(filename) <= 0)
+		return (0);
+
+	if (stat(filename, &st) != 0) {
+		config_error_set("Unable to stat x509 "
+		    "certificate PEM file '%s': ", filename,
+		    strerror(errno));
+		return (0);
+	}
+	if (! S_ISREG(st.st_mode)) {
+		config_error_set("Invalid x509 certificate "
+		    "PEM file '%s': Not a file.", filename);
+		return (0);
+	}
+
+	ALLOC_OBJ(cert, CFG_CERT_FILE_MAGIC);
+	AN(cert);
+	config_assign_str(&cert->filename, filename);
+	cert->mtim = st.st_mtim.tv_sec
+	    + st.st_mtim.tv_nsec * 1e-9;
+
+	*cfptr = cert;
+	cert->ref++;
+	return (1);
+
+}
 #ifdef USE_SHARED_CACHE
 /* Parse mcast and ttl options */
 int
@@ -538,7 +574,7 @@ config_param_shcupd_peer(char *str, hitch_config *cfg)
 
 #endif /* USE_SHARED_CACHE */
 
-void
+int
 config_param_validate(char *k, char *v, hitch_config *cfg,
     char *file, int line)
 {
@@ -565,25 +601,45 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		r = config_param_val_bool(v, &cfg->PREFER_SERVER_CIPHERS);
 	} else if (strcmp(k, CFG_FRONTEND) == 0) {
 		struct front_arg *fa;
+		struct cfg_cert_file *cert;
+		char *certfile = NULL;
+
 		ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
 		r = config_param_host_port_wildcard(v,
-		    &fa->ip, &fa->port, &fa->cert, 1);
+		    &fa->ip, &fa->port, &certfile, 1);
 		if (r != 0) {
-			if (VTAILQ_FIRST(&cfg->LISTEN_ARGS) == cfg->LISTEN_DEFAULT) {
+			if (cfg->LISTEN_DEFAULT != NULL) {
 				/* drop default listen arg. */
-				struct front_arg *def = cfg->LISTEN_DEFAULT;
-				VTAILQ_REMOVE(&cfg->LISTEN_ARGS, def, list);
+				struct front_arg *def = NULL;
+				HASH_FIND_STR(cfg->LISTEN_ARGS, "default", def);
+				AN(def);
+				HASH_DEL(cfg->LISTEN_ARGS, def);
 				free(def->ip);
 				free(def->port);
 				free(def->cert);
+				free(def->pspec);
 				FREE_OBJ(def);
+				cfg->LISTEN_DEFAULT = NULL;
 			}
-			VTAILQ_INSERT_TAIL(&cfg->LISTEN_ARGS, fa, list);
-	  	}
+			fa->pspec = strdup(v);
+			HASH_ADD_KEYPTR(hh, cfg->LISTEN_ARGS, fa->pspec,
+			    strlen(fa->pspec), fa);
+			if (certfile != NULL) {
+				r = config_param_pem_file(certfile, &cert);
+				if (r != 0) {
+					AN(cert);
+					fa->cert = cert;
+				}
+				free(certfile);
+			}
+		} else {
+			FREE_OBJ(fa);
+		}
 	} else if (strcmp(k, CFG_BACKEND) == 0) {
+		free(cfg->BACK_PORT);
+		free(cfg->BACK_IP);
 		r = config_param_host_port(v, &cfg->BACK_IP, &cfg->BACK_PORT);
 	} else if (strcmp(k, CFG_WORKERS) == 0) {
-		fprintf(stderr, "wrk: %s\n", v);
 		r = config_param_val_long(v, &cfg->NCORES, 1);
 	} else if (strcmp(k, CFG_BACKLOG) == 0) {
 		r = config_param_val_int(v, &cfg->BACKLOG, 0);
@@ -608,14 +664,17 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		if (strlen(v) > 0) {
 			// check directory
 			if (stat(v, &st) != 0) {
-				config_error_set("Unable to stat directory '%s': %s'.", v, strerror(errno));
+				config_error_set("Unable to stat directory"
+				    " '%s': %s'.",v,strerror(errno));
 				r = 0;
 			} else {
 				if (! S_ISDIR(st.st_mode)) {
-				  config_error_set("Bad chroot directory '%s': Not a directory.", v, strerror(errno));
-				  r = 0;
+					config_error_set("Bad chroot directory "
+					    "'%s': Not a directory.", v,
+					    strerror(errno));
+					r = 0;
 				} else {
-				  config_assign_str(&cfg->CHROOT, v);
+					config_assign_str(&cfg->CHROOT, v);
 				}
 			}
 		}
@@ -647,41 +706,15 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 	} else if (strcmp(k, CFG_SYSLOG) == 0) {
 		r = config_param_val_bool(v, &cfg->SYSLOG);
 	} else if (strcmp(k, CFG_SYSLOG_FACILITY) == 0) {
+		int facility = -1;
 		r = 1;
-		if (!strcmp(v, "auth") || !strcmp(v, "authpriv"))
-			cfg->SYSLOG_FACILITY = LOG_AUTHPRIV;
-		else if (!strcmp(v, "cron"))
-			cfg->SYSLOG_FACILITY = LOG_CRON;
-		else if (!strcmp(v, "daemon"))
-			cfg->SYSLOG_FACILITY = LOG_DAEMON;
-		else if (!strcmp(v, "ftp"))
-			cfg->SYSLOG_FACILITY = LOG_FTP;
-		else if (!strcmp(v, "local0"))
-			cfg->SYSLOG_FACILITY = LOG_LOCAL0;
-		else if (!strcmp(v, "local1"))
-			cfg->SYSLOG_FACILITY = LOG_LOCAL1;
-		else if (!strcmp(v, "local2"))
-			cfg->SYSLOG_FACILITY = LOG_LOCAL2;
-		else if (!strcmp(v, "local3"))
-			cfg->SYSLOG_FACILITY = LOG_LOCAL3;
-		else if (!strcmp(v, "local4"))
-			cfg->SYSLOG_FACILITY = LOG_LOCAL4;
-		else if (!strcmp(v, "local5"))
-			cfg->SYSLOG_FACILITY = LOG_LOCAL5;
-		else if (!strcmp(v, "local6"))
-			cfg->SYSLOG_FACILITY = LOG_LOCAL6;
-		else if (!strcmp(v, "local7"))
-			cfg->SYSLOG_FACILITY = LOG_LOCAL7;
-		else if (!strcmp(v, "lpr"))
-			cfg->SYSLOG_FACILITY = LOG_LPR;
-		else if (!strcmp(v, "mail"))
-			cfg->SYSLOG_FACILITY = LOG_MAIL;
-		else if (!strcmp(v, "news"))
-			cfg->SYSLOG_FACILITY = LOG_NEWS;
-		else if (!strcmp(v, "user"))
-			cfg->SYSLOG_FACILITY = LOG_USER;
-		else if (!strcmp(v, "uucp"))
-			cfg->SYSLOG_FACILITY = LOG_UUCP;
+#define SYSLOG_FAC(m, s)				\
+		if (!strcmp(v, s))			\
+			facility = m;
+#include "sysl_tbl.h"
+#undef SYSLOG_FAC
+		if (facility != -1)
+			cfg->SYSLOG_FACILITY = facility;
 		else {
 			config_error_set("Invalid facility '%s'.", v);
 			r = 0;
@@ -699,20 +732,17 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 	} else if (strcmp(k, CFG_PROXY_PROXY) == 0) {
 		r = config_param_val_bool(v, &cfg->PROXY_PROXY_LINE);
 	} else if (strcmp(k, CFG_PEM_FILE) == 0) {
-		if (strlen(v) > 0) {
-			if (stat(v, &st) != 0) {
-				config_error_set("Unable to stat x509 certificate PEM file '%s': ", v, strerror(errno));
-				r = 0;
+		struct cfg_cert_file *cert;
+		r = config_param_pem_file(v, &cert);
+		if (r != 0) {
+			AN(cert);
+			if (cfg->CERT_DEFAULT != NULL) {
+				struct cfg_cert_file *tmp = cfg->CERT_DEFAULT;
+				HASH_ADD_KEYPTR(hh, cfg->CERT_FILES,
+				    tmp->filename, strlen(tmp->filename),
+				    tmp);
 			}
-			else if (! S_ISREG(st.st_mode)) {
-				config_error_set("Invalid x509 certificate PEM file '%s': Not a file.", v);
-				r = 0;
-			} else {
-				struct cert_files *cert = calloc(1, sizeof(*cert));
-				config_assign_str(&cert->CERT_FILE, v);
-				cert->NEXT = cfg->CERT_FILES;
-				cfg->CERT_FILES = cert;
-			}
+			cfg->CERT_DEFAULT = cert;
 		}
 	} else if (strcmp(k, CFG_BACKEND_CONNECT_TIMEOUT) == 0) {
 		r = config_param_val_int(v, &cfg->BACKEND_CONNECT_TIMEOUT, 1);
@@ -746,24 +776,27 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 
 	if (!r) {
 		if (file != NULL)
-			config_die("Error in configuration file '%s', line %d: %s\n", file, line, config_error_get());
+			config_error_set("Error in configuration file '%s', "
+			    "line %d: %s\n", file, line, config_error_get());
 		else
-			config_die("Invalid parameter '%s': %s", k, config_error_get());
+			config_error_set("Invalid parameter '%s': %s", k,
+			    config_error_get());
+		return (1);
 	}
+
+	return (0);
 }
 
-#ifndef NO_CONFIG_FILE
 int
 config_file_parse(char *file, hitch_config *cfg)
 {
-	if (cfg == NULL)
-		config_die("Undefined hitch options; THIS IS A BUG!\n");
-
 	char line[CONFIG_BUF_SIZE];
 	char *key, *value;
 	FILE *fd = NULL;
 
 	int r;
+
+	AN(cfg);
 
 	// should we read stdin?
 	if (file == NULL || strlen(file) < 1 || strcmp(file, "-") == 0)
@@ -771,9 +804,11 @@ config_file_parse(char *file, hitch_config *cfg)
 	else
 		fd = fopen(file, "r");
 
-	if (fd == NULL)
-		config_die("Unable to open configuration file '%s': %s\n",
+	if (fd == NULL) {
+		config_error_set("Unable to open configuration file '%s': %s\n",
 		    file, strerror(errno));
+		return (1);
+	}
 
 	int i = 0;
 	while (1) {
@@ -782,19 +817,19 @@ config_file_parse(char *file, hitch_config *cfg)
 		i++;
 
 		r = config_parse_content((char*)&line, &key, &value);
-		if (r < 0)
-			config_error_set( "Invalid configuration line %i\n", i);
-		if (r != 0)
+		if (r != 0) 	/* comments/blank lines */
 			continue;
 		// printf("File '%s', line %d, key: '%s', value: '%s'\n", file, i, key, value);
 
-		config_param_validate(key, value, cfg, file, i);
+		if (config_param_validate(key, value, cfg, file, i) != 0) {
+			fclose(fd);
+			return (1);
+		}
 	}
-	fclose(fd);
 
-	return 1;
+	fclose(fd);
+	return (0);
 }
-#endif /* NO_CONFIG_FILE */
 
 char *
 config_disp_str(char *str)
@@ -855,40 +890,11 @@ config_disp_log_facility (int facility)
 {
 	switch (facility)
 	{
-		case LOG_AUTHPRIV:
-			return "authpriv";
-		case LOG_CRON:
-			return "cron";
-		case LOG_DAEMON:
-			return "daemon";
-		case LOG_FTP:
-			return "ftp";
-		case LOG_LOCAL0:
-			return "local0";
-		case LOG_LOCAL1:
-			return "local1";
-		case LOG_LOCAL2:
-			return "local2";
-		case LOG_LOCAL3:
-			return "local3";
-		case LOG_LOCAL4:
-			return "local4";
-		case LOG_LOCAL5:
-			return "local5";
-		case LOG_LOCAL6:
-			return "local6";
-		case LOG_LOCAL7:
-			return "local7";
-		case LOG_LPR:
-			return "lpr";
-		case LOG_MAIL:
-			return "mail";
-		case LOG_NEWS:
-			return "news";
-		case LOG_USER:
-			return "user";
-		case LOG_UUCP:
-			return "uucp";
+#define SYSLOG_FAC(m, s)			\
+		case m:				\
+			return (s);
+#include "sysl_tbl.h"
+#undef SYSLOG_FAC
 		default:
 			return "UNKNOWN";
 	}
@@ -901,12 +907,10 @@ config_print_usage_fd(char *prog, hitch_config *cfg, FILE *out)
 		out = stderr;
 	fprintf(out, "Usage: %s [OPTIONS] PEM\n\n", basename(prog));
 	fprintf(out, "This is hitch, The Scalable TLS Unwrapping Daemon.\n\n");
-#ifndef NO_CONFIG_FILE
 	fprintf(out, "CONFIGURATION:\n");
 	fprintf(out, "\n");
 	fprintf(out, "        --config=FILE      Load configuration from specified file.\n");
 	fprintf(out, "\n");
-#endif
 	fprintf(out, "ENCRYPTION METHODS:\n");
 	fprintf(out, "\n");
 	fprintf(out, "      --tls                   TLSv1 (default. No SSLv3)\n");
@@ -919,7 +923,7 @@ config_print_usage_fd(char *prog, hitch_config *cfg, FILE *out)
 	fprintf(out, "\n");
 	fprintf(out, "  --client                      Enable client proxy mode\n");
 	fprintf(out, "  -b  --backend=[HOST]:PORT     Backend [connect] (default is \"%s\")\n", config_disp_hostport(cfg->BACK_IP, cfg->BACK_PORT));
-	fprintf(out, "  -f  --frontend=[HOST]:PORT[+CERT]    Frontend [bind] (default is \"%s\")\n", config_disp_hostport(VTAILQ_FIRST(&cfg->LISTEN_ARGS)->ip, VTAILQ_FIRST(&cfg->LISTEN_ARGS)->port));
+	fprintf(out, "  -f  --frontend=[HOST]:PORT[+CERT]    Frontend [bind] (default is \"%s\")\n", config_disp_hostport(cfg->LISTEN_DEFAULT->ip, cfg->LISTEN_DEFAULT->port));
 	fprintf(out, "                                (Note: brackets are mandatory in endpoint specifiers.)");
 
 #ifdef USE_SHARED_CACHE
@@ -992,20 +996,20 @@ config_print_usage(char *prog, hitch_config *cfg)
 	config_print_usage_fd(prog, cfg, stdout);
 }
 
-void
-config_parse_cli(int argc, char **argv, hitch_config *cfg)
+int
+config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 {
 	static int tls = 0, ssl = 0;
 	static int client = 0;
 	int c, i;
-	int test_only = 0;
-	char *prog;
+
+	optind = 1;
+
+	AN(retval);
+	*retval = 0;
 
 	struct option long_options[] = {
-#ifndef NO_CONFIG_FILE
 		{ CFG_CONFIG, 1, NULL, CFG_PARAM_CFGFILE },
-#endif
-
 		{ "tls", 0, &tls, 1},
 		{ "ssl", 0, &ssl, 1},
 		{ "client", 0, &client, 1},
@@ -1044,10 +1048,12 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 
 	if (argc == 1) {
 		config_print_usage(argv[0], cfg);
-		exit(0);
+		*retval = 0;
+		return (1);
 	}
 
 	while (1) {
+		int ret = 0;
 		int option_index = 0;
 		c = getopt_long(argc, argv,
 			"c:e:Ob:f:n:B:C:U:p:P:M:k:r:u:g:qstVh",
@@ -1057,95 +1063,107 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 			break;
 
 		switch (c) {
-			case 0:
-				break;
-#ifndef NO_CONFIG_FILE
-			case CFG_PARAM_CFGFILE:
-				if (!config_file_parse(optarg, cfg))
-				  config_die("%s", config_error_get());
-				break;
-#endif
-			case CFG_PARAM_SYSLOG_FACILITY:
-				config_param_validate(CFG_SYSLOG_FACILITY, optarg, cfg, NULL, 0);
-				break;
-			case 'c':
-				config_param_validate(CFG_CIPHERS, optarg, cfg, NULL, 0);
-				break;
-			case 'e':
-				config_param_validate(CFG_SSL_ENGINE, optarg, cfg, NULL, 0);
-				 break;
-			case 'O':
-				config_param_validate(CFG_PREFER_SERVER_CIPHERS, CFG_BOOL_ON, cfg, NULL, 0);
-				break;
-			case 'b':
-				config_param_validate(CFG_BACKEND, optarg, cfg, NULL, 0);
-				break;
-			case 'f':
-				config_param_validate(CFG_FRONTEND, optarg, cfg, NULL, 0);
-				break;
-			case 'n':
-				config_param_validate(CFG_WORKERS, optarg, cfg, NULL, 0);
-				break;
-			case 'B':
-				config_param_validate(CFG_BACKLOG, optarg, cfg, NULL, 0);
-				break;
+		case 0:
+			break;
+		case CFG_PARAM_CFGFILE:
+			if (config_file_parse(optarg, cfg) != 0) {
+				*retval = 1;
+				return (1);
+			}
+			break;
+		case CFG_PARAM_SYSLOG_FACILITY:
+			ret = config_param_validate(CFG_SYSLOG_FACILITY, optarg, cfg, NULL, 0);
+			break;
+		case 'c':
+			ret = config_param_validate(CFG_CIPHERS, optarg, cfg, NULL, 0);
+			break;
+		case 'e':
+			ret = config_param_validate(CFG_SSL_ENGINE, optarg, cfg, NULL, 0);
+			break;
+		case 'O':
+			ret = config_param_validate(CFG_PREFER_SERVER_CIPHERS, CFG_BOOL_ON, cfg, NULL, 0);
+			break;
+		case 'b':
+			ret = config_param_validate(CFG_BACKEND, optarg, cfg, NULL, 0);
+			break;
+		case 'f':
+			ret = config_param_validate(CFG_FRONTEND, optarg, cfg, NULL, 0);
+			break;
+		case 'n':
+			ret = config_param_validate(CFG_WORKERS, optarg, cfg, NULL, 0);
+			break;
+		case 'B':
+			ret = config_param_validate(CFG_BACKLOG, optarg, cfg, NULL, 0);
+			break;
 #ifdef USE_SHARED_CACHE
-			case 'C':
-				config_param_validate(CFG_SHARED_CACHE, optarg, cfg, NULL, 0);
-				break;
-			case 'U':
-				config_param_validate(CFG_SHARED_CACHE_LISTEN, optarg, cfg, NULL, 0);
-				break;
-			case 'P':
-				config_param_validate(CFG_SHARED_CACHE_PEER, optarg, cfg, NULL, 0);
-				break;
-			case 'M':
-				config_param_validate(CFG_SHARED_CACHE_MCASTIF, optarg, cfg, NULL, 0);
-				break;
+		case 'C':
+			ret = config_param_validate(CFG_SHARED_CACHE, optarg, cfg, NULL, 0);
+			break;
+		case 'U':
+			ret = config_param_validate(CFG_SHARED_CACHE_LISTEN, optarg, cfg, NULL, 0);
+			break;
+		case 'P':
+			ret = config_param_validate(CFG_SHARED_CACHE_PEER, optarg, cfg, NULL, 0)s;
+			break;
+		case 'M':
+			ret =config_param_validate(CFG_SHARED_CACHE_MCASTIF, optarg, cfg, NULL, 0);
+			break;
 #endif
-			case 'p':
-				config_param_validate(CFG_PIDFILE, optarg, cfg, NULL, 0);
-				break;
-			case 'k':
-				config_param_validate(CFG_KEEPALIVE, optarg, cfg, NULL, 0);
-				break;
-			case 'r':
-				config_param_validate(CFG_CHROOT, optarg, cfg, NULL, 0);
-				break;
-			case 'u':
-				config_param_validate(CFG_USER, optarg, cfg, NULL, 0);
-				break;
-			case 'g':
-				config_param_validate(CFG_GROUP, optarg, cfg, NULL, 0);
-				break;
-			case 'q':
-				config_param_validate(CFG_QUIET, CFG_BOOL_ON, cfg, NULL, 0);
-				break;
-			case 's':
-				config_param_validate(CFG_SYSLOG, CFG_BOOL_ON, cfg, NULL, 0);
-				break;
-			case 't':
-				test_only = 1;
-				break;
-			case 'V':
-				printf("%s %s\n", basename(argv[0]), VERSION);
-				exit(0);
-				break;
-			case 'h':
-				config_print_usage(argv[0], cfg);
-				exit(0);
-				break;
+		case 'p':
+			ret = config_param_validate(CFG_PIDFILE, optarg, cfg, NULL, 0);
+			break;
+		case 'k':
+			ret = config_param_validate(CFG_KEEPALIVE, optarg, cfg, NULL, 0);
+			break;
+		case 'r':
+			ret = config_param_validate(CFG_CHROOT, optarg, cfg, NULL, 0);
+			break;
+		case 'u':
+			ret = config_param_validate(CFG_USER, optarg, cfg, NULL, 0);
+			break;
+		case 'g':
+			ret = config_param_validate(CFG_GROUP, optarg, cfg, NULL, 0);
+			break;
+		case 'q':
+			ret = config_param_validate(CFG_QUIET, CFG_BOOL_ON, cfg, NULL, 0);
+			break;
+		case 's':
+			ret = config_param_validate(CFG_SYSLOG, CFG_BOOL_ON, cfg, NULL, 0);
+			break;
+		case 't':
+			cfg->TEST = 1;
+			break;
+		case 'V':
+			printf("%s %s\n", basename(argv[0]), VERSION);
+			*retval = 0;
+			return (1);
+			break;
+		case 'h':
+			config_print_usage(argv[0], cfg);
+			*retval = 0;
+			return (1);
+			break;
 
-			default:
-				config_die("Invalid command line parameters. Run %s --help for instructions.", basename(argv[0]));
+		default:
+			config_error_set("Invalid command line parameters. "
+			    "Run %s --help for instructions.",
+			    basename(argv[0]));
+			*retval = 1;
+			return (1);
+		}
+
+		if (ret != 0) {
+			*retval = 1;
+			return (1);
 		}
 	}
 
-	prog = argv[0];
-
-	if (tls && ssl)
-		config_die("Options --tls and --ssl are mutually exclusive.");
-	else {
+	if (tls && ssl) {
+		config_error_set("Options --tls and --ssl are mutually"
+		    " exclusive.");
+		*retval = 1;
+		return (1);
+	} else {
 		if (ssl)
 			cfg->ETYPE = ENC_SSL;
 		else if (tls)
@@ -1156,9 +1174,14 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 		cfg->PMODE = SSL_CLIENT;
 
 	if ((!!cfg->WRITE_IP_OCTET + !!cfg->PROXY_PROXY_LINE +
-	    !!cfg->WRITE_PROXY_LINE_V1 + !!cfg->WRITE_PROXY_LINE_V2) >= 2)
-		config_die("Options --write-ip, --write-proxy-proxy,"
-		    " --write-proxy-v1 and --write-proxy-v2 are mutually exclusive.");
+		!!cfg->WRITE_PROXY_LINE_V1 + !!cfg->WRITE_PROXY_LINE_V2) >= 2) {
+		config_error_set("Options --write-ip, --write-proxy-proxy,"
+		    " --write-proxy-v1 and --write-proxy-v2 are"
+		    " mutually exclusive.");
+		*retval = 1;
+		return (1);
+	}
+
 
 	if (cfg->DAEMONIZE) {
 		cfg->SYSLOG = 1;
@@ -1166,26 +1189,28 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 	}
 
 #ifdef USE_SHARED_CACHE
-	if (cfg->SHCUPD_IP != NULL && ! cfg->SHARED_CACHE)
-		config_die("Shared cache update listener is defined, but shared cache is disabled.");
+	if (cfg->SHCUPD_IP != NULL && ! cfg->SHARED_CACHE) {
+		config_error_set("Shared cache update listener is defined,"
+		    " but shared cache is disabled.");
+		*retval = 1;
+		return (1);
+	}
 #endif
 
 	// Any arguments left are presumed to be PEM files
 	argc -= optind;
 	argv += optind;
 	for (i = 0; i < argc; i++) {
-		config_param_validate(CFG_PEM_FILE, argv[i], cfg, NULL, 0);
+		if (config_param_validate(CFG_PEM_FILE, argv[i], cfg, NULL, 0)) {
+			*retval = 1;
+			return (1);
+		}
 	}
-	if (cfg->PMODE == SSL_SERVER && cfg->CERT_FILES == NULL) {
-		config_die("No x509 certificate PEM file specified!");
+	if (cfg->PMODE == SSL_SERVER && cfg->CERT_DEFAULT == NULL) {
+		config_error_set("No x509 certificate PEM file specified!");
+		*retval = 1;
+		return (1);
 	}
 
-	// was this only a test?
-	if (test_only) {
-		fprintf(stderr, "Trying to initialize SSL contexts with your certificates\n");
-		init_globals();
-		init_openssl();
-		fprintf(stderr, "%s configuration looks ok.\n", basename(prog));
-		exit(0);
-	}
+	return (0);
 }
