@@ -4,8 +4,8 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
-hitch-1.1.0-beta (unreleased)
-------------------------
+hitch-1.1.0-beta1 (2015-11-06)
+------------------------------
 
 * [dist] init.hitch file has been removed, CHANGES.rst is now distributed.
 * [configure] session cache support can now be enabled. (default off)
