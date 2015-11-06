@@ -114,7 +114,7 @@ config_new(void)
 	hitch_config *r;
 	struct front_arg *fa;
 
-	r = malloc(sizeof(hitch_config));
+	r = calloc(1, sizeof(hitch_config));
 	AN(r);
 
 	// set default values
@@ -214,8 +214,11 @@ config_destroy(hitch_config *cfg)
 		free(cf->filename);
 		FREE_OBJ(cf);
 	}
-	free(cfg->CERT_DEFAULT->filename);
-	FREE_OBJ(cfg->CERT_DEFAULT);
+
+	if (cfg->CERT_DEFAULT != NULL) {
+		free(cfg->CERT_DEFAULT->filename);
+		FREE_OBJ(cfg->CERT_DEFAULT);
+	}
 	free(cfg->CIPHER_SUITE);
 	free(cfg->ENGINE);
 	free(cfg->PIDFILE);
