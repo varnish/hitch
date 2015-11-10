@@ -1226,6 +1226,9 @@ create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 
 	for (it = ai; it != NULL; it = it->ai_next) {
 		ALLOC_OBJ(ls, LISTEN_SOCK_MAGIC);
+		VTAILQ_INSERT_TAIL(&tmp_list, ls, list);
+		count++;
+
 		ls->sock = socket(it->ai_family, SOCK_STREAM, IPPROTO_TCP);
 		if (ls->sock == -1) {
 			ERR("{socket: main}: %s: %s\n", strerror(errno),
@@ -1331,9 +1334,6 @@ create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 			fa->cert->ref++;
 		}
 		ls->pspec = strdup(fa->pspec);
-
-		VTAILQ_INSERT_TAIL(&tmp_list, ls, list);
-		count++;
 
 		LOG("{core} Listening on %s\n", ls->name);
 	}
