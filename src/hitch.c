@@ -901,13 +901,34 @@ sni_switch_ctx(SSL *ssl, int *al, void *data)
 }
 #endif /* OPENSSL_NO_TLSEXT */
 
+static void
+sctx_free(sslctx *sc, sni_name **sn_tab)
+{
+	sni_name *sn, *sntmp;
+
+	if (sn_tab != NULL)
+		CHECK_OBJ_NOTNULL(*sn_tab, SNI_NAME_MAGIC);
+	CHECK_OBJ_NOTNULL(sc, SSLCTX_MAGIC);
+	VTAILQ_FOREACH_SAFE(sn, &sc->sni_list, list, sntmp) {
+		CHECK_OBJ_NOTNULL(sn, SNI_NAME_MAGIC);
+		VTAILQ_REMOVE(&sc->sni_list, sn, list);
+		if (sn_tab != NULL)
+			HASH_DEL(*sn_tab, sn);
+		free(sn->servername);
+		FREE_OBJ(sn);
+	}
+
+	free(sc->filename);
+	SSL_CTX_free(sc->ctx);
+	FREE_OBJ(sc);
+}
 
 /* Initialize an SSL context */
 sslctx *
 make_ctx(const struct cfg_cert_file *cf)
 {
 	SSL_CTX *ctx;
-	sslctx *sobj;
+	sslctx *sc;
 	RSA *rsa;
 
 	long ssloptions = SSL_OP_NO_SSLv2 | SSL_OP_ALL |
@@ -933,32 +954,35 @@ make_ctx(const struct cfg_cert_file *cf)
 	if (CONFIG->PREFER_SERVER_CIPHERS)
 		SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
 
-	ALLOC_OBJ(sobj, SSLCTX_MAGIC);
-	AN(sobj);
-	sobj->filename = strdup(cf->filename);
-	sobj->mtim = cf->mtim;
-	sobj->ctx = ctx;
-	VTAILQ_INIT(&sobj->sni_list);
+	ALLOC_OBJ(sc, SSLCTX_MAGIC);
+	AN(sc);
+	sc->filename = strdup(cf->filename);
+	sc->mtim = cf->mtim;
+	sc->ctx = ctx;
+	VTAILQ_INIT(&sc->sni_list);
 
 	if (CONFIG->PMODE == SSL_CLIENT)
-		return (sobj);
+		return (sc);
 
 	/* SSL_SERVER Mode stuff */
 	if (SSL_CTX_use_certificate_chain_file(ctx, cf->filename) <= 0) {
 		ERR("Error loading certificate file %s\n", cf->filename);
 		ERR_print_errors_fp(stderr);
+		sctx_free(sc, NULL);
 		return (NULL);
 	}
 
 	rsa = load_rsa_privatekey(ctx, cf->filename);
 	if (!rsa) {
 		ERR("Error loading RSA private key (%s)\n", cf->filename);
+		sctx_free(sc, NULL);
 		return (NULL);
 	}
 
 	if (SSL_CTX_use_RSAPrivateKey(ctx, rsa) <= 0) {
 		ERR_print_errors_fp(stderr);
 		RSA_free(rsa);
+		sctx_free(sc, NULL);
 		return (NULL);
 	}
 
@@ -978,12 +1002,14 @@ make_ctx(const struct cfg_cert_file *cf)
 		if (shared_context_init(ctx, CONFIG->SHARED_CACHE) < 0) {
 			ERR("Unable to alloc memory for shared cache.\n");
 			RSA_free(rsa);
+			sctx_free(sc, NULL);
 			return (NULL);
 		}
 		if (CONFIG->SHCUPD_PORT) {
 			if (compute_secret(rsa, shared_secret) < 0) {
 				ERR("Unable to compute shared secret.\n");
 				RSA_free(rsa);
+				sctx_free(sc, NULL);
 				return (NULL);
 			}
 
@@ -997,7 +1023,7 @@ make_ctx(const struct cfg_cert_file *cf)
 	}
 #endif
 	RSA_free(rsa);
-	return (sobj);
+	return (sc);
 }
 
 static void
@@ -2942,28 +2968,6 @@ ls_query(struct front_arg *new_set, struct cfg_tpc_obj_head *cfg_objs)
 	}
 
 	return (0);
-}
-
-static void
-sctx_free(sslctx *sc, sni_name **sn_tab)
-{
-	sni_name *sn, *sntmp;
-
-	if (sn_tab != NULL)
-		CHECK_OBJ_NOTNULL(*sn_tab, SNI_NAME_MAGIC);
-	CHECK_OBJ_NOTNULL(sc, SSLCTX_MAGIC);
-	VTAILQ_FOREACH_SAFE(sn, &sc->sni_list, list, sntmp) {
-		CHECK_OBJ_NOTNULL(sn, SNI_NAME_MAGIC);
-		VTAILQ_REMOVE(&sc->sni_list, sn, list);
-		if (sn_tab != NULL)
-			HASH_DEL(*sn_tab, sn);
-		free(sn->servername);
-		FREE_OBJ(sn);
-	}
-
-	free(sc->filename);
-	SSL_CTX_free(sc->ctx);
-	FREE_OBJ(sc);
 }
 
 static void
