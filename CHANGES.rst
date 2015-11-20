@@ -4,6 +4,13 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.1.0 (2015-11-20)
+------------------------
+
+* Avoid leaking memory if failing to create an ssl context. (coverity)
+* Fix possible memory leak in create_listen_sock(). (coverity)
+
+
 hitch-1.1.0-beta1 (2015-11-06)
 ------------------------------
 

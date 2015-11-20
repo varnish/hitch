@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.59])
-AC_INIT([hitch], [1.1.0-beta1], [support@varnish-software.com])
+AC_INIT([hitch], [1.1.0], [support@varnish-software.com])
 AC_CONFIG_SRCDIR([src/configuration.c])
 AC_CONFIG_HEADERS([config.h])
 
