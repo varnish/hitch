@@ -4,12 +4,38 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.1.0 (2015-11-20)
+------------------------
+
+* Avoid leaking memory if failing to create an ssl context. (coverity)
+* Fix possible memory leak in create_listen_sock(). (coverity)
+
+
+hitch-1.1.0-beta1 (2015-11-06)
+------------------------------
+
+* [dist] init.hitch file has been removed, CHANGES.rst is now distributed.
+* [configure] session cache support can now be enabled. (default off)
+* Fixes an off-by-one bug that broke wildcard certificate matching.
+* Set the IPV6_V6ONLY socket option for IPv6 listen sockets in order
+  to avoid conflicts between INADDR_ANY and IN6ADDR_ANY.
+* Uninterrupted configuration reload of PEM files and frontend listen
+  endpoints.
+* Priv-sep: To permit configuration reloads, privileges are now
+  dropped in the child processes, and elevated privileges are retained
+  in the management process.
+* Various error messages are now rewritten to be more specific about
+  what went wrong.
+* A warning is issued if multiple certificates contain identical
+  server name entries.
+* Initialize ECDH also for certificates without DH parameters (patch
+  from Fedor Indutny).
+
 
 hitch-1.0.1 (2015-10-15)
 ------------------------
 
 * Fix configuration parsing bug skipping short values, typically "workers = 1".
-
 * Tarball now contains an example configuration file.
 
 

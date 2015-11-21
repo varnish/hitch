@@ -25,7 +25,7 @@ unencrypted traffic to some backend. It's designed to handle 10s of thousands of
 connections efficiently on multicore machines.
 
 Hitch has very few features -- it's designed to be paired with an intelligent
-backend like haproxy or nginx.  It maintains a strict 1:1 connection pattern
+backend like Varnish Cache. It maintains a strict 1:1 connection pattern
 with this backend handler so that the backend can dictate throttling behavior,
 maximum connection behavior, availability of service, etc.
 

@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.59])
-AC_INIT([hitch], [1.0.1], [support@varnish-software.com])
+AC_INIT([hitch], [1.1.0], [support@varnish-software.com])
 AC_CONFIG_SRCDIR([src/configuration.c])
 AC_CONFIG_HEADERS([config.h])
 
@@ -26,7 +26,7 @@ AC_ARG_ENABLE(sessioncache,
     [use_shctx=no])
 
 if test xno != x"$use_shctx"; then
-	CFLAGS="-DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX $CFLAGS"
+	CFLAGS += " -DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX"
 fi
 AM_CONDITIONAL(USE_SHCTX, test xno != x"$use_shctx")
 
