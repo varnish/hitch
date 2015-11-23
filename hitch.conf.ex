@@ -32,7 +32,7 @@ pem-file = ""
 #
 # Run openssl ciphers for list of available ciphers.
 # type: string
-ciphers = ""
+ciphers = "EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH"
 
 # Enforce server cipher list order
 #
