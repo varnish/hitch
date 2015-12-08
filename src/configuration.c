@@ -13,7 +13,6 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <getopt.h>
-#include <libgen.h>
 #include <sys/types.h>
 #include <pwd.h>
 #include <grp.h>
