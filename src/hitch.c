@@ -545,6 +545,7 @@ info_callback(const SSL *ssl, int where, int ret)
 	}
 }
 
+
 #ifdef USE_SHARED_CACHE
 
 /* Handle incoming message updates */
@@ -825,6 +826,24 @@ create_shcupd_socket()
 
 #endif /*USE_SHARED_CACHE */
 
+/* 
+ * callback method for openssl config password handling, effectively just 
+ * copies the user data pointer contents to the buffer.  We pass the pointer
+ * to the config password entry in to the calling method
+ */
+int cfg_pw_callback(char *buf, int size, int rwflag, void *u) {
+	char *pw = (char*)u;
+	int pwlen = strlen(pw);
+	if (pwlen > size || pwlen <= 0)  {
+		LOG("(config file password callback) Invalid config file password entry.");
+		return 0;
+	}
+	
+	memset(buf, '\0', size);
+	memcpy(buf, pw, size);
+	return strlen(pw);
+}
+
 RSA *
 load_rsa_privatekey(SSL_CTX *ctx, const char *file)
 {
@@ -837,9 +856,14 @@ load_rsa_privatekey(SSL_CTX *ctx, const char *file)
 		return NULL;
 	}
 
-	rsa = PEM_read_bio_RSAPrivateKey(bio, NULL,
-	    ctx->default_passwd_callback,
-	    ctx->default_passwd_callback_userdata);
+	if(CONFIG->PEM_KEYPASS != NULL) {
+		rsa = PEM_read_bio_RSAPrivateKey(bio, NULL, cfg_pw_callback,
+				                                       (void*)CONFIG->PEM_KEYPASS);
+	} else {
+		rsa = PEM_read_bio_RSAPrivateKey(bio, NULL, ctx->default_passwd_callback,
+			    	ctx->default_passwd_callback_userdata);
+	}
+
 	BIO_free(bio);
 
 	return rsa;

@@ -63,6 +63,8 @@ struct __hitch_config {
     int WRITE_PROXY_LINE_V1;
     int WRITE_PROXY_LINE_V2;
     int PROXY_PROXY_LINE;
+	 int WRITE_XFF_LINE;
+	 int READ_PROXY_LINE;
     char *CHROOT;
     int UID;
     int GID;
@@ -84,6 +86,7 @@ struct __hitch_config {
     char *SHCUPD_MCASTIF;
     char *SHCUPD_MCASTTTL;
 #endif
+	 char *PEM_KEYPASS;
     int QUIET;
     int SYSLOG;
     int SYSLOG_FACILITY;
