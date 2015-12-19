@@ -29,6 +29,9 @@ AM_MAINTAINER_MODE([disable])
 # Checks for libraries.
 AC_CHECK_LIB([ev], [ev_default_loop], [], AC_MSG_ERROR([Cannot find libev headers.]))
 AC_CHECK_LIB([ssl], [SSL_CTX_free], [], AC_MSG_ERROR([Cannot find libssl headers.]))
+AC_CHECK_MEMBERS([struct stat.st_mtim, struct stat.st_mtimespec], [nsec_avail="true"], [])
+AM_CONDITIONAL(NSEC_AVAIL, [test "x$nsec_avail" == xtrue])
+AM_COND_IF(NSEC_AVAIL, [], AC_MSG_WARN([Nanosecond resolution not available from struct stat]))
 
 AC_ARG_ENABLE(sessioncache,
     AC_HELP_STRING([--enable-sessioncache],

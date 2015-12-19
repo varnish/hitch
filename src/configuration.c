@@ -423,8 +423,13 @@ config_param_pem_file(char *filename, struct cfg_cert_file **cfptr)
 	ALLOC_OBJ(cert, CFG_CERT_FILE_MAGIC);
 	AN(cert);
 	config_assign_str(&cert->filename, filename);
-	cert->mtim = st.st_mtim.tv_sec
-	    + st.st_mtim.tv_nsec * 1e-9;
+	cert->mtim = st.st_mtime;
+#if defined(HAVE_STRUCT_STAT_ST_MTIM)
+	cert->mtim += st.st_mtim.tv_nsec * 1e-9;
+#elif defined(HAVE_STRUCT_STAT_ST_MTIMESPEC)
+	cert->mtim += st.st_mtimespec.tv_nsec * 1e-9;
+#endif
+
 
 	*cfptr = cert;
 	return (1);
