@@ -22,6 +22,7 @@
 #include "config.h"
 #include "miniobj.h"
 #include "configuration.h"
+#include "libgen.h"
 
 #define AZ(foo)		do { assert((foo) == 0); } while (0)
 #define AN(foo)		do { assert((foo) != 0); } while (0)
@@ -128,6 +129,7 @@ config_new(void)
 	r->WRITE_PROXY_LINE_V2= 0;
 	r->PROXY_PROXY_LINE   = 0;
 	r->WRITE_XFF_LINE     = 0;
+	r->READ_PROXY_LINE	 = 0;
 	r->CHROOT             = NULL;
 	r->UID                = -1;
 	r->GID                = -1;
@@ -1001,9 +1003,9 @@ config_print_usage_fd(char *prog, hitch_config *cfg, FILE *out)
 	fprintf(out, "                              --write-proxy-v1 explicitly\n");
 	fprintf(out, "      --write-xff            Write X-Forwarded-For header before actual data\n" );
 	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->WRITE_XFF_LINE));
-	fprintf(out, "      --read-proxy           Read HAProxy's PROXY (IPv4 or IPv6) protocol line\n" );
+	fprintf(out, "      --read-proxy           Read HAProxy's PROXY V1 (IPv4 or IPv6) protocol line\n" );
 	fprintf(out, "                             before actual data.  This address will be sent to\n");
-	fprintf(out, "                             the backend if one of --write-ip or --write-proxy\n");
+	fprintf(out, "                             the backend if one of --write-ip, --write-xff, or --write-proxy\n");
 	fprintf(out, "                             is specified.\n");
 	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->READ_PROXY_LINE));
 	fprintf(out, "      --proxy-proxy          Proxy HaProxy's PROXY (IPv4 or IPv6) protocol line\n" );

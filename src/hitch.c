@@ -135,6 +135,8 @@ enum child_state_e {
 	CHILD_EXITING
 };
 
+#define XFF_LINE_MAX 128
+
 static enum child_state_e child_state;
 
 struct child_proc {
@@ -297,6 +299,7 @@ typedef struct proxystate {
 	int			fd_down;	/* Downstream (backend)
 						 * socket */
 
+	int			sent_xff:1;
 	int			want_shutdown:1; /* Connection is
 						  * half-shutdown */
 	int			handshaked:1;	/* Initial handshake happened */
@@ -825,6 +828,41 @@ create_shcupd_socket()
 }
 
 #endif /*USE_SHARED_CACHE */
+
+/*
+ * xff related code co-opted from http://github.com/insom/stud, with minor changes.
+ * Forks were different enough that it wasn't worth the mess of conflict resolution
+ * to use git to bring the code in.  It would have made reviewing changes in the 
+ * future a messy proposition.
+ */
+char *prepare_xff_line(struct sockaddr* ai_addr) {
+	
+	char* xff_line = 0;
+	char tcp6_address_string[INET6_ADDRSTRLEN];
+
+	/* We need to take responsibility for this memory later */
+	xff_line = calloc(XFF_LINE_MAX, sizeof(char));
+	
+	if (ai_addr->sa_family == AF_INET) {
+		struct sockaddr_in* addr = (struct sockaddr_in*)ai_addr;
+		size_t res = snprintf(xff_line, XFF_LINE_MAX - 1,
+									 "X-Forwarded-For: %s\r\nX-Forwarded-Proto: https\r\n",
+									 inet_ntoa(addr->sin_addr));
+		assert(res < XFF_LINE_MAX -1);
+	}
+	else if (ai_addr->sa_family == AF_INET6 ) {
+		struct sockaddr_in6* addr = (struct sockaddr_in6*)ai_addr;
+		inet_ntop(AF_INET6,&(addr->sin6_addr),tcp6_address_string,INET6_ADDRSTRLEN);
+		size_t res = snprintf(xff_line, XFF_LINE_MAX -1,
+									 "X-Forwarded-For: %s\r\nX-Forwarded-Proto: https\r\n",
+									 tcp6_address_string);
+		assert(res < XFF_LINE_MAX - 1);
+	}
+	else {
+		ERR("The --write-xff mode is not implemented for this address family.\n");
+	}
+	return xff_line;
+}
 
 /* 
  * callback method for openssl config password handling, effectively just 
@@ -1565,7 +1603,8 @@ clear_read(struct ev_loop *loop, ev_io *w, int revents)
 
 
 /* Write some data, previously received on the secure upstream socket,
- * out of the downstream buffer and onto the backend socket */
+ * out of the downstream buffer and onto the backend socket.  XFF portions
+ * from http://github.com/insom/stud. */
 static void
 clear_write(struct ev_loop *loop, ev_io *w, int revents)
 {
@@ -1579,6 +1618,49 @@ clear_write(struct ev_loop *loop, ev_io *w, int revents)
 	assert(!ringbuffer_is_empty(&ps->ring_ssl2clear));
 
 	char *next = ringbuffer_read_next(&ps->ring_ssl2clear, &sz);
+	
+	if (ps->sent_xff == 0 && CONFIG->WRITE_XFF_LINE) {
+		for(int i = 0; i < sz; i++) {
+			if(next[i] == '\n') {
+				char *xff_line = prepare_xff_line((struct sockaddr *)&(ps->remote_ip));
+				/* Send the request through because we don't know where it's
+				 * from */
+				if(xff_line == NULL) {
+					ps->sent_xff = 1;
+					break;
+				}
+				int temporary_buffer_length = sz + strlen(xff_line);
+				char *temporary_buffer = (char *)malloc(temporary_buffer_length);
+				/* Send the request through because we don't have enough
+				 * RAM to fiddle with the headers */
+				if(temporary_buffer == NULL) {
+					ps->sent_xff = 1;
+					break;
+				}
+				/* Create a temporary buffer with the original HTTP line, the
+				 * XFF header, and the remainer of the ringbuffer */
+				int http_line_length = i+1;
+				int xff_line_length = strlen(xff_line);
+				memcpy(temporary_buffer, next, http_line_length);
+				memcpy(temporary_buffer+http_line_length, xff_line, xff_line_length);
+				memcpy(temporary_buffer+http_line_length+xff_line_length, next+http_line_length, sz-http_line_length);
+				
+				ringbuffer_read_pop(&ps->ring_ssl2clear);
+				
+				char *write_ptr = ringbuffer_write_ptr(&ps->ring_ssl2clear);
+				memcpy(write_ptr, temporary_buffer, temporary_buffer_length);
+				ringbuffer_write_append(&ps->ring_ssl2clear, temporary_buffer_length);
+				next = write_ptr;
+				sz = temporary_buffer_length;
+				free(temporary_buffer);
+				free(xff_line);
+				
+				ps->sent_xff = 1;
+				break;
+			}
+		}
+	}
+
 	t = send(fd, next, sz, MSG_NOSIGNAL);
 
 	if (t > 0) {
@@ -1851,6 +1933,43 @@ static void end_handshake(proxystate *ps) {
 		ev_io_start(loop, &ps->ev_w_ssl);
 }
 
+static int parse_proxy_protov1_line(proxystate *ps, const char *buf) {
+	int t;
+	int protocol;
+	int af;
+	int bufsize = strlen(buf);
+	// rather than use constants to define the size of the proxy line I'm going
+	// to base the size of the address buffers on the size of the buffer being
+	// passed in.
+	char addr1[bufsize + 1];
+	char addr2[bufsize + 1];
+	short int port1;
+	short int port2;
+	t = sscanf(buf, "PROXY TCP%d %s %s %hu %hu", &protocol, addr1, addr2, &port1, &port2);
+	if (t != 5)
+		return 1;
+	if (protocol == 4) {
+		struct sockaddr_in* addr = (struct sockaddr_in*)&ps->remote_ip;
+		af = AF_INET;
+		if (!inet_pton(af, addr1, &addr->sin_addr)) {
+			return 1;
+		}
+		addr->sin_port = htons(port1);
+		ps->remote_ip.ss_family = af;
+	} else if (protocol == 6) {
+		struct sockaddr_in6* addr = (struct sockaddr_in6*)&ps->remote_ip;
+		af = AF_INET6;
+		if (!inet_pton(af, addr1, &addr->sin6_addr)) {
+			return 1;
+		}
+		addr->sin6_port = htons(port1);
+		ps->remote_ip.ss_family = af;
+	} else {
+		return 1;
+	}
+	return 0;
+}
+
 static void
 client_proxy_proxy(struct ev_loop *loop, ev_io *w, int revents)
 {
@@ -1874,16 +1993,29 @@ client_proxy_proxy(struct ev_loop *loop, ev_io *w, int revents)
 		LOG("{client} Unexpectedly long PROXY line. Malformed req?");
 		shutdown_proxy(ps, SHUTDOWN_SSL);
 	} else if (t == 1) {
-		if (ringbuffer_is_full(&ps->ring_ssl2clear)) {
-			LOG("{client} Error writing PROXY line");
-			shutdown_proxy(ps, SHUTDOWN_SSL);
-			return;
+		/* We only write out proxy data if we're not in read-proxy mode */
+		if(!CONFIG->READ_PROXY_LINE) {
+			if (ringbuffer_is_full(&ps->ring_ssl2clear)) {
+				LOG("{client} Error writing PROXY line");
+				shutdown_proxy(ps, SHUTDOWN_SSL);
+				return;
+			}
+			
+			char *ring = ringbuffer_write_ptr(&ps->ring_ssl2clear);
+			memcpy(ring, tcp_proxy_line, proxy - tcp_proxy_line);
+			ringbuffer_write_append(&ps->ring_ssl2clear,
+											proxy - tcp_proxy_line);
+		} else {
+			/*
+			 * parse the PROXY line (and re-assign the source ip to the relevant ip
+			 * inside the PROXY line
+			 */
+			if(parse_proxy_protov1_line(ps, tcp_proxy_line) != 0) {
+				LOG("{client} Error parsing PROXY line");
+				shutdown_proxy(ps, SHUTDOWN_SSL);
+				return;
+			}
 		}
-
-		char *ring = ringbuffer_write_ptr(&ps->ring_ssl2clear);
-		memcpy(ring, tcp_proxy_line, proxy - tcp_proxy_line);
-		ringbuffer_write_append(&ps->ring_ssl2clear,
-		    proxy - tcp_proxy_line);
 
 		// Finished reading the PROXY header
 		if (*(proxy - 1) == '\n') {
@@ -2237,7 +2369,7 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 	n_conns++;
 
 	LOGPROXY(ps, "proxy connect\n");
-	if (CONFIG->PROXY_PROXY_LINE) {
+	if (CONFIG->PROXY_PROXY_LINE || CONFIG->READ_PROXY_LINE) {
 		ev_io_start(loop, &ps->ev_proxy);
 	} else {
 		/* for client-first handshake */
