@@ -23,6 +23,10 @@ backend = "[127.0.0.1]:6081"
 # type: string
 pem-file = ""
 
+# Password for private key in PEM file OPTIONAL.
+# pem-keypass = "mypassword"
+pem-keypass = "example"
+
 # SSL protocol.
 #
 # tls = on
@@ -130,5 +134,18 @@ proxy-proxy = off
 #
 # type: boolean
 sni-nomatch-abort = off
+
+# Read client address using HAProxy PROXY protocol line, see
+# http://haproxy.1wt.eu/download/1.5/doc/proxy-protocol.txt
+# for details. This address will be reported to the backend
+# if one of write-ip or write-proxy is specified.
+#
+# type: boolean
+read-proxy = off
+
+# Report client address using X-Forwarded-For header.
+#
+# type: boolean
+write-xff = off
 
 # EOF
