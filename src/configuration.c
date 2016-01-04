@@ -903,8 +903,13 @@ config_disp_log_facility (int facility)
 }
 
 void
-config_print_usage_fd(char *prog, hitch_config *cfg, FILE *out)
+config_print_usage_fd(char *prog, FILE *out)
 {
+	hitch_config *cfg;
+
+	cfg = config_new();
+	AN(cfg);
+
 	if (out == NULL)
 		out = stderr;
 	fprintf(out, "Usage: %s [OPTIONS] PEM\n\n", basename(prog));
@@ -993,9 +998,9 @@ config_print_usage_fd(char *prog, hitch_config *cfg, FILE *out)
 }
 
 void
-config_print_usage(char *prog, hitch_config *cfg)
+config_print_usage(char *prog)
 {
-	config_print_usage_fd(prog, cfg, stdout);
+	config_print_usage_fd(prog, stdout);
 }
 
 int
@@ -1049,7 +1054,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 	};
 
 	if (argc == 1) {
-		config_print_usage(argv[0], cfg);
+		config_print_usage(argv[0]);
 		*retval = 0;
 		return (1);
 	}
@@ -1141,7 +1146,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 			return (1);
 			break;
 		case 'h':
-			config_print_usage(argv[0], cfg);
+			config_print_usage(argv[0]);
 			*retval = 0;
 			return (1);
 			break;
