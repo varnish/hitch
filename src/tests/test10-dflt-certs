@@ -1,0 +1,50 @@
+#/bin/bash
+#
+# 
+#
+. common.sh
+set +o errexit
+
+PORT1=$(($RANDOM + 1024))
+PORT2=$(($RANDOM + 1024))
+PORT3=$(($RANDOM + 1024))
+PORT4=$(($RANDOM + 1024))
+
+$HITCH $HITCH_ARGS --backend=[hitch-tls.org]:80 \
+       --frontend=[${LISTENADDR}]:$PORT1+certs/site1.example.com \
+       --frontend=[${LISTENADDR}]:$PORT2+certs/site2.example.com \
+       --frontend=[${LISTENADDR}]:$PORT3+certs/site3.example.com \
+       --frontend=[${LISTENADDR}]:$PORT4 \
+       certs/default.example.com
+
+test "$?" = "0" || die "Hitch did not start."
+
+# :PORT1 without SNI
+echo | openssl s_client -prexit -connect $LISTENADDR:$PORT1 2>/dev/null > $DUMPFILE
+test "$?" = "0" || die "s_client failed"
+grep -q -c "subject=/CN=site1.example.com" $DUMPFILE
+test "$?" = "0" || die "s_client got wrong certificate on listen port #1"
+
+# :PORT1 w/ SNI
+echo | openssl s_client -servername site1.example.com -prexit -connect $LISTENADDR:$PORT1 2>/dev/null > $DUMPFILE
+test "$?" = "0" || die "s_client failed"
+grep -q -c "subject=/CN=site1.example.com" $DUMPFILE
+test "$?" = "0" || die "s_client got wrong certificate in listen port #2"
+
+# :PORT1 w/ different matching SNI name
+echo | openssl s_client -servername site3.example.com -prexit -connect $LISTENADDR:$PORT1 2>/dev/null > $DUMPFILE
+test "$?" = "0" || die "s_client failed"
+grep -q -c "subject=/CN=site3.example.com" $DUMPFILE
+test "$?" = "0" || die "s_client got wrong certificate in listen port #2"
+
+# :PORT2 no SNI
+echo | openssl s_client -prexit -connect $LISTENADDR:$PORT2 > $DUMPFILE 2>&1
+test "$?" = "0" || die "s_client failed"
+grep -q -c "subject=/CN=site2.example.com" $DUMPFILE
+test "$?" = "0" || die "s_client got wrong certificate in listen port #2"
+
+# :PORT4 SNI w/ unknown servername 
+echo | openssl s_client -servername invalid.example.com -prexit -connect $LISTENADDR:$PORT4 > $DUMPFILE 2>&1
+test "$?" = "0" || die "s_client failed"
+grep -q -c "subject=/CN=default.example.com" $DUMPFILE
+test "$?" = "0" || die "s_client got wrong certificate in listen port #2"
