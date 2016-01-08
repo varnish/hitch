@@ -995,6 +995,8 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "  -p  --pidfile=FILE         PID file\n");
 	fprintf(out, "  -V  --version              Print program version and exit\n");
 	fprintf(out, "  -h  --help                 This help message\n");
+
+	config_destroy(cfg);
 }
 
 void
