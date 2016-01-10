@@ -22,6 +22,7 @@
 #include "config.h"
 #include "miniobj.h"
 #include "configuration.h"
+#include "libgen.h"
 
 #define AZ(foo)		do { assert((foo) == 0); } while (0)
 #define AN(foo)		do { assert((foo) != 0); } while (0)
@@ -51,7 +52,10 @@
 #define CFG_WRITE_PROXY "write-proxy"
 #define CFG_WRITE_PROXY_V1 "write-proxy-v1"
 #define CFG_WRITE_PROXY_V2 "write-proxy-v2"
+#define CFG_WRITE_XFF "write-xff"
+#define CFG_READ_PROXY "read-proxy"
 #define CFG_PEM_FILE "pem-file"
+#define CFG_PEM_KEYPASS "pem-keypass"
 #define CFG_PROXY_PROXY "proxy-proxy"
 #define CFG_BACKEND_CONNECT_TIMEOUT "backend-connect-timeout"
 #define CFG_SSL_HANDSHAKE_TIMEOUT "ssl-handshake-timeout"
@@ -124,6 +128,8 @@ config_new(void)
 	r->WRITE_PROXY_LINE_V1= 0;
 	r->WRITE_PROXY_LINE_V2= 0;
 	r->PROXY_PROXY_LINE   = 0;
+	r->WRITE_XFF_LINE     = 0;
+	r->READ_PROXY_LINE	 = 0;
 	r->CHROOT             = NULL;
 	r->UID                = -1;
 	r->GID                = -1;
@@ -462,8 +468,13 @@ config_param_pem_file(char *filename, struct cfg_cert_file **cfptr)
 	ALLOC_OBJ(cert, CFG_CERT_FILE_MAGIC);
 	AN(cert);
 	config_assign_str(&cert->filename, filename);
-	cert->mtim = st.st_mtim.tv_sec
-	    + st.st_mtim.tv_nsec * 1e-9;
+	cert->mtim = st.st_mtime;
+#if defined(HAVE_STRUCT_STAT_ST_MTIM)
+	cert->mtim += st.st_mtim.tv_nsec * 1e-9;
+#elif defined(HAVE_STRUCT_STAT_ST_MTIMESPEC)
+	cert->mtim += st.st_mtimespec.tv_nsec * 1e-9;
+#endif
+
 
 	*cfptr = cert;
 	cert->ref++;
@@ -733,6 +744,10 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		r = config_param_val_bool(v, &cfg->WRITE_PROXY_LINE_V2);
 	} else if (strcmp(k, CFG_PROXY_PROXY) == 0) {
 		r = config_param_val_bool(v, &cfg->PROXY_PROXY_LINE);
+   } else if (strcmp(k, CFG_WRITE_XFF) == 0) {
+		r = config_param_val_bool(v, &cfg->WRITE_XFF_LINE);
+	} else if (strcmp(k, CFG_READ_PROXY) == 0) {
+		    r = config_param_val_bool(v, &cfg->READ_PROXY_LINE);
 	} else if (strcmp(k, CFG_PEM_FILE) == 0) {
 		struct cfg_cert_file *cert;
 		r = config_param_pem_file(v, &cert);
@@ -745,6 +760,14 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 				    tmp);
 			}
 			cfg->CERT_DEFAULT = cert;
+		}
+	} else if (strcmp(k, CFG_PEM_KEYPASS) == 0) {
+		// this should only be null if we haven't hit the value yet.
+		// if we hit it a second time it's an error
+		if (cfg->PEM_KEYPASS == NULL) {
+			config_assign_str(&cfg->PEM_KEYPASS, v);
+		} else {
+			config_error_set("Duplicate PEM private key passwords");
 		}
 	} else if (strcmp(k, CFG_BACKEND_CONNECT_TIMEOUT) == 0) {
 		r = config_param_val_int(v, &cfg->BACKEND_CONNECT_TIMEOUT, 1);
@@ -983,6 +1006,13 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->WRITE_PROXY_LINE_V2));
 	fprintf(out, "      --write-proxy          Equivalent to --write-proxy-v2. For PROXY version 1 use\n");
 	fprintf(out, "                              --write-proxy-v1 explicitly\n");
+	fprintf(out, "      --write-xff            Write X-Forwarded-For header before actual data\n" );
+	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->WRITE_XFF_LINE));
+	fprintf(out, "      --read-proxy           Read HAProxy's PROXY V1 (IPv4 or IPv6) protocol line\n" );
+	fprintf(out, "                             before actual data.  This address will be sent to\n");
+	fprintf(out, "                             the backend if one of --write-ip, --write-xff, or --write-proxy\n");
+	fprintf(out, "                             is specified.\n");
+	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->READ_PROXY_LINE));
 	fprintf(out, "      --proxy-proxy          Proxy HaProxy's PROXY (IPv4 or IPv6) protocol line\n" );
 	fprintf(out, "                             before actual data (PROXY v1 only)\n");
 	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->PROXY_PROXY_LINE));
@@ -1047,6 +1077,8 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		{ CFG_WRITE_PROXY_V1, 0, &cfg->WRITE_PROXY_LINE_V1, 1 },
 		{ CFG_WRITE_PROXY_V2, 0, &cfg->WRITE_PROXY_LINE_V2, 1 },
 		{ CFG_WRITE_PROXY, 0, &cfg->WRITE_PROXY_LINE_V2, 1 },
+		{ CFG_WRITE_XFF, 0, &cfg->WRITE_XFF_LINE, 1 },
+		{ CFG_READ_PROXY, 0, &cfg->READ_PROXY_LINE, 1 },
 		{ CFG_PROXY_PROXY, 0, &cfg->PROXY_PROXY_LINE, 1 },
 		{ CFG_SNI_NOMATCH_ABORT, 0, &cfg->SNI_NOMATCH_ABORT, 1 },
 		{ "test", 0, NULL, 't' },
