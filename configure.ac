@@ -12,6 +12,10 @@ AM_INIT_AUTOMAKE
 AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
+AC_CHECK_PROG([RST2MAN], [rst2man], [yes], [no])
+if test x"${RST2MAN}" != x"yes" ; then
+	AC_MSG_ERROR([Cannot find rst2man program])
+fi
 
 AM_MAINTAINER_MODE([disable])
 
