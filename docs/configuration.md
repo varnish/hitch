@@ -3,7 +3,7 @@
 Hitch can be configured either from command line arguments or from a
 configuration file on disk.
 
-You can extract the usage description by invocing Hitch with the "--help"
+You can extract the usage description by invoking Hitch with the "--help"
 argument. An example configuration file is included in the distribution.
 
 In general Hitch is a protocol agnostic proxy and does not need much configuration.
