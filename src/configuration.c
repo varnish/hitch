@@ -4,7 +4,6 @@
  * Original author: Brane F. Gracnar
  */
 
-#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -22,9 +21,7 @@
 #include "config.h"
 #include "miniobj.h"
 #include "configuration.h"
-
-#define AZ(foo)		do { assert((foo) == 0); } while (0)
-#define AN(foo)		do { assert((foo) != 0); } while (0)
+#include "vas.h"
 
 #define ADDR_LEN 150
 #define PORT_LEN 6

@@ -30,7 +30,7 @@
   **/
 
 #include "ringbuffer.h"
-#include <assert.h>
+#include "vas.h"
 #include <stdlib.h>
 
 /* Initialize a ringbuffer structure to empty */

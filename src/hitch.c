@@ -50,7 +50,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -83,6 +82,7 @@
 #include "miniobj.h"
 #include "shctx.h"
 #include "vpf.h"
+#include "vas.h"
 #include "configuration.h"
 
 #ifndef MSG_NOSIGNAL
@@ -183,8 +183,6 @@ struct addrinfo *shcupd_peers[MAX_SHCUPD_PEERS+1];
 static unsigned char shared_secret[SHA_DIGEST_LENGTH];
 #endif /*USE_SHARED_CACHE*/
 
-#define AZ(foo)		do { assert((foo) == 0); } while (0)
-#define AN(foo)		do { assert((foo) != 0); } while (0)
 #define NULL_DEV "/dev/null"
 
 int create_workers;
