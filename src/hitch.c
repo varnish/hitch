@@ -488,7 +488,7 @@ init_dh(SSL_CTX *ctx, const char *cert)
 	DH *dh;
 	BIO *bio;
 
-	assert(cert);
+	AN(cert);
 
 	bio = BIO_new_file(cert, "r");
 	if (!bio) {
@@ -1137,7 +1137,7 @@ init_openssl(void)
 	SSL_library_init();
 	SSL_load_error_strings();
 
-	assert(CONFIG->CERT_DEFAULT != NULL);
+	AN(CONFIG->CERT_DEFAULT);
 
 	/* The last file listed in config is the "default" cert */
 	default_ctx = make_ctx(CONFIG->CERT_DEFAULT);
@@ -1731,12 +1731,12 @@ write_proxy_v1(proxystate *ps, const struct sockaddr *local, socklen_t slen)
 	p = ringbuffer_write_ptr(&ps->ring_ssl2clear);
 	n = getnameinfo(local, slen, dst_addr, sizeof dst_addr, dst_port,
 	    sizeof dst_port, NI_NUMERICHOST | NI_NUMERICSERV);
-	assert (n == 0);
+	AZ(n);
 
 	n = getnameinfo((struct sockaddr *) &ps->remote_ip, slen, src_addr,
 	    sizeof src_addr, src_port, sizeof src_port,
 	    NI_NUMERICHOST | NI_NUMERICSERV);
-	assert (n == 0);
+	AZ(n);
 
 	if (local->sa_family == AF_INET) {
 		len = sprintf(p, "PROXY TCP4 %s %s %s %s\r\n", src_addr,
@@ -2995,7 +2995,7 @@ cert_commit(struct cfg_tpc_obj *o)
 		insert_sni_names(sc);
 		break;
 	case CFG_TPC_KEEP:
-		assert(0);
+		WRONG("unreachable");
 		break;
 	case CFG_TPC_DROP:
 		HASH_DEL(ssl_ctxs, sc);
@@ -3029,7 +3029,7 @@ dcert_commit(struct cfg_tpc_obj *o)
 	case CFG_TPC_DROP:
 		/* We always have a default cert. This should not
 		 * happen. */
-		assert(0);
+		WRONG("unreachable");
 		break;
 	}
 }
@@ -3060,7 +3060,7 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 
 	/* handle default cert. Default cert has its own
 	 * rollback/commit functions. */
-	assert(cfg->CERT_DEFAULT != NULL);
+	AN(cfg->CERT_DEFAULT);
 	cf = cfg->CERT_DEFAULT;
 	CHECK_OBJ_NOTNULL(default_ctx, SSLCTX_MAGIC);
 	if (strcmp(default_ctx->filename, cf->filename) != 0
