@@ -8,4 +8,4 @@ doc_DATA = hitch.conf.ex CHANGES.rst README.md
 
 dist_man_MANS = hitch.8
 
-EXTRA_DIST = LICENSE README.md hitch.man.rst hitch.conf.ex CHANGES.rst
+EXTRA_DIST = LICENSE README.md hitch.man.rst hitch.conf.ex CHANGES.rst docs
