@@ -2092,7 +2092,8 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 	socklen_t sl = sizeof(addr);
 
 #if HAVE_ACCEPT4==1
-	int client = accept4(w->fd, (struct sockaddr *) &addr, &sl, SOCK_NONBLOCK);
+	int client = accept4(w->fd, (struct sockaddr *) &addr, &sl,
+	    SOCK_NONBLOCK);
 #else
 	int client = accept(w->fd, (struct sockaddr *) &addr, &sl);
 #endif
