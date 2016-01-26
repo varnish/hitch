@@ -3033,7 +3033,7 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 {
 	struct cfg_cert_file *cf, *cftmp;
 	sslctx *sc, *sctmp;
-	struct cfg_tpc_obj *o;
+	struct cfg_tpc_obj *o, *otmp;
 	struct listen_sock *ls;
 
 	/* NB: The ordering here is significant. It is imperative that
@@ -3101,7 +3101,6 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 		HASH_FIND_STR(cfg->CERT_FILES, ls->cert->filename, cf);
 		if (cf != NULL) {
 			CAST_OBJ_NOTNULL(sc, cf->priv, SSLCTX_MAGIC);
-			o->p[1] = sc;
 		} else {
 			sc = make_ctx(ls->cert);
 			if (sc == NULL)
@@ -3110,11 +3109,11 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 				sctx_free(sc, NULL);
 				return (-1);
 			}
-			o = make_cfg_obj(CFG_CERT, CFG_TPC_NEW,
+			otmp = make_cfg_obj(CFG_CERT, CFG_TPC_NEW,
 			    sc, cert_rollback, cert_commit);
-			VTAILQ_INSERT_TAIL(cfg_objs, o, list);
-			o->p[1] = sc;
+			VTAILQ_INSERT_TAIL(cfg_objs, otmp, list);
 		}
+		o->p[1] = sc;
 	}
 	return (0);
 }
