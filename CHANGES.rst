@@ -4,12 +4,17 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
-hitch-1.1.1 (unreleased)
+hitch-1.1.1 (2016-01-26)
 ------------------------
 
 * Remove compiler warning on FreeBSD.
-
 * Fix fatal build error for manpage on FreeBSD.
+* #55: Fix a bug which caused the Hitch worker threads to sometimes
+ hit an assert after a configuration reload.
+* #57: Slightly reorganize assertion handling.
+* #52: Fix a bug where we would crash on --help.
+* Various minor documentation changes.
+
 
 hitch-1.1.0 (2015-11-20)
 ------------------------
