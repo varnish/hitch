@@ -791,7 +791,7 @@ config_file_parse(char *file, hitch_config *cfg)
 {
 	char line[CONFIG_BUF_SIZE];
 	char *key, *value;
-	FILE *fd = NULL;
+	FILE *fp = NULL;
 
 	int r;
 
@@ -799,11 +799,11 @@ config_file_parse(char *file, hitch_config *cfg)
 
 	// should we read stdin?
 	if (file == NULL || strlen(file) < 1 || strcmp(file, "-") == 0)
-		fd = stdin;
+		fp = stdin;
 	else
-		fd = fopen(file, "r");
+		fp = fopen(file, "r");
 
-	if (fd == NULL) {
+	if (fp == NULL) {
 		config_error_set("Unable to open configuration file '%s': %s\n",
 		    file, strerror(errno));
 		return (1);
@@ -811,7 +811,7 @@ config_file_parse(char *file, hitch_config *cfg)
 
 	int i = 0;
 	while (1) {
-		if (fgets(line, sizeof(line)-1, fd) == NULL)
+		if (fgets(line, sizeof(line)-1, fp) == NULL)
 			break;
 		i++;
 
@@ -821,12 +821,12 @@ config_file_parse(char *file, hitch_config *cfg)
 		// printf("File '%s', line %d, key: '%s', value: '%s'\n", file, i, key, value);
 
 		if (config_param_validate(key, value, cfg, file, i) != 0) {
-			fclose(fd);
+			fclose(fp);
 			return (1);
 		}
 	}
 
-	fclose(fd);
+	fclose(fp);
 	return (0);
 }
 
