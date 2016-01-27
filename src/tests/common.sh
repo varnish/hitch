@@ -7,6 +7,7 @@ LISTENPORT=$(($RANDOM + 1024))
 PIDFILE="$(mktemp -u)"
 CONFFILE="$(mktemp -u)"
 DUMPFILE="$(mktemp -u)"
+TESTDIR="$(pwd)"
 
 HITCH=../hitch
 HITCH_ARGS="--pidfile=$PIDFILE --daemon --quiet"
@@ -29,6 +30,13 @@ die() {
 		cat $DUMPFILE;
 	fi
 	exit 255
+}
+
+mk_cfg() {
+    rm -f "$CONFFILE"
+    while read inp; do
+	echo "$inp" >> "$CONFFILE"
+    done
 }
 
 runcurl() {
