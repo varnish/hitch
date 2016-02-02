@@ -17,6 +17,7 @@
 #include <grp.h>
 #include <sys/stat.h>
 #include <syslog.h>
+#include <libgen.h>
 
 #include "config.h"
 #include "miniobj.h"
