@@ -22,6 +22,7 @@
 #include "miniobj.h"
 #include "configuration.h"
 #include "vas.h"
+#include "cfg_parser.h"
 
 #define ADDR_LEN 150
 #define PORT_LEN 6
@@ -75,6 +76,8 @@
 #define CFG_PARAM_CFGFILE 10000
 
 #define CFG_CONFIG "config"
+
+extern FILE *yyin;
 
 // END: configuration parameters
 
@@ -232,47 +235,6 @@ config_destroy(hitch_config *cfg)
 	free(cfg->SHCUPD_MCASTTTL);
 #endif
 	free(cfg);
-}
-
-int
-config_parse_content(char *line, char **key, char **value)
-{
-	assert(line != NULL);
-
-	if (line[0] == '#')
-		return 1;  // NOOP
-
-	if (strlen(line) < 1 || line[0] == '\n' || strcmp(line, "\r\n") == 0)
-		return 1;
-
-	while (*line != '\0' && isspace(*line)) line++;
-	*key = line;
-	while(*line != '\0' && (isalnum(*line) || *line == '-')) line++;
-	if (*line == '\0' || *(line+1) == '\0')
-		return -1;
-	*line = '\0'; // key end.
-	line++;
-
-	while(*line != '\0' && (*line != '=')) line++;
-	if (*line != '=')
-		return -3;
-
-	if (*line == '\0' || *(line+1) == '\0')
-		return -1;
-	line++;
-
-	while(*line != '\0' && (isspace(*line) || *line == '"' || *line == '\'')) line++;
-	if (*line == '\0')
-		return -1;
-	*value = line;
-
-	while (*line != '\0' && *line != '"' && *line != '\'' && !isspace(*line)) line++;
-	*line = '\0';  // value end.
-
-	if (strlen(*key) <= 1 || strlen(*value) < 1)
-		return -1;
-
-	return(0);
 }
 
 char *
@@ -789,11 +751,8 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 int
 config_file_parse(char *file, hitch_config *cfg)
 {
-	char line[CONFIG_BUF_SIZE];
-	char *key, *value;
 	FILE *fp = NULL;
-
-	int r;
+	int r = 0;
 
 	AN(cfg);
 
@@ -809,25 +768,16 @@ config_file_parse(char *file, hitch_config *cfg)
 		return (1);
 	}
 
-	int i = 0;
-	while (1) {
-		if (fgets(line, sizeof(line)-1, fp) == NULL)
+	yyin = fp;
+	do {
+		if (yyparse(cfg) != 0) {
+			r = 1;
 			break;
-		i++;
-
-		r = config_parse_content((char*)&line, &key, &value);
-		if (r != 0) 	/* comments/blank lines */
-			continue;
-		// printf("File '%s', line %d, key: '%s', value: '%s'\n", file, i, key, value);
-
-		if (config_param_validate(key, value, cfg, file, i) != 0) {
-			fclose(fp);
-			return (1);
 		}
-	}
+	} while (!feof(yyin));
 
 	fclose(fp);
-	return (0);
+	return (r);
 }
 
 char *
