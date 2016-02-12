@@ -1109,7 +1109,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 			ret = config_param_validate(CFG_SHARED_CACHE_LISTEN, optarg, cfg, NULL, 0);
 			break;
 		case 'P':
-			ret = config_param_validate(CFG_SHARED_CACHE_PEER, optarg, cfg, NULL, 0)s;
+			ret = config_param_validate(CFG_SHARED_CACHE_PEER, optarg, cfg, NULL, 0);
 			break;
 		case 'M':
 			ret =config_param_validate(CFG_SHARED_CACHE_MCASTIF, optarg, cfg, NULL, 0);
