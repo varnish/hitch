@@ -22,6 +22,7 @@
 #include "miniobj.h"
 #include "configuration.h"
 #include "vas.h"
+#include "vsb.h"
 #include "cfg_parser.h"
 
 #define ADDR_LEN 150
@@ -535,6 +536,41 @@ config_param_shcupd_peer(char *str, hitch_config *cfg)
 
 #endif /* USE_SHARED_CACHE */
 
+void
+front_arg_add(hitch_config *cfg, struct front_arg *fa)
+{
+	struct vsb pspec;
+
+	CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
+	CHECK_OBJ_ORNULL(fa->cert, CFG_CERT_FILE_MAGIC);
+	AN(fa->port);
+
+	if (cfg->LISTEN_DEFAULT != NULL) {
+		/* drop default listen arg. */
+		struct front_arg *def = NULL;
+		HASH_FIND_STR(cfg->LISTEN_ARGS, "default", def);
+		AN(def);
+		HASH_DEL(cfg->LISTEN_ARGS, def);
+		free(def->ip);
+		free(def->port);
+		free(def->cert);
+		free(def->pspec);
+		FREE_OBJ(def);
+		cfg->LISTEN_DEFAULT = NULL;
+	}
+
+	VSB_new(&pspec, NULL, 0, VSB_AUTOEXTEND);
+	VSB_printf(&pspec, "[%s]:", fa->ip);
+	VSB_cat(&pspec, fa->port);
+	if (fa->cert) {
+		VSB_printf(&pspec, "+%s", fa->cert->filename);
+	}
+	VSB_finish(&pspec);
+	fa->pspec = VSB_data(&pspec);
+	HASH_ADD_KEYPTR(hh, cfg->LISTEN_ARGS, fa->pspec,
+	    strlen(fa->pspec), fa);
+}
+
 int
 config_param_validate(char *k, char *v, hitch_config *cfg,
     char *file, int line)
@@ -568,34 +604,15 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
 		r = config_param_host_port_wildcard(v,
 		    &fa->ip, &fa->port, &certfile, 1);
-		if (r != 0) {
-			if (cfg->LISTEN_DEFAULT != NULL) {
-				/* drop default listen arg. */
-				struct front_arg *def = NULL;
-				HASH_FIND_STR(cfg->LISTEN_ARGS, "default", def);
-				AN(def);
-				HASH_DEL(cfg->LISTEN_ARGS, def);
-				free(def->ip);
-				free(def->port);
-				free(def->cert);
-				free(def->pspec);
-				FREE_OBJ(def);
-				cfg->LISTEN_DEFAULT = NULL;
+		if (certfile != NULL) {
+			r = config_param_pem_file(certfile, &cert);
+			if (r != 0) {
+				AN(cert);
+				fa->cert = cert;
 			}
-			fa->pspec = strdup(v);
-			HASH_ADD_KEYPTR(hh, cfg->LISTEN_ARGS, fa->pspec,
-			    strlen(fa->pspec), fa);
-			if (certfile != NULL) {
-				r = config_param_pem_file(certfile, &cert);
-				if (r != 0) {
-					AN(cert);
-					fa->cert = cert;
-				}
-				free(certfile);
-			}
-		} else {
-			FREE_OBJ(fa);
+			free(certfile);
 		}
+		front_arg_add(cfg, fa);
 	} else if (strcmp(k, CFG_BACKEND) == 0) {
 		free(cfg->BACK_PORT);
 		free(cfg->BACK_IP);

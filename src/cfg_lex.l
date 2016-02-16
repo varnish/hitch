@@ -68,6 +68,8 @@
 "ring-data-len"		{ return (TOK_RING_DATA_LEN); }
 "pidfile"		{ return (TOK_PIDFILE); }
 "sni-nomatch-abort"	{ return (TOK_SNI_NOMATCH_ABORT); }
+"host"		{ return (TOK_HOST); }
+"port"		{ return (TOK_PORT); }
 
 
 \"(\\.|[^\\"])*\" {
@@ -78,11 +80,11 @@
 	}
 	s = strchr(yytext + 1, '"');
 	*s = '\0';
-	yylval.s = strdup(yytext + 1);
+	yylval.s = yytext + 1;
 	return (STRING);
 }
 [a-zA-Z0-9\-]+    {
-	yylval.s = strdup(yytext);
+	yylval.s = yytext;
 	return (STRING);
 }
 

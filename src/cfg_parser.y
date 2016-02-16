@@ -3,17 +3,22 @@
 #include <stdlib.h>
 #include "configuration.h"
 #include "vas.h"
+#include "miniobj.h"
 
 extern int yylex (hitch_config *);
 extern int yyparse(hitch_config *);
 extern FILE *yyin;
 int yyget_lineno(void);
 
-int
-config_param_validate(char *k, char *v, hitch_config *cfg,
+int config_param_validate(char *k, char *v, hitch_config *cfg,
     char *file, int line);
+void front_arg_add(hitch_config *cfg, struct front_arg *fa);
+int config_param_pem_file(char *filename, struct cfg_cert_file **cfptr);
 
 void yyerror(hitch_config *, const char *);
+
+static struct front_arg *cur_fa;
+
 %}
 
 %union {
@@ -36,8 +41,7 @@ void yyerror(hitch_config *, const char *);
 %token TOK_WRITE_PROXY_V1 TOK_WRITE_PROXY_V2 TOK_PEM_FILE TOK_PROXY_PROXY
 %token TOK_BACKEND_CONNECT_TIMEOUT TOK_SSL_HANDSHAKE_TIMEOUT TOK_RECV_BUFSIZE
 %token TOK_SEND_BUFSIZE TOK_LOG_FILENAME TOK_RING_SLOTS TOK_RING_DATA_LEN
-%token TOK_PIDFILE TOK_SNI_NOMATCH_ABORT TOK_SSL TOK_TLS
-
+%token TOK_PIDFILE TOK_SNI_NOMATCH_ABORT TOK_SSL TOK_TLS TOK_HOST TOK_PORT
 
 %param {hitch_config *cfg}
 %define parse.error verbose
@@ -79,18 +83,49 @@ CFG_RECORD
 	| SNI_NOMATCH_ABORT_REC
 	;
 
-FRONTEND_REC: TOK_FRONTEND '=' STRING
+FRONTEND_REC
+	: TOK_FRONTEND '=' STRING
 {
 	if ($3 && config_param_validate("frontend", $3, cfg, /* XXX: */ "",
 	    yyget_lineno()) != 0)
 		YYABORT;
 }
-/* 	| FRONTEND '=' '{' STRING '}' */
-/* { */
-/* 	printf("frontblk = %s\n", $4); */
-/* } */
+	| TOK_FRONTEND '=' '{'
+{
+	/* NB: Mid-rule action */
+	ALLOC_OBJ(cur_fa, FRONT_ARG_MAGIC);
+	AN(cur_fa);
+}
+	FRONTEND_BLK '}'
+{
+	front_arg_add(cfg, cur_fa);
+	cur_fa = NULL;
+};
 
-;
+FRONTEND_BLK: FB_RECS;
+FB_RECS
+	: FB_REC
+	| FB_RECS FB_REC
+	;
+
+FB_REC
+	: FB_HOST
+	| FB_PORT
+	| FB_CERT
+	;
+
+FB_HOST: TOK_HOST '=' STRING { cur_fa->ip = strdup($3); };
+FB_PORT: TOK_PORT '=' STRING { cur_fa->port = strdup($3); };
+FB_CERT: TOK_PEM_FILE '=' STRING
+{
+	int r;
+	struct cfg_cert_file *cert;
+	r = config_param_pem_file($3, &cert);
+	if (r == 0)
+		YYABORT;
+	cur_fa->cert = cert;
+};
+
 QUIET_REC: TOK_QUIET '=' BOOL { cfg->QUIET = $3; };
 
 WORKERS_REC: TOK_WORKERS '=' UINT { cfg->NCORES = $3; };
@@ -103,7 +138,7 @@ TLS_REC: TOK_TLS '=' BOOL { if ($3) { cfg->ETYPE = ENC_TLS; } };
 
 SSL_REC: TOK_SSL '=' BOOL { if ($3) { cfg->ETYPE = ENC_SSL; } };
 
-SSL_ENGINE_REC: TOK_SSL_ENGINE '=' STRING { if ($3) cfg->ENGINE = $3; };
+SSL_ENGINE_REC: TOK_SSL_ENGINE '=' STRING { if ($3) cfg->ENGINE = strdup($3); };
 
 PREFER_SERVER_CIPHERS_REC: TOK_PREFER_SERVER_CIPHERS '=' BOOL
 {
@@ -139,7 +174,7 @@ SNI_NOMATCH_ABORT_REC
 	cfg->SNI_NOMATCH_ABORT = $3;
 };
 
-CIPHERS_REC: TOK_CIPHERS '=' STRING { if ($3) cfg->CIPHER_SUITE = $3; };
+CIPHERS_REC: TOK_CIPHERS '=' STRING { if ($3) cfg->CIPHER_SUITE = strdup($3); };
 
 USER_REC: TOK_USER '=' STRING
 {
@@ -185,5 +220,5 @@ void
 yyerror(hitch_config *cfg, const char *s)
 {
 	(void) cfg;
-	fprintf(stderr, "parsing error: %s\n", s);
+	fprintf(stderr, "parsing error: line: %d: %s\n", yyget_lineno(), s);
 }
