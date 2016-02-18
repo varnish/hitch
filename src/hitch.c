@@ -153,10 +153,10 @@ VTAILQ_HEAD(child_proc_head, child_proc);
 static struct child_proc_head child_procs;
 struct sslctx_s;
 
-struct listen_sock {
+struct frontend {
 	unsigned			magic;
-#define LISTEN_SOCK_MAGIC 		0x5b04e577
-	VTAILQ_ENTRY(listen_sock)	list;
+#define FRONTEND_MAGIC	 		0x5b04e577
+	VTAILQ_ENTRY(frontend)		list;
 	ev_io				listener;
 	int				sock;
 	char				*name;
@@ -166,10 +166,10 @@ struct listen_sock {
 	struct sockaddr_storage		addr;
 };
 
-VTAILQ_HEAD(listen_sock_head, listen_sock);
+VTAILQ_HEAD(frontend_head, frontend);
 
-static struct listen_sock_head listen_socks;
-static unsigned nlisten_socks;
+static struct frontend_head frontends;
+static unsigned nfrontends;
 
 #define LOG_REOPEN_INTERVAL 60
 static FILE* logf;
@@ -1131,7 +1131,7 @@ void
 init_openssl(void)
 {
 	struct cfg_cert_file *cf, *cftmp;
-	struct listen_sock *ls;
+	struct frontend *fr;
 	sslctx *so;
 
 	SSL_library_init();
@@ -1163,19 +1163,19 @@ init_openssl(void)
 		}
 	}
 
-	VTAILQ_FOREACH(ls, &listen_socks, list) {
-		if (ls->cert) {
-			so = find_ctx(ls->cert->filename);
+	VTAILQ_FOREACH(fr, &frontends, list) {
+		if (fr->cert) {
+			so = find_ctx(fr->cert->filename);
 			if (so == NULL) {
-				so = make_ctx(ls->cert);
+				so = make_ctx(fr->cert);
 				AN(so);
 				HASH_ADD_KEYPTR(hh, ssl_ctxs,
-				    ls->cert->filename,
-				    strlen(ls->cert->filename), so);
+				    fr->cert->filename,
+				    strlen(fr->cert->filename), so);
 				load_cert_ctx(so);
 				insert_sni_names(so);
 			}
-			ls->sctx = so;
+			fr->sctx = so;
 		}
 	}
 
@@ -1203,36 +1203,36 @@ init_openssl(void)
 }
 
 static void
-destroy_listen_sock(struct listen_sock *ls)
+destroy_frontend(struct frontend *fr)
 {
-	CHECK_OBJ_NOTNULL(ls, LISTEN_SOCK_MAGIC);
-	if (ls->sock > 0)
-		(void) close(ls->sock);
-	free(ls->name);
-	free(ls->pspec);
-	if (ls->cert) {
-		CHECK_OBJ_NOTNULL(ls->cert, CFG_CERT_FILE_MAGIC);
-		ls->cert->ref--;
-		if (ls->cert->ref == 0) {
-			free(ls->cert->filename);
-			FREE_OBJ(ls->cert);
+	CHECK_OBJ_NOTNULL(fr, FRONTEND_MAGIC);
+	if (fr->sock > 0)
+		(void) close(fr->sock);
+	free(fr->name);
+	free(fr->pspec);
+	if (fr->cert) {
+		CHECK_OBJ_NOTNULL(fr->cert, CFG_CERT_FILE_MAGIC);
+		fr->cert->ref--;
+		if (fr->cert->ref == 0) {
+			free(fr->cert->filename);
+			FREE_OBJ(fr->cert);
 		}
 	}
-	FREE_OBJ(ls);
+	FREE_OBJ(fr);
 }
 
 /* Create the bound socket in the parent process */
 static int
-create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
+create_frontend(const struct front_arg *fa, struct frontend_head *socks)
 {
 	struct addrinfo *ai, hints, *it;
-	struct listen_sock *ls, *lstmp;
+	struct frontend *fr, *frtmp;
 	char buf[INET6_ADDRSTRLEN+20];
 	char abuf[INET6_ADDRSTRLEN];
 	char pbuf[8];
 	int n, r;
 	int count = 0;
-	struct listen_sock_head tmp_list;
+	struct frontend_head tmp_list;
 
 	CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
 
@@ -1250,101 +1250,101 @@ create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 	}
 
 	for (it = ai; it != NULL; it = it->ai_next) {
-		ALLOC_OBJ(ls, LISTEN_SOCK_MAGIC);
-		VTAILQ_INSERT_TAIL(&tmp_list, ls, list);
+		ALLOC_OBJ(fr, FRONTEND_MAGIC);
+		VTAILQ_INSERT_TAIL(&tmp_list, fr, list);
 		count++;
 
-		ls->sock = socket(it->ai_family, SOCK_STREAM, IPPROTO_TCP);
-		if (ls->sock == -1) {
+		fr->sock = socket(it->ai_family, SOCK_STREAM, IPPROTO_TCP);
+		if (fr->sock == -1) {
 			ERR("{socket: main}: %s: %s\n", strerror(errno),
 			    fa->pspec);
-			goto creat_ls_err;
+			goto creat_frontend_err;
 		}
 
 		int t = 1;
-		if (setsockopt(ls->sock, SOL_SOCKET, SO_REUSEADDR,
+		if (setsockopt(fr->sock, SOL_SOCKET, SO_REUSEADDR,
 			&t, sizeof(int))
 		    < 0) {
 			ERR("{setsockopt-reuseaddr}: %s: %s\n", strerror(errno),
 			    fa->pspec);
-			goto creat_ls_err;
+			goto creat_frontend_err;
 		}
 #ifdef SO_REUSEPORT
-		if (setsockopt(ls->sock, SOL_SOCKET, SO_REUSEPORT,
+		if (setsockopt(fr->sock, SOL_SOCKET, SO_REUSEPORT,
 			&t, sizeof(int))
 		    < 0) {
 			ERR("{setsockopt-reuseport}: %s: %s\n", strerror(errno),
 			    fa->pspec);
-			goto creat_ls_err;
+			goto creat_frontend_err;
 		}
 #endif
-		if(setnonblocking(ls->sock) < 0) {
+		if(setnonblocking(fr->sock) < 0) {
 			ERR("{listen sock: setnonblocking}: %s: %s\n",
 			    strerror(errno), fa->pspec);
-			goto creat_ls_err;
+			goto creat_frontend_err;
 		}
 #ifdef IPV6_V6ONLY
 		t = 1;
 		if (it->ai_family == AF_INET6 &&
-		    setsockopt(ls->sock, IPPROTO_IPV6, IPV6_V6ONLY, &t,
+		    setsockopt(fr->sock, IPPROTO_IPV6, IPV6_V6ONLY, &t,
 			sizeof (t)) != 0) {
 			ERR("{setsockopt-ipv6only}: %s: %s\n", strerror(errno),
 			    fa->pspec);
-			goto creat_ls_err;
+			goto creat_frontend_err;
 		}
 #endif
 		if (CONFIG->RECV_BUFSIZE > 0) {
-			r = setsockopt(ls->sock, SOL_SOCKET, SO_RCVBUF,
+			r = setsockopt(fr->sock, SOL_SOCKET, SO_RCVBUF,
 			    &CONFIG->RECV_BUFSIZE,
 			    sizeof(CONFIG->RECV_BUFSIZE));
 			if (r < 0) {
 				ERR("{setsockopt-rcvbuf}: %s: %s\n",
-				    strerror(errno),fa->pspec);
-				goto creat_ls_err;
+				    strerror(errno), fa->pspec);
+				goto creat_frontend_err;
 			}
 		}
 		if (CONFIG->SEND_BUFSIZE > 0) {
-			r = setsockopt(ls->sock, SOL_SOCKET, SO_SNDBUF,
+			r = setsockopt(fr->sock, SOL_SOCKET, SO_SNDBUF,
 			    &CONFIG->SEND_BUFSIZE,
 			    sizeof(CONFIG->SEND_BUFSIZE));
 			if (r < 0) {
 				ERR("{setsockopt-sndbuf}: %s: %s\n",
 				    strerror(errno), fa->pspec);
-				goto creat_ls_err;
+				goto creat_frontend_err;
 			}
 		}
 
-		if (bind(ls->sock, it->ai_addr, it->ai_addrlen)) {
+		if (bind(fr->sock, it->ai_addr, it->ai_addrlen)) {
 			ERR("{bind-socket}: %s: %s\n", strerror(errno),
 			    fa->pspec);
-			goto creat_ls_err;
+			goto creat_frontend_err;
 		}
 
 #ifndef NO_DEFER_ACCEPT
 #if TCP_DEFER_ACCEPT
 		int timeout = 1;
-		if (setsockopt(ls->sock, IPPROTO_TCP, TCP_DEFER_ACCEPT,
+		if (setsockopt(fr->sock, IPPROTO_TCP, TCP_DEFER_ACCEPT,
 			&timeout, sizeof(int)) < 0) {
 			ERR("{setsockopt-defer_accept}: %s: %s\n",
 			    strerror(errno), fa->pspec);
-			goto creat_ls_err;
+			goto creat_frontend_err;
 		}
 #endif /* TCP_DEFER_ACCEPT */
 #endif
-		if (listen(ls->sock, CONFIG->BACKLOG) != 0) {
+		if (listen(fr->sock, CONFIG->BACKLOG) != 0) {
 			ERR("{listen-socket}: %s: %s\n", strerror(errno),
 			    fa->pspec);
-			goto creat_ls_err;
+			goto creat_frontend_err;
 		}
 
-		memcpy(&ls->addr, it->ai_addr, it->ai_addrlen);
+		memcpy(&fr->addr, it->ai_addr, it->ai_addrlen);
 
 		n = getnameinfo(it->ai_addr, it->ai_addrlen, abuf,
 		    sizeof abuf, pbuf, sizeof pbuf,
 		    NI_NUMERICHOST | NI_NUMERICSERV);
 		if (n != 0) {
 			ERR("{getnameinfo}: %s\n", fa->pspec);
-			goto creat_ls_err;
+			goto creat_frontend_err;
 		}
 
 		if (it->ai_addr->sa_family == AF_INET6) {
@@ -1352,30 +1352,30 @@ create_listen_sock(const struct front_arg *fa, struct listen_sock_head *socks)
 		} else {
 			sprintf(buf, "%s:%s", abuf, pbuf);
 		}
-		ls->name = strdup(buf);
-		AN(ls->name);
+		fr->name = strdup(buf);
+		AN(fr->name);
 		if (fa->cert != NULL) {
-			ls->cert = fa->cert;
-			fa->cert->ref++;
+			fr->cert = fa->cert;
+			fr->cert->ref++;
 		}
-		ls->pspec = strdup(fa->pspec);
+		fr->pspec = strdup(fa->pspec);
 
-		LOG("{core} Listening on %s\n", ls->name);
+		LOG("{core} Listening on %s\n", fr->name);
 	}
 
-	VTAILQ_FOREACH_SAFE(ls, &tmp_list, list, lstmp) {
-		VTAILQ_REMOVE(&tmp_list, ls, list);
-		VTAILQ_INSERT_TAIL(socks, ls, list);
+	VTAILQ_FOREACH_SAFE(fr, &tmp_list, list, frtmp) {
+		VTAILQ_REMOVE(&tmp_list, fr, list);
+		VTAILQ_INSERT_TAIL(socks, fr, list);
 	}
 
 	freeaddrinfo(ai);
 	return (count);
 
-creat_ls_err:
+creat_frontend_err:
 	freeaddrinfo(ai);
-	VTAILQ_FOREACH_SAFE(ls, &tmp_list, list, lstmp) {
-		VTAILQ_REMOVE(&tmp_list, ls, list);
-		destroy_listen_sock(ls);
+	VTAILQ_FOREACH_SAFE(fr, &tmp_list, list, frtmp) {
+		VTAILQ_REMOVE(&tmp_list, fr, list);
+		destroy_frontend(fr);
 	}
 
 	return (-1);
@@ -2224,17 +2224,17 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 static void
 check_ppid(struct ev_loop *loop, ev_timer *w, int revents)
 {
-	struct listen_sock *ls;
+	struct frontend *fr;
 	(void)revents;
 	pid_t ppid = getppid();
 	if (ppid != master_pid) {
 		ERR("{core} Process %d detected parent death, "
 		    "closing listener sockets.\n", core_id);
 		ev_timer_stop(loop, w);
-		VTAILQ_FOREACH(ls, &listen_socks, list) {
-			CHECK_OBJ_NOTNULL(ls, LISTEN_SOCK_MAGIC);
-			ev_io_stop(loop, &ls->listener);
-			close(ls->sock);
+		VTAILQ_FOREACH(fr, &frontends, list) {
+			CHECK_OBJ_NOTNULL(fr, FRONTEND_MAGIC);
+			ev_io_stop(loop, &fr->listener);
+			close(fr->sock);
 		}
 	}
 }
@@ -2244,7 +2244,7 @@ handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 {
 	unsigned cg;
 	ssize_t r;
-	struct listen_sock *ls;
+	struct frontend *fr;
 
 	(void) revents;
 	r = read(w->fd, &cg, sizeof(cg));
@@ -2268,10 +2268,10 @@ handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 		child_state = CHILD_EXITING;
 
 		/* Stop accepting new connections. */
-		VTAILQ_FOREACH(ls, &listen_socks, list) {
-			CHECK_OBJ_NOTNULL(ls, LISTEN_SOCK_MAGIC);
-			ev_io_stop(loop, &ls->listener);
-			close(ls->sock);
+		VTAILQ_FOREACH(fr, &frontends, list) {
+			CHECK_OBJ_NOTNULL(fr, FRONTEND_MAGIC);
+			ev_io_stop(loop, &fr->listener);
+			close(fr->sock);
 		}
 
 		check_exit_state();
@@ -2410,7 +2410,7 @@ handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents)
 static void
 handle_connections(int mgt_fd)
 {
-	struct listen_sock *ls;
+	struct frontend *fr;
 	struct sigaction sa;
 
 	child_state = CHILD_ACTIVE;
@@ -2445,16 +2445,16 @@ handle_connections(int mgt_fd)
 	ev_timer_init(&timer_ppid_check, check_ppid, 1.0, 1.0);
 	ev_timer_start(loop, &timer_ppid_check);
 
-	VTAILQ_FOREACH(ls, &listen_socks, list) {
-		ev_io_init(&ls->listener,
+	VTAILQ_FOREACH(fr, &frontends, list) {
+		ev_io_init(&fr->listener,
 		    (CONFIG->PMODE == SSL_CLIENT) ?
 		    handle_clear_accept : handle_accept,
-		    ls->sock, EV_READ);
-		if (ls->sctx)
-			ls->listener.data = ls->sctx;
+		    fr->sock, EV_READ);
+		if (fr->sctx)
+			fr->listener.data = fr->sctx;
 		else
-			ls->listener.data = default_ctx;
-		ev_io_start(loop, &ls->listener);
+			fr->listener.data = default_ctx;
+		ev_io_start(loop, &fr->listener);
 	}
 
 	AZ(setnonblocking(mgt_fd));
@@ -2505,7 +2505,7 @@ init_globals(void)
 	/* backaddr */
 	struct addrinfo hints;
 
-	VTAILQ_INIT(&listen_socks);
+	VTAILQ_INIT(&frontends);
 	VTAILQ_INIT(&child_procs);
 
 	memset(&hints, 0, sizeof hints);
@@ -2823,7 +2823,7 @@ remove_pfh(void)
 struct cfg_tpc_obj;
 
 enum cfg_tpc_type {
-	CFG_LISTEN_ADDR,
+	CFG_FRONTEND,
 	CFG_CERT
 
 	/* ... */
@@ -2881,38 +2881,38 @@ make_cfg_obj(enum cfg_tpc_type type, enum cfg_tpc_handling handling,
 }
 
 static void
-ls_rollback(struct cfg_tpc_obj *o)
+frontend_rollback(struct cfg_tpc_obj *o)
 {
-	struct listen_sock *ls;
+	struct frontend *fr;
 
 	if (o->handling == CFG_TPC_NEW) {
-		CAST_OBJ_NOTNULL(ls, o->p[0], LISTEN_SOCK_MAGIC);
-		destroy_listen_sock(ls);
+		CAST_OBJ_NOTNULL(fr, o->p[0], FRONTEND_MAGIC);
+		destroy_frontend(fr);
 	}
 
 	/* KEEP/DROP: ignore */
 }
 
 static void
-ls_commit(struct cfg_tpc_obj *o)
+frontend_commit(struct cfg_tpc_obj *o)
 {
-	struct listen_sock *ls;
+	struct frontend *fr;
 	sslctx *sc;
-	CAST_OBJ_NOTNULL(ls, o->p[0], LISTEN_SOCK_MAGIC);
+	CAST_OBJ_NOTNULL(fr, o->p[0], FRONTEND_MAGIC);
 
 	switch (o->handling) {
 	case CFG_TPC_NEW:
-		VTAILQ_INSERT_TAIL(&listen_socks, ls, list);
+		VTAILQ_INSERT_TAIL(&frontends, fr, list);
 		/* FALL-THROUGH */
 	case CFG_TPC_KEEP:
 		if (o->p[1]) {
 			CAST_OBJ_NOTNULL(sc, o->p[1], SSLCTX_MAGIC);
-			ls->sctx = sc;
+			fr->sctx = sc;
 		}
 		break;
 	case CFG_TPC_DROP:
-		VTAILQ_REMOVE(&listen_socks, ls, list);
-		destroy_listen_sock(ls);
+		VTAILQ_REMOVE(&frontends, fr, list);
+		destroy_frontend(fr);
 		break;
 	}
 }
@@ -2923,37 +2923,37 @@ ls_commit(struct cfg_tpc_obj *o)
    Success: Caller calls .commit()
 */
 static int
-ls_query(struct front_arg *new_set, struct cfg_tpc_obj_head *cfg_objs)
+frontend_query(struct front_arg *new_set, struct cfg_tpc_obj_head *cfg_objs)
 {
-	struct listen_sock *ls, *lstmp;
+	struct frontend *fr, *frtmp;
 	struct front_arg *fa, *ftmp;
 	struct cfg_tpc_obj *o;
-	struct listen_sock_head lsocks;
+	struct frontend_head lfrontends;
 	int n;
 
-	VTAILQ_INIT(&lsocks);
+	VTAILQ_INIT(&lfrontends);
 
-	VTAILQ_FOREACH(ls, &listen_socks, list) {
-		HASH_FIND_STR(new_set, ls->pspec, fa);
+	VTAILQ_FOREACH(fr, &frontends, list) {
+		HASH_FIND_STR(new_set, fr->pspec, fa);
 		if (fa != NULL) {
 			fa->mark = 1;
-			o = make_cfg_obj(CFG_LISTEN_ADDR, CFG_TPC_KEEP, ls,
-			    ls_rollback, ls_commit);
+			o = make_cfg_obj(CFG_FRONTEND, CFG_TPC_KEEP, fr,
+			    frontend_rollback, frontend_commit);
 		} else
-			o = make_cfg_obj(CFG_LISTEN_ADDR, CFG_TPC_DROP, ls,
-			    ls_rollback, ls_commit);
+			o = make_cfg_obj(CFG_FRONTEND, CFG_TPC_DROP, fr,
+			    frontend_rollback, frontend_commit);
 		VTAILQ_INSERT_TAIL(cfg_objs, o, list);
 	}
 
 	HASH_ITER(hh, new_set, fa, ftmp) {
 		if (!fa->mark) {
-			n = create_listen_sock(fa, &lsocks);
+			n = create_frontend(fa, &lfrontends);
 			if (n <= 0)
 				return (-1);
-			VTAILQ_FOREACH_SAFE(ls, &lsocks, list, lstmp) {
-				VTAILQ_REMOVE(&lsocks, ls, list);
-				o = make_cfg_obj(CFG_LISTEN_ADDR, CFG_TPC_NEW,
-				    ls, ls_rollback, ls_commit);
+			VTAILQ_FOREACH_SAFE(fr, &lfrontends, list, frtmp) {
+				VTAILQ_REMOVE(&lfrontends, fr, list);
+				o = make_cfg_obj(CFG_FRONTEND, CFG_TPC_NEW,
+				    fr, frontend_rollback, frontend_commit);
 				VTAILQ_INSERT_TAIL(cfg_objs, o, list);
 			}
 		}
@@ -3034,7 +3034,7 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 	struct cfg_cert_file *cf, *cftmp;
 	sslctx *sc, *sctmp;
 	struct cfg_tpc_obj *o, *otmp;
-	struct listen_sock *ls;
+	struct frontend *fr;
 
 	/* NB: The ordering here is significant. It is imperative that
 	 * all DROP objects are inserted before any NEW objects, in
@@ -3090,19 +3090,19 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 	 * new certs specific to the already queried listen
 	 * endpoints. */
 	VTAILQ_FOREACH(o, cfg_objs, list) {
-		if (o->type != CFG_LISTEN_ADDR)
+		if (o->type != CFG_FRONTEND)
 			break;
 		if (o->handling == CFG_TPC_DROP)
 			continue;
-		CAST_OBJ_NOTNULL(ls, o->p[0], LISTEN_SOCK_MAGIC);
-		if (ls->cert == NULL)
+		CAST_OBJ_NOTNULL(fr, o->p[0], FRONTEND_MAGIC);
+		if (fr->cert == NULL)
 			continue;
-		CHECK_OBJ_NOTNULL(ls->cert, CFG_CERT_FILE_MAGIC);
-		HASH_FIND_STR(cfg->CERT_FILES, ls->cert->filename, cf);
+		CHECK_OBJ_NOTNULL(fr->cert, CFG_CERT_FILE_MAGIC);
+		HASH_FIND_STR(cfg->CERT_FILES, fr->cert->filename, cf);
 		if (cf != NULL) {
 			CAST_OBJ_NOTNULL(sc, cf->priv, SSLCTX_MAGIC);
 		} else {
-			sc = make_ctx(ls->cert);
+			sc = make_ctx(fr->cert);
 			if (sc == NULL)
 				return (-1);
 			if (load_cert_ctx(sc) != 0) {
@@ -3144,7 +3144,7 @@ reconfigure(int argc, char **argv)
 
 	/* NB: the ordering of the foo_query() calls here is
 	 * significant. */
-	if (ls_query(cfg_new->LISTEN_ARGS, &cfg_objs) < 0
+	if (frontend_query(cfg_new->LISTEN_ARGS, &cfg_objs) < 0
 	    || cert_query(cfg_new, &cfg_objs) < 0) {
 		VTAILQ_FOREACH_SAFE(cto, &cfg_objs, list, cto_tmp) {
 			VTAILQ_REMOVE(&cfg_objs, cto, list);
@@ -3252,10 +3252,10 @@ main(int argc, char **argv)
 	init_globals();
 
 	HASH_ITER(hh, CONFIG->LISTEN_ARGS, fa, ftmp) {
-		int c = create_listen_sock(fa, &listen_socks);
+		int c = create_frontend(fa, &frontends);
 		if (c <= 0)
 			exit(1);
-		nlisten_socks += c;
+		nfrontends += c;
 	}
 
 #ifdef USE_SHARED_CACHE
