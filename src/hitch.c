@@ -1130,57 +1130,9 @@ find_ctx(const char *file)
 void
 init_openssl(void)
 {
-	struct cfg_cert_file *cf, *cftmp;
-	struct frontend *fr;
-	sslctx *so;
-
 	SSL_library_init();
 	SSL_load_error_strings();
 
-	AN(CONFIG->CERT_DEFAULT);
-
-	/* The last file listed in config is the "default" cert */
-	default_ctx = make_ctx(CONFIG->CERT_DEFAULT);
-	if (default_ctx == NULL)
-		exit(1);
-
-#ifndef OPENSSL_NO_TLSEXT
-	load_cert_ctx(default_ctx);
-	insert_sni_names(default_ctx);
-
-	// Go through the list of PEMs and make some SSL contexts for
-	// them. We also keep track of the names associated with each
-	// cert so we can do SNI on them later
-	HASH_ITER(hh, CONFIG->CERT_FILES, cf, cftmp) {
-		if (find_ctx(cf->filename) == NULL) {
-			so = make_ctx(cf);
-			if (so == NULL)
-				exit(1);
-			HASH_ADD_KEYPTR(hh, ssl_ctxs, cf->filename,
-			    strlen(cf->filename), so);
-			load_cert_ctx(so);
-			insert_sni_names(so);
-		}
-	}
-
-	VTAILQ_FOREACH(fr, &frontends, list) {
-		if (fr->cert) {
-			so = find_ctx(fr->cert->filename);
-			if (so == NULL) {
-				so = make_ctx(fr->cert);
-				AN(so);
-				HASH_ADD_KEYPTR(hh, ssl_ctxs,
-				    fr->cert->filename,
-				    strlen(fr->cert->filename), so);
-				load_cert_ctx(so);
-				insert_sni_names(so);
-			}
-			fr->sctx = so;
-		}
-	}
-
-#undef APPEND_CTX
-#endif /* OPENSSL_NO_TLSEXT */
 
 	if (CONFIG->ENGINE) {
 		ENGINE *e = NULL;
@@ -1198,6 +1150,60 @@ init_openssl(void)
 			    ENGINE_get_id(e));
 			ENGINE_finish(e);
 			ENGINE_free(e);
+		}
+	}
+}
+
+static void
+init_certs(void) {
+	struct cfg_cert_file *cf, *cftmp;
+	struct frontend *fr;
+	sslctx *so;
+
+	AN(CONFIG->CERT_DEFAULT);
+
+	/* The last file listed in config is the "default" cert */
+	default_ctx = make_ctx(CONFIG->CERT_DEFAULT);
+	if (default_ctx == NULL)
+		exit(1);
+
+#ifndef OPENSSL_NO_TLSEXT
+	load_cert_ctx(default_ctx);
+	insert_sni_names(default_ctx);
+#endif
+
+	// Go through the list of PEMs and make some SSL contexts for
+	// them. We also keep track of the names associated with each
+	// cert so we can do SNI on them later
+	HASH_ITER(hh, CONFIG->CERT_FILES, cf, cftmp) {
+		if (find_ctx(cf->filename) == NULL) {
+			so = make_ctx(cf);
+			if (so == NULL)
+				exit(1);
+			HASH_ADD_KEYPTR(hh, ssl_ctxs, cf->filename,
+			    strlen(cf->filename), so);
+#ifndef OPENSSL_NO_TLSEXT
+			load_cert_ctx(so);
+			insert_sni_names(so);
+#endif
+		}
+	}
+
+	VTAILQ_FOREACH(fr, &frontends, list) {
+		if (fr->cert) {
+			so = find_ctx(fr->cert->filename);
+			if (so == NULL) {
+				so = make_ctx(fr->cert);
+				AN(so);
+				HASH_ADD_KEYPTR(hh, ssl_ctxs,
+				    fr->cert->filename,
+				    strlen(fr->cert->filename), so);
+#ifndef OPENSSL_NO_TLSEXT
+				load_cert_ctx(so);
+				insert_sni_names(so);
+#endif
+			}
+			fr->sctx = so;
 		}
 	}
 }
@@ -3215,6 +3221,7 @@ main(int argc, char **argv)
 		    " certificates\n");
 		init_globals();
 		init_openssl();
+		init_certs();
 		fprintf(stderr, "%s configuration looks ok.\n",
 		    basename(argv[0]));
 		return (0);
@@ -3266,10 +3273,12 @@ main(int argc, char **argv)
 	}
 #endif /* USE_SHARED_CACHE */
 
+	init_openssl();
+
 	/* load certificates, pass to handle_connections */
 	LOGL("{core} Loading certificate pem files (%d)\n",
 	    HASH_COUNT(CONFIG->CERT_FILES) + 1);
-	init_openssl();
+	init_certs();
 
 	if (CONFIG->CHROOT && CONFIG->CHROOT[0])
 		change_root();
