@@ -51,6 +51,7 @@ struct front_arg {
 	char			*port;
 	struct cfg_cert_file	*cert;
 	char			*pspec;
+	int			match_global_certs;
 	int			mark;
 	UT_hash_handle		hh;
 };

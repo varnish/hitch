@@ -42,6 +42,7 @@ static struct front_arg *cur_fa;
 %token TOK_BACKEND_CONNECT_TIMEOUT TOK_SSL_HANDSHAKE_TIMEOUT TOK_RECV_BUFSIZE
 %token TOK_SEND_BUFSIZE TOK_LOG_FILENAME TOK_RING_SLOTS TOK_RING_DATA_LEN
 %token TOK_PIDFILE TOK_SNI_NOMATCH_ABORT TOK_SSL TOK_TLS TOK_HOST TOK_PORT
+%token TOK_MATCH_GLOBAL
 
 %param {hitch_config *cfg}
 %define parse.error verbose
@@ -112,6 +113,7 @@ FB_REC
 	: FB_HOST
 	| FB_PORT
 	| FB_CERT
+	| FB_MATCH_GLOBAL
 	;
 
 FB_HOST: TOK_HOST '=' STRING { cur_fa->ip = strdup($3); };
@@ -125,6 +127,8 @@ FB_CERT: TOK_PEM_FILE '=' STRING
 		YYABORT;
 	cur_fa->cert = cert;
 };
+
+FB_MATCH_GLOBAL: TOK_MATCH_GLOBAL '=' BOOL { cur_fa->match_global_certs = $3; };
 
 QUIET_REC: TOK_QUIET '=' BOOL { cfg->QUIET = $3; };
 
