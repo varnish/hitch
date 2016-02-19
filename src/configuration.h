@@ -37,9 +37,7 @@ struct cfg_cert_file {
 	unsigned	magic;
 #define CFG_CERT_FILE_MAGIC 0x58c280d2
 	char 		*filename;
-	void		*priv;
 	int		mark;
-	unsigned	ref;
 	double		mtim;
 	UT_hash_handle	hh;
 };
@@ -49,7 +47,7 @@ struct front_arg {
 #define FRONT_ARG_MAGIC		0x07a16cb5
 	char			*ip;
 	char			*port;
-	struct cfg_cert_file	*cert;
+	struct cfg_cert_file	*certs;
 	char			*pspec;
 	int			match_global_certs;
 	int			mark;

@@ -4,6 +4,7 @@
 #include "configuration.h"
 #include "vas.h"
 #include "miniobj.h"
+#include "uthash.h"
 
 extern int yylex (hitch_config *);
 extern int yyparse(hitch_config *);
@@ -125,7 +126,9 @@ FB_CERT: TOK_PEM_FILE '=' STRING
 	r = config_param_pem_file($3, &cert);
 	if (r == 0)
 		YYABORT;
-	cur_fa->cert = cert;
+	AN(cert);
+	HASH_ADD_KEYPTR(hh, cur_fa->certs, cert->filename,
+	    strlen(cert->filename), cert);
 };
 
 FB_MATCH_GLOBAL: TOK_MATCH_GLOBAL '=' BOOL { cur_fa->match_global_certs = $3; };

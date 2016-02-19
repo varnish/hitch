@@ -152,24 +152,34 @@ struct child_proc {
 VTAILQ_HEAD(child_proc_head, child_proc);
 static struct child_proc_head child_procs;
 struct sslctx_s;
+struct sni_name_s;
+
+struct listen_sock {
+	unsigned		magic;
+#define LISTEN_SOCK_MAGIC	0xda96b2f6
+	int			sock;
+	char			*name;
+	ev_io			listener;
+	struct sockaddr_storage	addr;
+	VTAILQ_ENTRY(listen_sock)	list;
+};
+
+VTAILQ_HEAD(listen_sock_head, listen_sock);
 
 struct frontend {
-	unsigned			magic;
-#define FRONTEND_MAGIC	 		0x5b04e577
-	VTAILQ_ENTRY(frontend)		list;
-	ev_io				listener;
-	int				sock;
-	char				*name;
-	struct cfg_cert_file		*cert;
-	struct sslctx_s			*sctx;
-	char				*pspec;
-	struct sockaddr_storage		addr;
+	unsigned		magic;
+#define FRONTEND_MAGIC	 	0x5b04e577
+	int			match_global_certs;
+	struct sni_name_s	*sni_names;
+	struct sslctx_s		*ssl_ctxs;
+	char			*pspec;
+	struct listen_sock_head	socks;
+	VTAILQ_ENTRY(frontend)	list;
 };
 
 VTAILQ_HEAD(frontend_head, frontend);
 
 static struct frontend_head frontends;
-static unsigned nfrontends;
 
 #define LOG_REOPEN_INTERVAL 60
 static FILE* logf;
@@ -230,7 +240,7 @@ static sni_name *sni_names;
 static sslctx *ssl_ctxs;
 static sslctx *default_ctx;
 
-static void insert_sni_names(sslctx *sc);
+static void insert_sni_names(sslctx *sc, sni_name **sn_tab);
 static int load_cert_ctx(sslctx *so);
 #endif /* OPENSSL_NO_TLSEXT */
 
@@ -857,23 +867,12 @@ sni_match(const sni_name *sn, const char *srvname)
 	}
 }
 
-/*
- * Switch the context of the current SSL object to the most appropriate one
- * based on the SNI header
- */
-static int
-sni_switch_ctx(SSL *ssl, int *al, void *data)
+static sslctx *
+sni_lookup(const char *servername, const sni_name *sn_tab)
 {
-	(void)data;
-	(void)al;
-	const char *servername;
 	const sni_name *sn;
 
-	servername = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
-	if (!servername)
-		return SSL_TLSEXT_ERR_NOACK;
-
-	HASH_FIND_STR(sni_names, servername, sn);
+	HASH_FIND_STR(sn_tab, servername, sn);
 	if (sn == NULL) {
 		char *s;
 		/* attempt another lookup for wildcard matches */
@@ -885,18 +884,57 @@ sni_switch_ctx(SSL *ssl, int *al, void *data)
 
 	if (sn != NULL) {
 		CHECK_OBJ_NOTNULL(sn, SNI_NAME_MAGIC);
-		if (sni_match(sn, servername)) {
-			CHECK_OBJ_NOTNULL(sn->sctx, SSLCTX_MAGIC);
-			SSL_set_SSL_CTX(ssl, sn->sctx->ctx);
-			return SSL_TLSEXT_ERR_OK;
+		if (sni_match(sn, servername))
+			return (sn->sctx);
+	}
+
+	return (NULL);
+}
+
+/*
+ * Switch the context of the current SSL object to the most appropriate one
+ * based on the SNI header
+ */
+static int
+sni_switch_ctx(SSL *ssl, int *al, void *data)
+{
+	const char *servername;
+	sslctx *sc;
+	const struct frontend *fr = NULL;
+	int lookup_global = 1;
+
+	(void)al;
+	if (data != NULL)
+		CAST_OBJ_NOTNULL(fr, data, FRONTEND_MAGIC);
+
+	servername = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
+	if (!servername)
+		return (SSL_TLSEXT_ERR_NOACK);
+
+	if (fr != NULL) {
+		sc = sni_lookup(servername, fr->sni_names);
+		if (sc != NULL) {
+			CHECK_OBJ_NOTNULL(sc, SSLCTX_MAGIC);
+			SSL_set_SSL_CTX(ssl, sc->ctx);
+			return (SSL_TLSEXT_ERR_OK);
+		}
+		lookup_global = fr->match_global_certs;
+	}
+
+	if (lookup_global) {
+		sc = sni_lookup(servername, sni_names);
+		if (sc != NULL) {
+			CHECK_OBJ_NOTNULL(sc, SSLCTX_MAGIC);
+			SSL_set_SSL_CTX(ssl, sc->ctx);
+			return (SSL_TLSEXT_ERR_OK);
 		}
 	}
 
 	/* No matching certs */
 	if (CONFIG->SNI_NOMATCH_ABORT)
-		return SSL_TLSEXT_ERR_ALERT_FATAL;
+		return (SSL_TLSEXT_ERR_ALERT_FATAL);
 	else
-		return SSL_TLSEXT_ERR_NOACK;
+		return (SSL_TLSEXT_ERR_NOACK);
 }
 #endif /* OPENSSL_NO_TLSEXT */
 
@@ -924,7 +962,7 @@ sctx_free(sslctx *sc, sni_name **sn_tab)
 
 /* Initialize an SSL context */
 sslctx *
-make_ctx(const struct cfg_cert_file *cf)
+make_ctx(const struct cfg_cert_file *cf, const struct frontend *fr)
 {
 	SSL_CTX *ctx;
 	sslctx *sc;
@@ -994,6 +1032,10 @@ make_ctx(const struct cfg_cert_file *cf)
 	if (!SSL_CTX_set_tlsext_servername_callback(ctx, sni_switch_ctx)) {
 		ERR("Error setting up SNI support.\n");
 	}
+	CHECK_OBJ_ORNULL(fr, FRONTEND_MAGIC);
+	if (!SSL_CTX_set_tlsext_servername_arg(ctx, fr)) {
+		ERR("Error setting SNI servername arg.\n");
+	}
 #endif /* OPENSSL_NO_TLSEXT */
 
 #ifdef USE_SHARED_CACHE
@@ -1026,7 +1068,7 @@ make_ctx(const struct cfg_cert_file *cf)
 }
 
 static void
-insert_sni_names(sslctx *sc)
+insert_sni_names(sslctx *sc, sni_name **sn_tab)
 {
 	sni_name *sn, *sn2;
 	char *key;
@@ -1037,13 +1079,13 @@ insert_sni_names(sslctx *sc)
 		key = sn->servername;
 		if (sn->is_wildcard)
 			key = sn->servername + 1;
-		HASH_FIND_STR(sni_names, key, sn2);
+		HASH_FIND_STR(*sn_tab, key, sn2);
 		if (sn2 != NULL) {
 			ERR("Warning: SNI name '%s' from '%s' overriden"
 			    " by '%s'\n",
 			    key, sn2->sctx->filename, sn->sctx->filename);
 		}
-		HASH_ADD_KEYPTR(hh, sni_names, key, strlen(key), sn);
+		HASH_ADD_KEYPTR(hh, *sn_tab, key, strlen(key), sn);
 	}
 }
 
@@ -1157,19 +1199,18 @@ init_openssl(void)
 static void
 init_certs(void) {
 	struct cfg_cert_file *cf, *cftmp;
-	struct frontend *fr;
 	sslctx *so;
 
 	AN(CONFIG->CERT_DEFAULT);
 
 	/* The last file listed in config is the "default" cert */
-	default_ctx = make_ctx(CONFIG->CERT_DEFAULT);
+	default_ctx = make_ctx(CONFIG->CERT_DEFAULT, NULL);
 	if (default_ctx == NULL)
 		exit(1);
 
 #ifndef OPENSSL_NO_TLSEXT
 	load_cert_ctx(default_ctx);
-	insert_sni_names(default_ctx);
+	insert_sni_names(default_ctx, &sni_names);
 #endif
 
 	// Go through the list of PEMs and make some SSL contexts for
@@ -1177,98 +1218,85 @@ init_certs(void) {
 	// cert so we can do SNI on them later
 	HASH_ITER(hh, CONFIG->CERT_FILES, cf, cftmp) {
 		if (find_ctx(cf->filename) == NULL) {
-			so = make_ctx(cf);
+			so = make_ctx(cf, NULL);
 			if (so == NULL)
 				exit(1);
 			HASH_ADD_KEYPTR(hh, ssl_ctxs, cf->filename,
 			    strlen(cf->filename), so);
 #ifndef OPENSSL_NO_TLSEXT
 			load_cert_ctx(so);
-			insert_sni_names(so);
+			insert_sni_names(so, &sni_names);
 #endif
-		}
-	}
-
-	VTAILQ_FOREACH(fr, &frontends, list) {
-		if (fr->cert) {
-			so = find_ctx(fr->cert->filename);
-			if (so == NULL) {
-				so = make_ctx(fr->cert);
-				AN(so);
-				HASH_ADD_KEYPTR(hh, ssl_ctxs,
-				    fr->cert->filename,
-				    strlen(fr->cert->filename), so);
-#ifndef OPENSSL_NO_TLSEXT
-				load_cert_ctx(so);
-				insert_sni_names(so);
-#endif
-			}
-			fr->sctx = so;
 		}
 	}
 }
 
 static void
+destroy_lsock(struct listen_sock *ls)
+{
+	CHECK_OBJ_NOTNULL(ls, LISTEN_SOCK_MAGIC);
+	if (ls->sock > 0)
+		(void) close(ls->sock);
+	free(ls->name);
+	FREE_OBJ(ls);
+}
+
+static void
 destroy_frontend(struct frontend *fr)
 {
+	struct listen_sock *ls, *lstmp;
 	CHECK_OBJ_NOTNULL(fr, FRONTEND_MAGIC);
-	if (fr->sock > 0)
-		(void) close(fr->sock);
-	free(fr->name);
-	free(fr->pspec);
-	if (fr->cert) {
-		CHECK_OBJ_NOTNULL(fr->cert, CFG_CERT_FILE_MAGIC);
-		fr->cert->ref--;
-		if (fr->cert->ref == 0) {
-			free(fr->cert->filename);
-			FREE_OBJ(fr->cert);
-		}
+
+	VTAILQ_FOREACH_SAFE(ls, &fr->socks, list, lstmp) {
+		CHECK_OBJ_NOTNULL(ls, LISTEN_SOCK_MAGIC);
+		VTAILQ_REMOVE(&fr->socks, ls, list);
+		destroy_lsock(ls);
 	}
+
+	/* TODO: sni_names, ssl_ctxs, .. */
+	free(fr->pspec);
+
 	FREE_OBJ(fr);
 }
 
 /* Create the bound socket in the parent process */
 static int
-create_frontend(const struct front_arg *fa, struct frontend_head *socks)
+frontend_listen(const struct front_arg *fa, struct listen_sock_head *slist)
 {
 	struct addrinfo *ai, hints, *it;
-	struct frontend *fr, *frtmp;
+	struct listen_sock *ls, *lstmp;
 	char buf[INET6_ADDRSTRLEN+20];
 	char abuf[INET6_ADDRSTRLEN];
 	char pbuf[8];
-	int n, r;
-	int count = 0;
-	struct frontend_head tmp_list;
+	int r, count = 0;
 
 	CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
-
-	VTAILQ_INIT(&tmp_list);
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
-	const int gai_err = getaddrinfo(fa->ip, fa->port,
+	r = getaddrinfo(fa->ip, fa->port,
 	    &hints, &ai);
-	if (gai_err != 0) {
+	if (r != 0) {
 		ERR("{getaddrinfo}: %s: [%s]\n", fa->pspec,
-		    gai_strerror(gai_err));
+		    gai_strerror(r));
 		return (-1);
 	}
 
 	for (it = ai; it != NULL; it = it->ai_next) {
-		ALLOC_OBJ(fr, FRONTEND_MAGIC);
-		VTAILQ_INSERT_TAIL(&tmp_list, fr, list);
+		ALLOC_OBJ(ls, LISTEN_SOCK_MAGIC);
+		VTAILQ_INSERT_TAIL(slist, ls, list);
 		count++;
 
-		fr->sock = socket(it->ai_family, SOCK_STREAM, IPPROTO_TCP);
-		if (fr->sock == -1) {
+		ls->sock = socket(it->ai_family, SOCK_STREAM, IPPROTO_TCP);
+		if (ls->sock == -1) {
 			ERR("{socket: main}: %s: %s\n", strerror(errno),
 			    fa->pspec);
 			goto creat_frontend_err;
 		}
 
 		int t = 1;
-		if (setsockopt(fr->sock, SOL_SOCKET, SO_REUSEADDR,
+		if (setsockopt(ls->sock, SOL_SOCKET, SO_REUSEADDR,
 			&t, sizeof(int))
 		    < 0) {
 			ERR("{setsockopt-reuseaddr}: %s: %s\n", strerror(errno),
@@ -1276,7 +1304,7 @@ create_frontend(const struct front_arg *fa, struct frontend_head *socks)
 			goto creat_frontend_err;
 		}
 #ifdef SO_REUSEPORT
-		if (setsockopt(fr->sock, SOL_SOCKET, SO_REUSEPORT,
+		if (setsockopt(ls->sock, SOL_SOCKET, SO_REUSEPORT,
 			&t, sizeof(int))
 		    < 0) {
 			ERR("{setsockopt-reuseport}: %s: %s\n", strerror(errno),
@@ -1284,7 +1312,7 @@ create_frontend(const struct front_arg *fa, struct frontend_head *socks)
 			goto creat_frontend_err;
 		}
 #endif
-		if(setnonblocking(fr->sock) < 0) {
+		if(setnonblocking(ls->sock) < 0) {
 			ERR("{listen sock: setnonblocking}: %s: %s\n",
 			    strerror(errno), fa->pspec);
 			goto creat_frontend_err;
@@ -1292,7 +1320,7 @@ create_frontend(const struct front_arg *fa, struct frontend_head *socks)
 #ifdef IPV6_V6ONLY
 		t = 1;
 		if (it->ai_family == AF_INET6 &&
-		    setsockopt(fr->sock, IPPROTO_IPV6, IPV6_V6ONLY, &t,
+		    setsockopt(ls->sock, IPPROTO_IPV6, IPV6_V6ONLY, &t,
 			sizeof (t)) != 0) {
 			ERR("{setsockopt-ipv6only}: %s: %s\n", strerror(errno),
 			    fa->pspec);
@@ -1300,7 +1328,7 @@ create_frontend(const struct front_arg *fa, struct frontend_head *socks)
 		}
 #endif
 		if (CONFIG->RECV_BUFSIZE > 0) {
-			r = setsockopt(fr->sock, SOL_SOCKET, SO_RCVBUF,
+			r = setsockopt(ls->sock, SOL_SOCKET, SO_RCVBUF,
 			    &CONFIG->RECV_BUFSIZE,
 			    sizeof(CONFIG->RECV_BUFSIZE));
 			if (r < 0) {
@@ -1310,7 +1338,7 @@ create_frontend(const struct front_arg *fa, struct frontend_head *socks)
 			}
 		}
 		if (CONFIG->SEND_BUFSIZE > 0) {
-			r = setsockopt(fr->sock, SOL_SOCKET, SO_SNDBUF,
+			r = setsockopt(ls->sock, SOL_SOCKET, SO_SNDBUF,
 			    &CONFIG->SEND_BUFSIZE,
 			    sizeof(CONFIG->SEND_BUFSIZE));
 			if (r < 0) {
@@ -1320,7 +1348,7 @@ create_frontend(const struct front_arg *fa, struct frontend_head *socks)
 			}
 		}
 
-		if (bind(fr->sock, it->ai_addr, it->ai_addrlen)) {
+		if (bind(ls->sock, it->ai_addr, it->ai_addrlen)) {
 			ERR("{bind-socket}: %s: %s\n", strerror(errno),
 			    fa->pspec);
 			goto creat_frontend_err;
@@ -1329,7 +1357,7 @@ create_frontend(const struct front_arg *fa, struct frontend_head *socks)
 #ifndef NO_DEFER_ACCEPT
 #if TCP_DEFER_ACCEPT
 		int timeout = 1;
-		if (setsockopt(fr->sock, IPPROTO_TCP, TCP_DEFER_ACCEPT,
+		if (setsockopt(ls->sock, IPPROTO_TCP, TCP_DEFER_ACCEPT,
 			&timeout, sizeof(int)) < 0) {
 			ERR("{setsockopt-defer_accept}: %s: %s\n",
 			    strerror(errno), fa->pspec);
@@ -1337,18 +1365,18 @@ create_frontend(const struct front_arg *fa, struct frontend_head *socks)
 		}
 #endif /* TCP_DEFER_ACCEPT */
 #endif
-		if (listen(fr->sock, CONFIG->BACKLOG) != 0) {
+		if (listen(ls->sock, CONFIG->BACKLOG) != 0) {
 			ERR("{listen-socket}: %s: %s\n", strerror(errno),
 			    fa->pspec);
 			goto creat_frontend_err;
 		}
 
-		memcpy(&fr->addr, it->ai_addr, it->ai_addrlen);
+		memcpy(&ls->addr, it->ai_addr, it->ai_addrlen);
 
-		n = getnameinfo(it->ai_addr, it->ai_addrlen, abuf,
+		r = getnameinfo(it->ai_addr, it->ai_addrlen, abuf,
 		    sizeof abuf, pbuf, sizeof pbuf,
 		    NI_NUMERICHOST | NI_NUMERICSERV);
-		if (n != 0) {
+		if (r != 0) {
 			ERR("{getnameinfo}: %s\n", fa->pspec);
 			goto creat_frontend_err;
 		}
@@ -1358,33 +1386,63 @@ create_frontend(const struct front_arg *fa, struct frontend_head *socks)
 		} else {
 			sprintf(buf, "%s:%s", abuf, pbuf);
 		}
-		fr->name = strdup(buf);
-		AN(fr->name);
-		if (fa->cert != NULL) {
-			fr->cert = fa->cert;
-			fr->cert->ref++;
-		}
-		fr->pspec = strdup(fa->pspec);
-
-		LOG("{core} Listening on %s\n", fr->name);
+		ls->name = strdup(buf);
+		AN(ls->name);
+		LOG("{core} Listening on %s\n", ls->name);
 	}
 
-	VTAILQ_FOREACH_SAFE(fr, &tmp_list, list, frtmp) {
-		VTAILQ_REMOVE(&tmp_list, fr, list);
-		VTAILQ_INSERT_TAIL(socks, fr, list);
-	}
-
-	freeaddrinfo(ai);
 	return (count);
 
 creat_frontend_err:
 	freeaddrinfo(ai);
-	VTAILQ_FOREACH_SAFE(fr, &tmp_list, list, frtmp) {
-		VTAILQ_REMOVE(&tmp_list, fr, list);
-		destroy_frontend(fr);
+	VTAILQ_FOREACH_SAFE(ls, slist, list, lstmp) {
+		VTAILQ_REMOVE(slist, ls, list);
+		free(ls->name);
+		if (ls->sock > 0)
+			(void) close(ls->sock);
+		FREE_OBJ(ls);
 	}
 
 	return (-1);
+}
+
+static struct frontend *
+create_frontend(const struct front_arg *fa)
+{
+	struct frontend *fr;
+	sslctx *so;
+	int count = 0;
+	struct frontend_head tmp_list;
+	struct cfg_cert_file *cf, *cftmp;
+
+	CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
+	ALLOC_OBJ(fr, FRONTEND_MAGIC);
+	VTAILQ_INIT(&fr->socks);
+	AN(fr);
+
+	VTAILQ_INIT(&tmp_list);
+	count = frontend_listen(fa, &fr->socks);
+	if (count < 0)
+		return (NULL);
+
+	HASH_ITER(hh, fa->certs, cf, cftmp) {
+		so = make_ctx(cf, fr);
+		if (so == NULL) {
+			destroy_frontend(fr);
+			return (NULL);
+		}
+		HASH_ADD_KEYPTR(hh, fr->ssl_ctxs,
+		    cf->filename, strlen(cf->filename), so);
+#ifndef OPENSSL_NO_TLSEXT
+		load_cert_ctx(so);
+		insert_sni_names(so, &fr->sni_names);
+#endif
+	}
+
+	fr->pspec = strdup(fa->pspec);
+	fr->match_global_certs = fa->match_global_certs;
+
+	return (fr);
 }
 
 /* Initiate a clear-text nonblocking connect() to the backend IP on behalf
@@ -2094,6 +2152,7 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 	(void)loop;
 	struct sockaddr_storage addr;
 	sslctx *so;
+	struct frontend *fr;
 	proxystate *ps;
 	socklen_t sl = sizeof(addr);
 
@@ -2156,7 +2215,14 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 		return;
 	}
 
-	CAST_OBJ_NOTNULL(so, w->data, SSLCTX_MAGIC);
+	CAST_OBJ_NOTNULL(fr, w->data, FRONTEND_MAGIC);
+	if (fr->ssl_ctxs != NULL) {
+		/* TODO: revist frontend dflt cert handling */
+		CAST_OBJ_NOTNULL(so, fr->ssl_ctxs, SSLCTX_MAGIC);
+	}
+	else
+		CAST_OBJ_NOTNULL(so, default_ctx, SSLCTX_MAGIC);
+
 	SSL *ssl = SSL_new(so->ctx);
 	long mode = SSL_MODE_ENABLE_PARTIAL_WRITE;
 #ifdef SSL_MODE_RELEASE_BUFFERS
@@ -2231,6 +2297,7 @@ static void
 check_ppid(struct ev_loop *loop, ev_timer *w, int revents)
 {
 	struct frontend *fr;
+	struct listen_sock *ls;
 	(void)revents;
 	pid_t ppid = getppid();
 	if (ppid != master_pid) {
@@ -2239,8 +2306,11 @@ check_ppid(struct ev_loop *loop, ev_timer *w, int revents)
 		ev_timer_stop(loop, w);
 		VTAILQ_FOREACH(fr, &frontends, list) {
 			CHECK_OBJ_NOTNULL(fr, FRONTEND_MAGIC);
-			ev_io_stop(loop, &fr->listener);
-			close(fr->sock);
+			VTAILQ_FOREACH(ls, &fr->socks, list) {
+				CHECK_OBJ_NOTNULL(ls, LISTEN_SOCK_MAGIC);
+				ev_io_stop(loop, &ls->listener);
+				close(ls->sock);
+			}
 		}
 	}
 }
@@ -2251,6 +2321,7 @@ handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 	unsigned cg;
 	ssize_t r;
 	struct frontend *fr;
+	struct listen_sock *ls;
 
 	(void) revents;
 	r = read(w->fd, &cg, sizeof(cg));
@@ -2276,8 +2347,11 @@ handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 		/* Stop accepting new connections. */
 		VTAILQ_FOREACH(fr, &frontends, list) {
 			CHECK_OBJ_NOTNULL(fr, FRONTEND_MAGIC);
-			ev_io_stop(loop, &fr->listener);
-			close(fr->sock);
+			VTAILQ_FOREACH(ls, &fr->socks, list) {
+				CHECK_OBJ_NOTNULL(ls, LISTEN_SOCK_MAGIC);
+				ev_io_stop(loop, &ls->listener);
+				close(ls->sock);
+			}
 		}
 
 		check_exit_state();
@@ -2417,6 +2491,7 @@ static void
 handle_connections(int mgt_fd)
 {
 	struct frontend *fr;
+	struct listen_sock *ls;
 	struct sigaction sa;
 
 	child_state = CHILD_ACTIVE;
@@ -2452,15 +2527,15 @@ handle_connections(int mgt_fd)
 	ev_timer_start(loop, &timer_ppid_check);
 
 	VTAILQ_FOREACH(fr, &frontends, list) {
-		ev_io_init(&fr->listener,
-		    (CONFIG->PMODE == SSL_CLIENT) ?
-		    handle_clear_accept : handle_accept,
-		    fr->sock, EV_READ);
-		if (fr->sctx)
-			fr->listener.data = fr->sctx;
-		else
-			fr->listener.data = default_ctx;
-		ev_io_start(loop, &fr->listener);
+		VTAILQ_FOREACH(ls, &fr->socks, list) {
+			ev_io_init(&ls->listener,
+			    (CONFIG->PMODE == SSL_CLIENT) ?
+			    handle_clear_accept : handle_accept,
+			    ls->sock, EV_READ);
+			ls->listener.data = (CONFIG->PMODE == SSL_CLIENT) ?
+			    (void *) default_ctx->ctx : (void *) fr;
+			ev_io_start(loop, &ls->listener);
+		}
 	}
 
 	AZ(setnonblocking(mgt_fd));
@@ -2871,7 +2946,8 @@ VTAILQ_HEAD(cfg_tpc_obj_head, cfg_tpc_obj);
 
 static struct cfg_tpc_obj *
 make_cfg_obj(enum cfg_tpc_type type, enum cfg_tpc_handling handling,
-    void *priv, cfg_tpc_rollback_f *rollback, cfg_tpc_commit_f *commit)
+    void *priv0, void *priv1, cfg_tpc_rollback_f *rollback,
+    cfg_tpc_commit_f *commit)
 {
 	struct cfg_tpc_obj *o;
 
@@ -2879,7 +2955,8 @@ make_cfg_obj(enum cfg_tpc_type type, enum cfg_tpc_handling handling,
 	AN(o);
 	o->type = type;
 	o->handling = handling;
-	o->p[0] = priv;
+	o->p[0] = priv0;
+	o->p[1] = priv1;
 	o->rollback = rollback;
 	o->commit = commit;
 
@@ -2913,7 +2990,7 @@ frontend_commit(struct cfg_tpc_obj *o)
 	case CFG_TPC_KEEP:
 		if (o->p[1]) {
 			CAST_OBJ_NOTNULL(sc, o->p[1], SSLCTX_MAGIC);
-			fr->sctx = sc;
+			/* fr->sctx = sc; */
 		}
 		break;
 	case CFG_TPC_DROP:
@@ -2921,6 +2998,47 @@ frontend_commit(struct cfg_tpc_obj *o)
 		destroy_frontend(fr);
 		break;
 	}
+}
+
+static void cert_rollback(struct cfg_tpc_obj *o);
+static void cert_commit(struct cfg_tpc_obj *o);
+
+/* Query frontend-specific certificates.  */
+static int
+cert_fr_query(struct frontend *fr, struct front_arg *fa,
+    struct cfg_tpc_obj_head *cfg_objs)
+{
+	struct cfg_cert_file *cf, *cftmp;
+	sslctx *sc, *sctmp;
+	struct cfg_tpc_obj *o;
+
+	HASH_ITER(hh, fr->ssl_ctxs, sc, sctmp) {
+		HASH_FIND_STR(fa->certs, sc->filename, cf);
+		if (cf != NULL && cf->mtim <= sc->mtim) {
+			cf->mark = 1;
+		} else {
+			o = make_cfg_obj(CFG_CERT, CFG_TPC_DROP,
+			    sc, fr, cert_rollback, cert_commit);
+			VTAILQ_INSERT_TAIL(cfg_objs, o, list);
+		}
+	}
+
+	HASH_ITER(hh, fa->certs, cf, cftmp) {
+		if (cf->mark)
+			continue;
+		sc = make_ctx(cf, fr);
+		if (sc == NULL)
+			return (-1);
+		if (load_cert_ctx(sc) != 0) {
+			sctx_free(sc, NULL);
+			return (-1);
+		}
+		o = make_cfg_obj(CFG_CERT, CFG_TPC_NEW,
+		    sc, fr, cert_rollback, cert_commit);
+		VTAILQ_INSERT_TAIL(cfg_objs, o, list);
+	}
+
+	return (0);
 }
 
 /* Query reload of listen sockets.
@@ -2931,37 +3049,33 @@ frontend_commit(struct cfg_tpc_obj *o)
 static int
 frontend_query(struct front_arg *new_set, struct cfg_tpc_obj_head *cfg_objs)
 {
-	struct frontend *fr, *frtmp;
+	struct frontend *fr;
 	struct front_arg *fa, *ftmp;
 	struct cfg_tpc_obj *o;
-	struct frontend_head lfrontends;
-	int n;
-
-	VTAILQ_INIT(&lfrontends);
 
 	VTAILQ_FOREACH(fr, &frontends, list) {
 		HASH_FIND_STR(new_set, fr->pspec, fa);
 		if (fa != NULL) {
 			fa->mark = 1;
-			o = make_cfg_obj(CFG_FRONTEND, CFG_TPC_KEEP, fr,
+			o = make_cfg_obj(CFG_FRONTEND, CFG_TPC_KEEP, fr, NULL,
 			    frontend_rollback, frontend_commit);
+			if(cert_fr_query(fr, fa, cfg_objs) < 0)
+				return (-1);
+
 		} else
-			o = make_cfg_obj(CFG_FRONTEND, CFG_TPC_DROP, fr,
+			o = make_cfg_obj(CFG_FRONTEND, CFG_TPC_DROP, fr, NULL,
 			    frontend_rollback, frontend_commit);
 		VTAILQ_INSERT_TAIL(cfg_objs, o, list);
 	}
 
 	HASH_ITER(hh, new_set, fa, ftmp) {
 		if (!fa->mark) {
-			n = create_frontend(fa, &lfrontends);
-			if (n <= 0)
+			fr = create_frontend(fa);
+			if (fr == NULL)
 				return (-1);
-			VTAILQ_FOREACH_SAFE(fr, &lfrontends, list, frtmp) {
-				VTAILQ_REMOVE(&lfrontends, fr, list);
-				o = make_cfg_obj(CFG_FRONTEND, CFG_TPC_NEW,
-				    fr, frontend_rollback, frontend_commit);
-				VTAILQ_INSERT_TAIL(cfg_objs, o, list);
-			}
+			o = make_cfg_obj(CFG_FRONTEND, CFG_TPC_NEW,
+			    fr, NULL, frontend_rollback, frontend_commit);
+			VTAILQ_INSERT_TAIL(cfg_objs, o, list);
 		}
 	}
 
@@ -2984,21 +3098,32 @@ static void
 cert_commit(struct cfg_tpc_obj *o)
 {
 	sslctx *sc;
+	sni_name **sn_tab;
+	sslctx **ctxs;
+	struct frontend *fr;
+
+	sn_tab = &sni_names;
+	ctxs = &ssl_ctxs;
 
 	CAST_OBJ_NOTNULL(sc, o->p[0], SSLCTX_MAGIC);
+	if (o->p[1] != NULL) {
+		CAST_OBJ_NOTNULL(fr, o->p[1], FRONTEND_MAGIC);
+		sn_tab = &fr->sni_names;
+		ctxs = &fr->ssl_ctxs;
+	}
 
 	switch (o->handling) {
 	case CFG_TPC_NEW:
-		HASH_ADD_KEYPTR(hh, ssl_ctxs, sc->filename,
+		HASH_ADD_KEYPTR(hh, *ctxs, sc->filename,
 		    strlen(sc->filename), sc);
-		insert_sni_names(sc);
+		insert_sni_names(sc, sn_tab);
 		break;
 	case CFG_TPC_KEEP:
 		WRONG("unreachable");
 		break;
 	case CFG_TPC_DROP:
-		HASH_DEL(ssl_ctxs, sc);
-		sctx_free(sc, &sni_names);
+		HASH_DEL(*ctxs, sc);
+		sctx_free(sc, sn_tab);
 		break;
 	}
 }
@@ -3021,7 +3146,7 @@ dcert_commit(struct cfg_tpc_obj *o)
 	case CFG_TPC_NEW:
 		sctx_free(default_ctx, &sni_names);
 		default_ctx = sc;
-		insert_sni_names(sc);
+		insert_sni_names(sc, &sni_names);
 		break;
 	case CFG_TPC_KEEP:
 		/* FALL-THROUGH */
@@ -3033,14 +3158,14 @@ dcert_commit(struct cfg_tpc_obj *o)
 	}
 }
 
+
 /* Query reload of certificate files */
 static int
 cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 {
 	struct cfg_cert_file *cf, *cftmp;
 	sslctx *sc, *sctmp;
-	struct cfg_tpc_obj *o, *otmp;
-	struct frontend *fr;
+	struct cfg_tpc_obj *o;
 
 	/* NB: The ordering here is significant. It is imperative that
 	 * all DROP objects are inserted before any NEW objects, in
@@ -3049,10 +3174,9 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 		HASH_FIND_STR(cfg->CERT_FILES, sc->filename, cf);
 		if (cf != NULL && cf->mtim <= sc->mtim) {
 			cf->mark = 1;
-			cf->priv = sc;
 		} else {
 			o = make_cfg_obj(CFG_CERT, CFG_TPC_DROP,
-			    sc, cert_rollback, cert_commit);
+			    sc, NULL, cert_rollback, cert_commit);
 			VTAILQ_INSERT_TAIL(cfg_objs, o, list);
 		}
 	}
@@ -3064,7 +3188,7 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 	CHECK_OBJ_NOTNULL(default_ctx, SSLCTX_MAGIC);
 	if (strcmp(default_ctx->filename, cf->filename) != 0
 	    || cf->mtim > default_ctx->mtim) {
-		sc = make_ctx(cf);
+		sc = make_ctx(cf, NULL);
 		if (sc == NULL)
 			return (-1);
 		if (load_cert_ctx(sc) != 0) {
@@ -3072,55 +3196,25 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 			return (-1);
 		}
 		o = make_cfg_obj(CFG_CERT, CFG_TPC_NEW,
-		    sc, dcert_rollback, dcert_commit);
+		    sc, NULL, dcert_rollback, dcert_commit);
 		VTAILQ_INSERT_TAIL(cfg_objs, o, list);
 	}
 
 	HASH_ITER(hh, cfg->CERT_FILES, cf, cftmp) {
 		if (cf->mark)
 			continue;
-		sc = make_ctx(cf);
+		sc = make_ctx(cf, NULL);
 		if (sc == NULL)
 			return (-1);
 		if (load_cert_ctx(sc) != 0) {
 			sctx_free(sc, NULL);
 			return (-1);
 		}
-		cf->priv = sc;
 		o = make_cfg_obj(CFG_CERT, CFG_TPC_NEW,
-		    sc, cert_rollback, cert_commit);
+		    sc, NULL, cert_rollback, cert_commit);
 		VTAILQ_INSERT_TAIL(cfg_objs, o, list);
 	}
 
-	/* This is a little hacky, but we need to also initialize any
-	 * new certs specific to the already queried listen
-	 * endpoints. */
-	VTAILQ_FOREACH(o, cfg_objs, list) {
-		if (o->type != CFG_FRONTEND)
-			break;
-		if (o->handling == CFG_TPC_DROP)
-			continue;
-		CAST_OBJ_NOTNULL(fr, o->p[0], FRONTEND_MAGIC);
-		if (fr->cert == NULL)
-			continue;
-		CHECK_OBJ_NOTNULL(fr->cert, CFG_CERT_FILE_MAGIC);
-		HASH_FIND_STR(cfg->CERT_FILES, fr->cert->filename, cf);
-		if (cf != NULL) {
-			CAST_OBJ_NOTNULL(sc, cf->priv, SSLCTX_MAGIC);
-		} else {
-			sc = make_ctx(fr->cert);
-			if (sc == NULL)
-				return (-1);
-			if (load_cert_ctx(sc) != 0) {
-				sctx_free(sc, NULL);
-				return (-1);
-			}
-			otmp = make_cfg_obj(CFG_CERT, CFG_TPC_NEW,
-			    sc, cert_rollback, cert_commit);
-			VTAILQ_INSERT_TAIL(cfg_objs, otmp, list);
-		}
-		o->p[1] = sc;
-	}
 	return (0);
 }
 
@@ -3255,15 +3349,20 @@ main(int argc, char **argv)
 	openssl_check_version();
 
 	init_signals();
-
 	init_globals();
+	init_openssl();
 
 	HASH_ITER(hh, CONFIG->LISTEN_ARGS, fa, ftmp) {
-		int c = create_frontend(fa, &frontends);
-		if (c <= 0)
+		struct frontend *fr = create_frontend(fa);
+		if (fr == NULL)
 			exit(1);
-		nfrontends += c;
+		VTAILQ_INSERT_TAIL(&frontends, fr, list);
 	}
+
+	/* load certificates, pass to handle_connections */
+	LOGL("{core} Loading certificate pem files (%d)\n",
+	    HASH_COUNT(CONFIG->CERT_FILES) + 1); /* XXX: TODO */
+	init_certs();
 
 #ifdef USE_SHARED_CACHE
 	if (CONFIG->SHCUPD_PORT) {
@@ -3272,13 +3371,6 @@ main(int argc, char **argv)
 		shcupd_socket = create_shcupd_socket();
 	}
 #endif /* USE_SHARED_CACHE */
-
-	init_openssl();
-
-	/* load certificates, pass to handle_connections */
-	LOGL("{core} Loading certificate pem files (%d)\n",
-	    HASH_COUNT(CONFIG->CERT_FILES) + 1);
-	init_certs();
 
 	if (CONFIG->CHROOT && CONFIG->CHROOT[0])
 		change_root();

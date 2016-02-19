@@ -196,13 +196,11 @@ config_destroy(hitch_config *cfg)
 		free(fa->ip);
 		free(fa->port);
 		free(fa->pspec);
-		CHECK_OBJ_ORNULL(fa->cert, CFG_CERT_FILE_MAGIC);
-		if (fa->cert != NULL) {
-			fa->cert->ref--;
-			if (fa->cert->ref == 0) {
-				free(fa->cert->filename);
-				FREE_OBJ(fa->cert);
-			}
+		HASH_ITER(hh, fa->certs, cf, cftmp) {
+			CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
+			HASH_DEL(fa->certs, cf);
+			free(cf->filename);
+			FREE_OBJ(cf);
 		}
 		FREE_OBJ(fa);
 	}
@@ -426,7 +424,6 @@ config_param_pem_file(char *filename, struct cfg_cert_file **cfptr)
 	    + st.st_mtim.tv_nsec * 1e-9;
 
 	*cfptr = cert;
-	cert->ref++;
 	return (1);
 
 }
@@ -542,7 +539,6 @@ front_arg_add(hitch_config *cfg, struct front_arg *fa)
 	struct vsb pspec;
 
 	CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
-	CHECK_OBJ_ORNULL(fa->cert, CFG_CERT_FILE_MAGIC);
 	AN(fa->port);
 
 	if (cfg->LISTEN_DEFAULT != NULL) {
@@ -553,7 +549,6 @@ front_arg_add(hitch_config *cfg, struct front_arg *fa)
 		HASH_DEL(cfg->LISTEN_ARGS, def);
 		free(def->ip);
 		free(def->port);
-		free(def->cert);
 		free(def->pspec);
 		FREE_OBJ(def);
 		cfg->LISTEN_DEFAULT = NULL;
@@ -562,9 +557,6 @@ front_arg_add(hitch_config *cfg, struct front_arg *fa)
 	VSB_new(&pspec, NULL, 0, VSB_AUTOEXTEND);
 	VSB_printf(&pspec, "[%s]:", fa->ip);
 	VSB_cat(&pspec, fa->port);
-	if (fa->cert) {
-		VSB_printf(&pspec, "+%s", fa->cert->filename);
-	}
 	VSB_finish(&pspec);
 	fa->pspec = VSB_data(&pspec);
 	HASH_ADD_KEYPTR(hh, cfg->LISTEN_ARGS, fa->pspec,
@@ -608,7 +600,8 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 			r = config_param_pem_file(certfile, &cert);
 			if (r != 0) {
 				AN(cert);
-				fa->cert = cert;
+				HASH_ADD_KEYPTR(hh, fa->certs, cert->filename,
+				    strlen(cert->filename), cert);
 			}
 			free(certfile);
 		}
