@@ -1245,6 +1245,8 @@ static void
 destroy_frontend(struct frontend *fr)
 {
 	struct listen_sock *ls, *lstmp;
+	sslctx *sc, *sctmp;
+
 	CHECK_OBJ_NOTNULL(fr, FRONTEND_MAGIC);
 
 	VTAILQ_FOREACH_SAFE(ls, &fr->socks, list, lstmp) {
@@ -1253,9 +1255,13 @@ destroy_frontend(struct frontend *fr)
 		destroy_lsock(ls);
 	}
 
-	/* TODO: sni_names, ssl_ctxs, .. */
-	free(fr->pspec);
+	HASH_ITER(hh, fr->ssl_ctxs, sc, sctmp) {
+		HASH_DEL(fr->ssl_ctxs, sc);
+		sctx_free(sc, &fr->sni_names);
+	}
 
+	AZ(HASH_COUNT(fr->sni_names));
+	free(fr->pspec);
 	FREE_OBJ(fr);
 }
 
