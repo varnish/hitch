@@ -2,7 +2,7 @@ language: c
 
 before_install:
   - sudo apt-get update -q
-  - sudo apt-get install -qq libev-dev libssl-dev automake python-docutils
+  - sudo apt-get install -qq libev-dev libssl-dev automake python-docutils flex bison
 
 
 before_script:
