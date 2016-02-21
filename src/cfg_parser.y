@@ -115,6 +115,7 @@ FB_REC
 	| FB_PORT
 	| FB_CERT
 	| FB_MATCH_GLOBAL
+	| FB_SNI_NOMATCH_ABORT
 	;
 
 FB_HOST: TOK_HOST '=' STRING { cur_fa->ip = strdup($3); };
@@ -132,6 +133,11 @@ FB_CERT: TOK_PEM_FILE '=' STRING
 };
 
 FB_MATCH_GLOBAL: TOK_MATCH_GLOBAL '=' BOOL { cur_fa->match_global_certs = $3; };
+
+FB_SNI_NOMATCH_ABORT:TOK_SNI_NOMATCH_ABORT '=' BOOL
+{
+		cur_fa->sni_nomatch_abort = $3;
+};
 
 QUIET_REC: TOK_QUIET '=' BOOL { cfg->QUIET = $3; };
 

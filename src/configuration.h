@@ -50,6 +50,7 @@ struct front_arg {
 	struct cfg_cert_file	*certs;
 	char			*pspec;
 	int			match_global_certs;
+	int			sni_nomatch_abort;
 	int			mark;
 	UT_hash_handle		hh;
 };

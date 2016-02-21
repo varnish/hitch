@@ -170,6 +170,7 @@ struct frontend {
 	unsigned		magic;
 #define FRONTEND_MAGIC	 	0x5b04e577
 	int			match_global_certs;
+	int			sni_nomatch_abort;
 	struct sni_name_s	*sni_names;
 	struct sslctx_s		*ssl_ctxs;
 	char			*pspec;
@@ -902,6 +903,7 @@ sni_switch_ctx(SSL *ssl, int *al, void *data)
 	sslctx *sc;
 	const struct frontend *fr = NULL;
 	int lookup_global = 1;
+	int sni_nomatch_abort = CONFIG->SNI_NOMATCH_ABORT;
 
 	(void)al;
 	if (data != NULL)
@@ -921,16 +923,19 @@ sni_switch_ctx(SSL *ssl, int *al, void *data)
 		}						\
 	} while (0)
 
+	fprintf(stderr, "fr = %p\n", fr);
 	if (fr != NULL) {
 		TRY_SNI_MATCH(fr->sni_names);
 		lookup_global = fr->match_global_certs;
+		if (fr->sni_nomatch_abort != -1)
+			sni_nomatch_abort = fr->sni_nomatch_abort;
 	}
 
 	if (lookup_global)
 		TRY_SNI_MATCH(sni_names);
 
 	/* No matching certs */
-	if (CONFIG->SNI_NOMATCH_ABORT)
+	if (sni_nomatch_abort)
 		return (SSL_TLSEXT_ERR_ALERT_FATAL);
 	else
 		return (SSL_TLSEXT_ERR_NOACK);
@@ -1447,6 +1452,7 @@ create_frontend(const struct front_arg *fa)
 
 	fr->pspec = strdup(fa->pspec);
 	fr->match_global_certs = fa->match_global_certs;
+	fr->sni_nomatch_abort = fa->sni_nomatch_abort;
 
 	return (fr);
 }

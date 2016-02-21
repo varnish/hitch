@@ -543,6 +543,7 @@ front_arg_new(void)
 	ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
 	AN(fa);
 	fa->match_global_certs = -1;
+	fa->sni_nomatch_abort = -1;
 
 	return (fa);
 }
