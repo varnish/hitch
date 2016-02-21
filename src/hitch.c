@@ -1397,6 +1397,7 @@ frontend_listen(const struct front_arg *fa, struct listen_sock_head *slist)
 		LOG("{core} Listening on %s\n", ls->name);
 	}
 
+	freeaddrinfo(ai);
 	return (count);
 
 creat_frontend_err:
