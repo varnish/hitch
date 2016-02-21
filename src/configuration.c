@@ -79,6 +79,7 @@
 #define CFG_CONFIG "config"
 
 extern FILE *yyin;
+extern int yyparse(hitch_config *);
 
 // END: configuration parameters
 
