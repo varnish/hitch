@@ -51,7 +51,6 @@
 "group"		{ return (TOK_GROUP); }
 "syslog"		{ return (TOK_SYSLOG); }
 "syslog-facility"		{ return (TOK_SYSLOG_FACILITY); }
-11015		{ return (TOK_PARAM_SYSLOG_FACILITY); }
 "daemon"		{ return (TOK_DAEMON); }
 "write-ip"		{ return (TOK_WRITE_IP); }
 "write-proxy"		{ return (TOK_WRITE_PROXY); }
