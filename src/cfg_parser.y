@@ -13,7 +13,8 @@ int yyget_lineno(void);
 
 int config_param_validate(char *k, char *v, hitch_config *cfg,
     char *file, int line);
-void front_arg_add(hitch_config *cfg, struct front_arg *fa);
+int front_arg_add(hitch_config *cfg, struct front_arg *fa);
+struct front_arg *front_arg_new(void);
 int config_param_pem_file(char *filename, struct cfg_cert_file **cfptr);
 
 void yyerror(hitch_config *, const char *);
@@ -94,12 +95,12 @@ FRONTEND_REC
 	| TOK_FRONTEND '=' '{'
 {
 	/* NB: Mid-rule action */
-	ALLOC_OBJ(cur_fa, FRONT_ARG_MAGIC);
-	AN(cur_fa);
+	cur_fa = front_arg_new();
 }
 	FRONTEND_BLK '}'
 {
-	front_arg_add(cfg, cur_fa);
+	if (front_arg_add(cfg, cur_fa) != 1)
+		YYABORT;
 	cur_fa = NULL;
 };
 

@@ -534,7 +534,19 @@ config_param_shcupd_peer(char *str, hitch_config *cfg)
 
 #endif /* USE_SHARED_CACHE */
 
-void
+struct front_arg *
+front_arg_new(void)
+{
+	struct front_arg *fa;
+
+	ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
+	AN(fa);
+	fa->match_global_certs = -1;
+
+	return (fa);
+}
+
+int
 front_arg_add(hitch_config *cfg, struct front_arg *fa)
 {
 	struct vsb pspec;
@@ -562,6 +574,22 @@ front_arg_add(hitch_config *cfg, struct front_arg *fa)
 	fa->pspec = VSB_data(&pspec);
 	HASH_ADD_KEYPTR(hh, cfg->LISTEN_ARGS, fa->pspec,
 	    strlen(fa->pspec), fa);
+
+	if (fa->match_global_certs == -1) {
+		if (HASH_CNT(hh, fa->certs) == 0)
+			fa->match_global_certs = 1;
+		else
+			fa->match_global_certs = 0;
+	} else {
+		if (HASH_CNT(hh, fa->certs) == 0
+		    && fa->match_global_certs == 0) {
+			config_error_set("No certs set for frontend '%s'",
+			    fa->pspec);
+			return (0);
+		}
+	}
+
+	return (1);
 }
 
 int
@@ -594,7 +622,7 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		struct cfg_cert_file *cert;
 		char *certfile = NULL;
 
-		ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
+		fa = front_arg_new();
 		r = config_param_host_port_wildcard(v,
 		    &fa->ip, &fa->port, &certfile, 1);
 		if (certfile != NULL) {
@@ -606,7 +634,7 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 			}
 			free(certfile);
 		}
-		front_arg_add(cfg, fa);
+		r = front_arg_add(cfg, fa);
 	} else if (strcmp(k, CFG_BACKEND) == 0) {
 		free(cfg->BACK_PORT);
 		free(cfg->BACK_IP);
