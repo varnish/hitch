@@ -584,8 +584,8 @@ front_arg_add(hitch_config *cfg, struct front_arg *fa)
 	} else {
 		if (HASH_CNT(hh, fa->certs) == 0
 		    && fa->match_global_certs == 0) {
-			config_error_set("No certs set for frontend '%s'",
-			    fa->pspec);
+			config_error_set("No certificate configured "
+			    "for frontend '%s'", fa->pspec);
 			return (0);
 		}
 	}
