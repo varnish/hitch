@@ -911,24 +911,23 @@ sni_switch_ctx(SSL *ssl, int *al, void *data)
 	if (!servername)
 		return (SSL_TLSEXT_ERR_NOACK);
 
+#define TRY_SNI_MATCH(sn_tab)					\
+	do {							\
+		sc = sni_lookup(servername, (sn_tab));		\
+		if (sc != NULL) {				\
+			CHECK_OBJ_NOTNULL(sc, SSLCTX_MAGIC);	\
+			SSL_set_SSL_CTX(ssl, sc->ctx);		\
+			return (SSL_TLSEXT_ERR_OK);		\
+		}						\
+	} while (0)
+
 	if (fr != NULL) {
-		sc = sni_lookup(servername, fr->sni_names);
-		if (sc != NULL) {
-			CHECK_OBJ_NOTNULL(sc, SSLCTX_MAGIC);
-			SSL_set_SSL_CTX(ssl, sc->ctx);
-			return (SSL_TLSEXT_ERR_OK);
-		}
+		TRY_SNI_MATCH(fr->sni_names);
 		lookup_global = fr->match_global_certs;
 	}
 
-	if (lookup_global) {
-		sc = sni_lookup(servername, sni_names);
-		if (sc != NULL) {
-			CHECK_OBJ_NOTNULL(sc, SSLCTX_MAGIC);
-			SSL_set_SSL_CTX(ssl, sc->ctx);
-			return (SSL_TLSEXT_ERR_OK);
-		}
-	}
+	if (lookup_global)
+		TRY_SNI_MATCH(sni_names);
 
 	/* No matching certs */
 	if (CONFIG->SNI_NOMATCH_ABORT)
