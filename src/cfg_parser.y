@@ -6,7 +6,7 @@
 #include "miniobj.h"
 #include "uthash.h"
 
-extern int yylex (hitch_config *);
+extern int yylex (void);
 extern int yyparse(hitch_config *);
 extern FILE *yyin;
 int yyget_lineno(void);
@@ -45,8 +45,7 @@ static struct front_arg *cur_fa;
 %token TOK_PIDFILE TOK_SNI_NOMATCH_ABORT TOK_SSL TOK_TLS TOK_HOST TOK_PORT
 %token TOK_MATCH_GLOBAL
 
-%param {hitch_config *cfg}
-%define parse.error verbose
+%parse-param {hitch_config *cfg}
 
 %%
 CFG
