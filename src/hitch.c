@@ -3312,7 +3312,7 @@ main(int argc, char **argv)
 
 	// parse command line
 	if (config_parse_cli(argc, argv, CONFIG, &rv) != 0) {
-		fprintf(stderr, "%s", config_error_get());
+		fprintf(stderr, "%s\n", config_error_get());
 		return (rv);
 	}
 
