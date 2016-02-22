@@ -947,6 +947,9 @@ sctx_free(sslctx *sc, sni_name **sn_tab)
 {
 	sni_name *sn, *sntmp;
 
+	if (sc == NULL)
+		return;
+
 	if (sn_tab != NULL)
 		CHECK_OBJ_NOTNULL(*sn_tab, SNI_NAME_MAGIC);
 	CHECK_OBJ_NOTNULL(sc, SSLCTX_MAGIC);
@@ -2376,6 +2379,7 @@ handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents)
 	(void)revents;
 	(void)loop;
 	struct sockaddr_storage addr;
+	struct frontend *fr;
 	sslctx *so;
 	proxystate *ps;
 	socklen_t sl = sizeof(addr);
@@ -2433,7 +2437,11 @@ handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents)
 		return;
 	}
 
-	CAST_OBJ_NOTNULL(so, w->data, SSLCTX_MAGIC);
+	CAST_OBJ_NOTNULL(fr, w->data, FRONTEND_MAGIC);
+	if (fr->ssl_ctxs != NULL)
+		CAST_OBJ_NOTNULL(so, fr->ssl_ctxs, SSLCTX_MAGIC);
+	else
+		CAST_OBJ_NOTNULL(so, default_ctx, SSLCTX_MAGIC);
 	SSL *ssl = SSL_new(so->ctx);
 	long mode = SSL_MODE_ENABLE_PARTIAL_WRITE;
 #ifdef SSL_MODE_RELEASE_BUFFERS
@@ -2541,8 +2549,7 @@ handle_connections(int mgt_fd)
 			    (CONFIG->PMODE == SSL_CLIENT) ?
 			    handle_clear_accept : handle_accept,
 			    ls->sock, EV_READ);
-			ls->listener.data = (CONFIG->PMODE == SSL_CLIENT) ?
-			    (void *) default_ctx->ctx : (void *) fr;
+			ls->listener.data = fr;
 			ev_io_start(loop, &ls->listener);
 		}
 	}
