@@ -1203,10 +1203,19 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 			return (1);
 		}
 	}
+
+
 	if (cfg->PMODE == SSL_SERVER && cfg->CERT_DEFAULT == NULL) {
-		config_error_set("No x509 certificate PEM file specified!");
-		*retval = 1;
-		return (1);
+		struct front_arg *fa, *fatmp;
+		HASH_ITER(hh, cfg->LISTEN_ARGS, fa, fatmp) {
+			if (HASH_CNT(hh, fa->certs) == 0) {
+				config_error_set("No x509 certificate PEM file "
+				    "specified for frontend '%s'!", fa->pspec);
+				*retval = 1;
+				return (1);
+
+			}
+		}
 	}
 
 	return (0);

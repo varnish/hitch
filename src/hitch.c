@@ -1205,17 +1205,16 @@ init_certs(void) {
 	struct cfg_cert_file *cf, *cftmp;
 	sslctx *so;
 
-	AN(CONFIG->CERT_DEFAULT);
-
-	/* The last file listed in config is the "default" cert */
-	default_ctx = make_ctx(CONFIG->CERT_DEFAULT, NULL);
-	if (default_ctx == NULL)
-		exit(1);
-
+	if (CONFIG->CERT_DEFAULT != NULL) {
+		AN(CONFIG->CERT_DEFAULT);
+		default_ctx = make_ctx(CONFIG->CERT_DEFAULT, NULL);
+		if (default_ctx == NULL)
+			exit(1);
 #ifndef OPENSSL_NO_TLSEXT
-	load_cert_ctx(default_ctx);
-	insert_sni_names(default_ctx, &sni_names);
+		load_cert_ctx(default_ctx);
+		insert_sni_names(default_ctx, &sni_names);
 #endif
+	}
 
 	// Go through the list of PEMs and make some SSL contexts for
 	// them. We also keep track of the names associated with each
@@ -2228,10 +2227,8 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 	}
 
 	CAST_OBJ_NOTNULL(fr, w->data, FRONTEND_MAGIC);
-	if (fr->ssl_ctxs != NULL) {
-		/* TODO: revist frontend dflt cert handling */
+	if (fr->ssl_ctxs != NULL)
 		CAST_OBJ_NOTNULL(so, fr->ssl_ctxs, SSLCTX_MAGIC);
-	}
 	else
 		CAST_OBJ_NOTNULL(so, default_ctx, SSLCTX_MAGIC);
 
@@ -3195,21 +3192,22 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 
 	/* handle default cert. Default cert has its own
 	 * rollback/commit functions. */
-	AN(cfg->CERT_DEFAULT);
-	cf = cfg->CERT_DEFAULT;
-	CHECK_OBJ_NOTNULL(default_ctx, SSLCTX_MAGIC);
-	if (strcmp(default_ctx->filename, cf->filename) != 0
-	    || cf->mtim > default_ctx->mtim) {
-		sc = make_ctx(cf, NULL);
-		if (sc == NULL)
-			return (-1);
-		if (load_cert_ctx(sc) != 0) {
-			sctx_free(sc, NULL);
-			return (-1);
+	if (cfg->CERT_DEFAULT != NULL) {
+		cf = cfg->CERT_DEFAULT;
+		CHECK_OBJ_NOTNULL(default_ctx, SSLCTX_MAGIC);
+		if (strcmp(default_ctx->filename, cf->filename) != 0
+		    || cf->mtim > default_ctx->mtim) {
+			sc = make_ctx(cf, NULL);
+			if (sc == NULL)
+				return (-1);
+			if (load_cert_ctx(sc) != 0) {
+				sctx_free(sc, NULL);
+				return (-1);
+			}
+			o = make_cfg_obj(CFG_CERT, CFG_TPC_NEW,
+			    sc, NULL, dcert_rollback, dcert_commit);
+			VTAILQ_INSERT_TAIL(cfg_objs, o, list);
 		}
-		o = make_cfg_obj(CFG_CERT, CFG_TPC_NEW,
-		    sc, NULL, dcert_rollback, dcert_commit);
-		VTAILQ_INSERT_TAIL(cfg_objs, o, list);
 	}
 
 	HASH_ITER(hh, cfg->CERT_FILES, cf, cftmp) {

@@ -5,7 +5,6 @@ set +o errexit
 
 
 mk_cfg <<EOF
-pem-file = "$TESTDIR/certs/site1.example.com"
 backend = "[hitch-tls.org]:80"
 frontend = {
 	 host = "*"
