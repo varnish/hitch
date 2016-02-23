@@ -545,6 +545,7 @@ front_arg_new(void)
 	fa->match_global_certs = -1;
 	fa->sni_nomatch_abort = -1;
 	fa->etype = ENC_TLS;
+	fa->prefer_server_ciphers = -1;
 
 	return (fa);
 }

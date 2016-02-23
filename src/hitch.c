@@ -173,8 +173,6 @@ struct frontend {
 	int			sni_nomatch_abort;
 	struct sni_name_s	*sni_names;
 	struct sslctx_s		*ssl_ctxs;
-	ENC_TYPE		etype;
-	char			*ciphers;
 	char			*pspec;
 	struct listen_sock_head	socks;
 	VTAILQ_ENTRY(frontend)	list;
@@ -970,20 +968,24 @@ sctx_free(sslctx *sc, sni_name **sn_tab)
 }
 
 /* Initialize an SSL context */
-sslctx *
-make_ctx(const struct cfg_cert_file *cf, const struct frontend *fr)
+static sslctx *
+make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
+    const struct front_arg *fa)
 {
 	SSL_CTX *ctx;
 	sslctx *sc;
 	RSA *rsa;
 	ENC_TYPE etype = CONFIG->ETYPE;
 	char *ciphers = CONFIG->CIPHER_SUITE;
+	int pref_srv_ciphers = CONFIG->PREFER_SERVER_CIPHERS;
 
-	if (fr != NULL) {
-		CHECK_OBJ_NOTNULL(fr, FRONTEND_MAGIC);
-		etype = fr->etype;
-		if (fr->ciphers != NULL)
-			ciphers = fr->ciphers;
+	if (fa != NULL) {
+		CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
+		etype = fa->etype;
+		if (fa->ciphers != NULL)
+			ciphers = fa->ciphers;
+		if (fa->prefer_server_ciphers != -1)
+			pref_srv_ciphers = fa->prefer_server_ciphers;
 	}
 
 	long ssloptions = SSL_OP_NO_SSLv2 | SSL_OP_ALL |
@@ -1006,7 +1008,7 @@ make_ctx(const struct cfg_cert_file *cf, const struct frontend *fr)
 		}
 	}
 
-	if (CONFIG->PREFER_SERVER_CIPHERS)
+	if (pref_srv_ciphers)
 		SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
 
 	ALLOC_OBJ(sc, SSLCTX_MAGIC);
@@ -1107,6 +1109,11 @@ insert_sni_names(sslctx *sc, sni_name **sn_tab)
 	}
 }
 
+static sslctx *
+make_ctx(const struct cfg_cert_file *cf)
+{
+	return (make_ctx_fr(cf, NULL, NULL));
+}
 #ifndef OPENSSL_NO_TLSEXT
 static int
 load_cert_ctx(sslctx *so)
@@ -1221,7 +1228,7 @@ init_certs(void) {
 
 	if (CONFIG->CERT_DEFAULT != NULL) {
 		AN(CONFIG->CERT_DEFAULT);
-		default_ctx = make_ctx(CONFIG->CERT_DEFAULT, NULL);
+		default_ctx = make_ctx(CONFIG->CERT_DEFAULT);
 		if (default_ctx == NULL)
 			exit(1);
 #ifndef OPENSSL_NO_TLSEXT
@@ -1235,7 +1242,7 @@ init_certs(void) {
 	// cert so we can do SNI on them later
 	HASH_ITER(hh, CONFIG->CERT_FILES, cf, cftmp) {
 		if (find_ctx(cf->filename) == NULL) {
-			so = make_ctx(cf, NULL);
+			so = make_ctx(cf);
 			if (so == NULL)
 				exit(1);
 			HASH_ADD_KEYPTR(hh, ssl_ctxs, cf->filename,
@@ -1447,8 +1454,6 @@ create_frontend(const struct front_arg *fa)
 	fr->pspec = strdup(fa->pspec);
 	fr->match_global_certs = fa->match_global_certs;
 	fr->sni_nomatch_abort = fa->sni_nomatch_abort;
-	fr->etype = fa->etype;
-	fr->ciphers = fa->ciphers;
 
 	VTAILQ_INIT(&tmp_list);
 	count = frontend_listen(fa, &fr->socks);
@@ -1456,7 +1461,7 @@ create_frontend(const struct front_arg *fa)
 		return (NULL);
 
 	HASH_ITER(hh, fa->certs, cf, cftmp) {
-		so = make_ctx(cf, fr);
+		so = make_ctx_fr(cf, fr, fa);
 		if (so == NULL) {
 			destroy_frontend(fr);
 			return (NULL);
@@ -3056,7 +3061,7 @@ cert_fr_query(struct frontend *fr, struct front_arg *fa,
 	HASH_ITER(hh, fa->certs, cf, cftmp) {
 		if (cf->mark)
 			continue;
-		sc = make_ctx(cf, fr);
+		sc = make_ctx_fr(cf, fr, fa);
 		if (sc == NULL)
 			return (-1);
 		if (load_cert_ctx(sc) != 0) {
@@ -3218,7 +3223,7 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 		CHECK_OBJ_NOTNULL(default_ctx, SSLCTX_MAGIC);
 		if (strcmp(default_ctx->filename, cf->filename) != 0
 		    || cf->mtim > default_ctx->mtim) {
-			sc = make_ctx(cf, NULL);
+			sc = make_ctx(cf);
 			if (sc == NULL)
 				return (-1);
 			if (load_cert_ctx(sc) != 0) {
@@ -3234,7 +3239,7 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 	HASH_ITER(hh, cfg->CERT_FILES, cf, cftmp) {
 		if (cf->mark)
 			continue;
-		sc = make_ctx(cf, NULL);
+		sc = make_ctx(cf);
 		if (sc == NULL)
 			return (-1);
 		if (load_cert_ctx(sc) != 0) {

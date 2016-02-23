@@ -51,6 +51,7 @@ struct front_arg {
 	char			*pspec;
 	int			match_global_certs;
 	int			sni_nomatch_abort;
+	int			prefer_server_ciphers;
 	char			*ciphers;
 	ENC_TYPE		etype;
 	int			mark;

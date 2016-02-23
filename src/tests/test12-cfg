@@ -12,6 +12,7 @@ frontend = {
 	 pem-file = "$TESTDIR/certs/default.example.com"
 	 tls = on
 	 ciphers = "HIGH"
+	 prefer-server-ciphers = on
 }
 EOF
 
