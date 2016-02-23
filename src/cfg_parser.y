@@ -116,6 +116,8 @@ FB_REC
 	| FB_CERT
 	| FB_MATCH_GLOBAL
 	| FB_SNI_NOMATCH_ABORT
+	| FB_TLS
+	| FB_SSL
 	;
 
 FB_HOST: TOK_HOST '=' STRING { cur_fa->ip = strdup($3); };
@@ -138,6 +140,8 @@ FB_SNI_NOMATCH_ABORT:TOK_SNI_NOMATCH_ABORT '=' BOOL
 {
 		cur_fa->sni_nomatch_abort = $3;
 };
+FB_TLS: TOK_TLS '=' BOOL { if ($3) cur_fa->etype = ENC_TLS; }
+FB_SSL: TOK_SSL '=' BOOL { if ($3) cur_fa->etype = ENC_SSL; }
 
 QUIET_REC: TOK_QUIET '=' BOOL { cfg->QUIET = $3; };
 

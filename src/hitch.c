@@ -173,6 +173,7 @@ struct frontend {
 	int			sni_nomatch_abort;
 	struct sni_name_s	*sni_names;
 	struct sslctx_s		*ssl_ctxs;
+	ENC_TYPE		etype;
 	char			*pspec;
 	struct listen_sock_head	socks;
 	VTAILQ_ENTRY(frontend)	list;
@@ -974,6 +975,12 @@ make_ctx(const struct cfg_cert_file *cf, const struct frontend *fr)
 	SSL_CTX *ctx;
 	sslctx *sc;
 	RSA *rsa;
+	ENC_TYPE etype = CONFIG->ETYPE;
+
+	if (fr != NULL) {
+		CHECK_OBJ_NOTNULL(fr, FRONTEND_MAGIC);
+		etype = fr->etype;
+	}
 
 	long ssloptions = SSL_OP_NO_SSLv2 | SSL_OP_ALL |
 	    SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION;
@@ -981,7 +988,7 @@ make_ctx(const struct cfg_cert_file *cf, const struct frontend *fr)
 #ifdef SSL_OP_NO_COMPRESSION
 	ssloptions |= SSL_OP_NO_COMPRESSION;
 #endif
-	if (CONFIG->ETYPE == ENC_TLS)
+	if (etype == ENC_TLS)
 		ssloptions |= SSL_OP_NO_SSLv3;
 	ctx = SSL_CTX_new((CONFIG->PMODE == SSL_CLIENT) ?
 	    SSLv23_client_method() : SSLv23_server_method());
@@ -1433,6 +1440,11 @@ create_frontend(const struct front_arg *fa)
 	VTAILQ_INIT(&fr->socks);
 	AN(fr);
 
+	fr->pspec = strdup(fa->pspec);
+	fr->match_global_certs = fa->match_global_certs;
+	fr->sni_nomatch_abort = fa->sni_nomatch_abort;
+	fr->etype = fa->etype;
+
 	VTAILQ_INIT(&tmp_list);
 	count = frontend_listen(fa, &fr->socks);
 	if (count < 0)
@@ -1452,9 +1464,6 @@ create_frontend(const struct front_arg *fa)
 #endif
 	}
 
-	fr->pspec = strdup(fa->pspec);
-	fr->match_global_certs = fa->match_global_certs;
-	fr->sni_nomatch_abort = fa->sni_nomatch_abort;
 
 	return (fr);
 }

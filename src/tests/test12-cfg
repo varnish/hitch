@@ -10,6 +10,7 @@ frontend = {
 	 host = "*"
 	 port = "$((LISTENPORT+2))"
 	 pem-file = "$TESTDIR/certs/default.example.com"
+	 tls = on
 }
 EOF
 
