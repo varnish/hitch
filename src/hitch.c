@@ -1001,7 +1001,7 @@ make_ctx(const struct cfg_cert_file *cf, const struct frontend *fr)
 	SSL_CTX_set_info_callback(ctx, info_callback);
 
 	if (ciphers != NULL) {
-		if (SSL_CTX_set_cipher_list(ctx, CONFIG->CIPHER_SUITE) != 1) {
+		if (SSL_CTX_set_cipher_list(ctx, ciphers) != 1) {
 			ERR_print_errors_fp(stderr);
 		}
 	}
