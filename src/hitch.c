@@ -174,6 +174,7 @@ struct frontend {
 	struct sni_name_s	*sni_names;
 	struct sslctx_s		*ssl_ctxs;
 	ENC_TYPE		etype;
+	char			*ciphers;
 	char			*pspec;
 	struct listen_sock_head	socks;
 	VTAILQ_ENTRY(frontend)	list;
@@ -976,10 +977,13 @@ make_ctx(const struct cfg_cert_file *cf, const struct frontend *fr)
 	sslctx *sc;
 	RSA *rsa;
 	ENC_TYPE etype = CONFIG->ETYPE;
+	char *ciphers = CONFIG->CIPHER_SUITE;
 
 	if (fr != NULL) {
 		CHECK_OBJ_NOTNULL(fr, FRONTEND_MAGIC);
 		etype = fr->etype;
+		if (fr->ciphers != NULL)
+			ciphers = fr->ciphers;
 	}
 
 	long ssloptions = SSL_OP_NO_SSLv2 | SSL_OP_ALL |
@@ -996,7 +1000,7 @@ make_ctx(const struct cfg_cert_file *cf, const struct frontend *fr)
 	SSL_CTX_set_options(ctx, ssloptions);
 	SSL_CTX_set_info_callback(ctx, info_callback);
 
-	if (CONFIG->CIPHER_SUITE) {
+	if (ciphers != NULL) {
 		if (SSL_CTX_set_cipher_list(ctx, CONFIG->CIPHER_SUITE) != 1) {
 			ERR_print_errors_fp(stderr);
 		}
@@ -1444,6 +1448,7 @@ create_frontend(const struct front_arg *fa)
 	fr->match_global_certs = fa->match_global_certs;
 	fr->sni_nomatch_abort = fa->sni_nomatch_abort;
 	fr->etype = fa->etype;
+	fr->ciphers = fa->ciphers;
 
 	VTAILQ_INIT(&tmp_list);
 	count = frontend_listen(fa, &fr->socks);

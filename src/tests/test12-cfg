@@ -11,6 +11,7 @@ frontend = {
 	 port = "$((LISTENPORT+2))"
 	 pem-file = "$TESTDIR/certs/default.example.com"
 	 tls = on
+	 ciphers = "HIGH"
 }
 EOF
 

@@ -118,6 +118,7 @@ FB_REC
 	| FB_SNI_NOMATCH_ABORT
 	| FB_TLS
 	| FB_SSL
+	| FB_CIPHERS
 	;
 
 FB_HOST: TOK_HOST '=' STRING { cur_fa->ip = strdup($3); };
@@ -142,6 +143,7 @@ FB_SNI_NOMATCH_ABORT:TOK_SNI_NOMATCH_ABORT '=' BOOL
 };
 FB_TLS: TOK_TLS '=' BOOL { if ($3) cur_fa->etype = ENC_TLS; }
 FB_SSL: TOK_SSL '=' BOOL { if ($3) cur_fa->etype = ENC_SSL; }
+FB_CIPHERS: TOK_CIPHERS '=' STRING { if ($3) cur_fa->ciphers = strdup($3); };
 
 QUIET_REC: TOK_QUIET '=' BOOL { cfg->QUIET = $3; };
 
