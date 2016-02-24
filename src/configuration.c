@@ -198,6 +198,7 @@ config_destroy(hitch_config *cfg)
 		free(fa->ip);
 		free(fa->port);
 		free(fa->pspec);
+		free(fa->ciphers);
 		HASH_ITER(hh, fa->certs, cf, cftmp) {
 			CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
 			HASH_DEL(fa->certs, cf);
