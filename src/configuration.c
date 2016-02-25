@@ -460,8 +460,8 @@ config_param_pem_file(char *filename, struct cfg_cert_file **cfptr)
 	ALLOC_OBJ(cert, CFG_CERT_FILE_MAGIC);
 	AN(cert);
 	config_assign_str(&cert->filename, filename);
-	cert->mtim = st.st_mtim.tv_sec
-	    + st.st_mtim.tv_nsec * 1e-9;
+	cert->mtim = st.st_mtime
+	    + st.st_mtime * 1e-9;
 
 	*cfptr = cert;
 	cert->ref++;
