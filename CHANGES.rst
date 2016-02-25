@@ -4,6 +4,20 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.2.0-beta1 (2015-02-25)
+------------------------------
+
+* Expanded configuration file format to permit settings various
+  options at a more granular level.
+* The following options can now be set on a per-frontend basis:
+  ``pem-file``, ``ssl``, ``tls``, ``ciphers``,
+  ``prefer-server-ciphers``, ``sni-nomatch-abort``
+* Added options ``host`` and ``port`` for specifying the listening
+  endpoint in a ``frontend`` block.
+* Added option ``match-global-certs`` (available in a ``frontend``
+  declaration)
+
+
 hitch-1.1.1 (2016-01-26)
 ------------------------
 
