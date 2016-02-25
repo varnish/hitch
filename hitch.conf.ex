@@ -1,14 +1,33 @@
 #
 # Example configuration file for hitch(8).
 #
-# NOTE: all config file parameters can be overriden
-#       from command line!
 
 # Listening address. REQUIRED.
 # Can be specified multiple times for multiple listen endpoints.
 # type: string
 # syntax: [HOST]:PORT[+CERT]
 frontend = "[*]:8443"
+
+
+# Listening address. Alternative syntax
+#
+frontend = {
+    host = "*"
+    port = "443"
+}
+
+# The following options can also be set in a frontend block, which
+# will configure the option for this specific frontend only:
+#
+#    pem-file = ""
+#    tls = on
+#    ssl = off
+#    ciphers = ""
+#    prefer-server-ciphers = off
+#    sni-nomatch-abort = off
+#    match-global-certs = off
+#
+# See further explanation below for each specifc option.
 
 # Upstream server address. REQUIRED.
 #
@@ -19,6 +38,9 @@ backend = "[127.0.0.1]:6081"
 # SSL x509 certificate file. REQUIRED.
 # List multiple certs to use SNI. Certs are used in the order they
 # are listed; the last cert listed will be used if none of the others match
+#
+# Also available in a frontend declaration, to make a certificate
+# only available for a specific listen endpoint.
 #
 # type: string
 pem-file = ""
@@ -31,10 +53,15 @@ pem-file = ""
 # List of allowed SSL ciphers.
 #
 # Run openssl ciphers for list of available ciphers.
+#
+# Option is also available in a frontend declaration.
+#
 # type: string
 ciphers = "EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH"
 
 # Enforce server cipher list order
+#
+# Option is also available in a frontend declaration.
 #
 # type: boolean
 prefer-server-ciphers = off
@@ -128,7 +155,23 @@ proxy-proxy = off
 
 # Abort handshake when the client submits an unrecognized SNI server name.
 #
+# Option is also available in a frontend declaration.
+#
 # type: boolean
 sni-nomatch-abort = off
+
+# frontend = {
+#
+# # match-global-certs: Also search globally defined PEM files for SNI
+# # certficiate lookups.
+# # Only available in a frontend declaration.
+#
+#     match-global-certs = off
+#
+#     host = "localhost"
+#     port = "443"
+#     pem-file = "/etc/hitch/certs/mycert.pem"
+#
+# }
 
 # EOF
