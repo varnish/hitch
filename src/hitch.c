@@ -923,7 +923,6 @@ sni_switch_ctx(SSL *ssl, int *al, void *data)
 		}						\
 	} while (0)
 
-	fprintf(stderr, "fr = %p\n", fr);
 	if (fr != NULL) {
 		TRY_SNI_MATCH(fr->sni_names);
 		lookup_global = fr->match_global_certs;
