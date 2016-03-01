@@ -1,6 +1,6 @@
 # Installing hitch
 
-hitch` requires:
+`hitch` requires:
 
     libev >= 4
     openssl (recent, >=1.0.0 recommended)
