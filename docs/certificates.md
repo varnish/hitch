@@ -4,7 +4,7 @@ To work hitch minimum requires a PEM file with:
 
   - an RSA key
   - a certificate
-  - (if you are doing DH ciphers: diffie-hellman parameters)
+  - (if you are doing DH ciphers: Diffie-Hellman parameters)
 
 For production use, you probably want to buy one from a friendly Certificate
 Authority (CA) nearby. For testing/playing around with hitch, you can create one using openssl:
@@ -27,7 +27,7 @@ And then start Hitch:
 
 and you're done!
 
-If you are running on a Debian system, there is a shell script availble to simplify this in the _ssl-cert_ package: `make-ssl-cert /usr/share/ssl-cert/ssleay.cnf /etc/hitch/testcert.pem`
+If you are running on a Debian system, there is a shell script available to simplify this in the _ssl-cert_ package: `make-ssl-cert /usr/share/ssl-cert/ssleay.cnf /etc/hitch/testcert.pem`
 
 On Redhat systems the OpenSSL package has `/etc/pki/tls/certs/make-dummy-cert` that can be used.
 

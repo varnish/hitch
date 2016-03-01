@@ -13,8 +13,8 @@ handshake decide which certificate to present to the client.
 		site1.example.com.pem site2.example.com.pem site3.example.com.pem
 
 Hitch will automatically try to find the best matching certificate to give to the client. The last
-PEM file provided will serve as the default if none of them matched. Wildcard certificates work fine,
-any more specific certificate will be preferred over a wildcard match.
+PEM file provided will serve as the default if none of them matched. Wild-card certificates work fine,
+any more specific certificate will be preferred over a wild-card match.
 
 If you would rather close the connection than serve a certificate that will
 yield a warning on the client, you can add the `--sni-nomatch-abort` argument.
@@ -26,7 +26,7 @@ multiple "pem-file = cert.pem" stances in a configuration file instead.
 
 To support older clients, you need to add multiple `--frontend=` stances to your configuration
 file (or command line) and a separate PEM file for each of them. Usually this
-means that you need many IP adresses assigned to the hitch server as well.
+means that you need many IP addresses assigned to the hitch server as well.
 
 *Legacy client example:*
 

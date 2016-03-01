@@ -1,4 +1,4 @@
-# Hitch architeture
+# Hitch architecture
 
 Hitch uses a process-per-core model; a parent process spawns N children who
 each `accept()` on a common socket to distribute connected clients among them.
