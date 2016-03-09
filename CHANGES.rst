@@ -4,7 +4,7 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
-hitch-1.2.0-beta1 (2015-02-25)
+hitch-1.2.0-beta1 (2016-02-25)
 ------------------------------
 
 * Expanded configuration file format to permit settings various
