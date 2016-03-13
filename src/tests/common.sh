@@ -7,6 +7,7 @@ LISTENPORT=$(($RANDOM + 1024))
 PIDFILE="$(mktemp -u)"
 CONFFILE="$(mktemp -u)"
 DUMPFILE="$(mktemp -u)"
+TESTDIR="$(pwd)"
 
 HITCH=../hitch
 HITCH_ARGS="--pidfile=$PIDFILE --daemon --quiet"
@@ -16,11 +17,6 @@ if [ "$USER" == "root" ]; then
 
 fi
 
-if [ -n "$TESTDIR" ]; then
-	cd $TESTDIR;
-else
-	export TESTDIR=$(pwd)
-fi
 
 cleanup() {
         test -s $PIDFILE && kill `cat "$PIDFILE"`

@@ -7,7 +7,7 @@
 
 PORT2=$(($RANDOM + 1024))
 
-hitch $HITCH_ARGS --backend=[hitch-tls.org]:80 \
+$HITCH $HITCH_ARGS --backend=[hitch-tls.org]:80 \
 	"--frontend=[${LISTENADDR}]:$LISTENPORT" \
 	"--frontend=[${LISTENADDR}]:$PORT2" \
 	certs/site1.example.com

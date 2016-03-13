@@ -21,8 +21,3 @@ Makefile
 /install-sh
 /autom4te.cache
 /hitch.8
-/test-driver
-/tags
-/src/test-suite.log
-/src/tests/test*.log
-/src/tests/test*.trs

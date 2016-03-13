@@ -11,7 +11,8 @@ before_script:
   - make -j4
 
 script:
-  - make check -j4
+#  - make check -j4
+  - cd src/tests && ./runtests
 
 compiler:
   - clang

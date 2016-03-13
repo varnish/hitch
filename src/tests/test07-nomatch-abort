@@ -30,7 +30,7 @@ frontend = {
 
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE
+$HITCH $HITCH_ARGS --config=$CONFFILE
 test "$?" = "0" || die "Hitch did not start."
 
 # No SNI - should not be affected.
