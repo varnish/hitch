@@ -1,6 +1,6 @@
 #/bin/bash
 # Test configuration parser.
-. common.sh
+. ${TESTDIR}common.sh
 set +o errexit
 
 hitch --test --config=configs/default.cfg certs/default.example.com 2>/dev/null 1>&2
