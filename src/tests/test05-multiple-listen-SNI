@@ -3,12 +3,12 @@
 # Test multiple certificates (SNI) on a listening socket.
 #
 # This implements T4 in the original test plan.
+
 . common.sh
-set +o errexit
 
 #PORT2=$(($RANDOM + 1024))
 
-$HITCH $HITCH_ARGS --backend=[hitch-tls.org]:80 --frontend=[${LISTENADDR}]:$LISTENPORT \
+hitch $HITCH_ARGS --backend=[hitch-tls.org]:80 --frontend=[${LISTENADDR}]:$LISTENPORT \
 	certs/site1.example.com certs/site2.example.com certs/default.example.com
 test "$?" = "0" || die "Hitch did not start."
 

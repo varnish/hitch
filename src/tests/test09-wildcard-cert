@@ -3,7 +3,7 @@
 . common.sh
 set +o errexit
 
-$HITCH $HITCH_ARGS --backend=[hitch-tls.org]:80 "--frontend=[${LISTENADDR}]:$LISTENPORT" certs/wildcard.example.com certs/default.example.com
+hitch $HITCH_ARGS --backend=[hitch-tls.org]:80 "--frontend=[${LISTENADDR}]:$LISTENPORT" certs/wildcard.example.com certs/default.example.com
 test "$?" = "0" || die "Hitch did not start."
 
 echo | openssl s_client -servername foo.example.com -prexit -connect $LISTENADDR:$LISTENPORT 2>/dev/null > $DUMPFILE

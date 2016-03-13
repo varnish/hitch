@@ -12,7 +12,7 @@ function rmsess {
 }
 trap rmsess EXIT
 
-$HITCH $HITCH_ARGS --backend=[hitch-tls.org]:80 "--frontend=[${LISTENADDR}]:$LISTENPORT" certs/site1.example.com
+hitch $HITCH_ARGS --backend=[hitch-tls.org]:80 "--frontend=[${LISTENADDR}]:$LISTENPORT" certs/site1.example.com
 test "$?" = "0" || die "Hitch did not start."
 
 echo -e "\n" | openssl s_client -prexit -sess_out $sessfile -connect $LISTENADDR:$LISTENPORT >/dev/null 2>&1
