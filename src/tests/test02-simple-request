@@ -2,7 +2,7 @@
 # Test basic argument handling.
 # This implements T2 in the original test plan.
 
-. ${TESTDIR}common.sh
+. common.sh
 set -o errexit
 
 hitch $HITCH_ARGS --backend=[hitch-tls.org]:80 "--frontend=[${LISTENADDR}]:$LISTENPORT" certs/site1.example.com

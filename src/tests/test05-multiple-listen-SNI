@@ -4,7 +4,7 @@
 #
 # This implements T4 in the original test plan.
 
-. ${TESTDIR}common.sh
+. common.sh
 
 #PORT2=$(($RANDOM + 1024))
 

@@ -20,7 +20,7 @@ endif
 EXTRA_DIST = tests
 
 AM_TESTS_ENVIRONMENT = \
-	TESTDIR=$(abs_top_builddir)/src/tests/; export TESTDIR; \
+	TESTDIR=$(abs_top_builddir)/src/tests; export TESTDIR; \
 	PATH=$(abs_top_builddir)/src:$$PATH; export PATH;
 
 TESTS = tests/test01-start-and-stop \

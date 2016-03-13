@@ -1,7 +1,8 @@
 #/bin/bash
 
-. ${TESTDIR}common.sh
+. common.sh
 set +o errexit
+
 
 mk_cfg <<EOF
 backend = "[hitch-tls.org]:80"
