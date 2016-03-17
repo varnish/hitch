@@ -95,6 +95,7 @@ FRONTEND_REC
 	| TOK_FRONTEND '=' '{'
 {
 	/* NB: Mid-rule action */
+	AZ(cur_fa);
 	cur_fa = front_arg_new();
 }
 	FRONTEND_BLK '}'
@@ -244,5 +245,10 @@ void
 yyerror(hitch_config *cfg, const char *s)
 {
 	(void) cfg;
+
+	/* Clean up if FRONTEND_BLK parsing failed */
+	if (cur_fa != NULL)
+		FREE_OBJ(cur_fa);
+
 	fprintf(stderr, "parsing error: line: %d: %s\n", yyget_lineno(), s);
 }
