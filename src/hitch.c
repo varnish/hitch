@@ -1456,8 +1456,10 @@ create_frontend(const struct front_arg *fa)
 
 	VTAILQ_INIT(&tmp_list);
 	count = frontend_listen(fa, &fr->socks);
-	if (count < 0)
+	if (count < 0) {
+		destroy_frontend(fr);
 		return (NULL);
+	}
 
 	HASH_ITER(hh, fa->certs, cf, cftmp) {
 		so = make_ctx_fr(cf, fr, fa);
@@ -1472,7 +1474,6 @@ create_frontend(const struct front_arg *fa)
 		insert_sni_names(so, &fr->sni_names);
 #endif
 	}
-
 
 	return (fr);
 }
