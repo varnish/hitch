@@ -58,7 +58,6 @@ AC_TYPE_UINT32_T
 
 # Checks for library functions.
 AC_FUNC_FORK
-AC_FUNC_MALLOC
 AC_FUNC_MMAP
 AC_CHECK_FUNCS([inet_ntoa])
 AC_CHECK_FUNCS([accept4])
