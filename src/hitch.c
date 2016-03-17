@@ -3093,8 +3093,10 @@ frontend_query(struct front_arg *new_set, struct cfg_tpc_obj_head *cfg_objs)
 			fa->mark = 1;
 			o = make_cfg_obj(CFG_FRONTEND, CFG_TPC_KEEP, fr, NULL,
 			    frontend_rollback, frontend_commit);
-			if(cert_fr_query(fr, fa, cfg_objs) < 0)
+			if(cert_fr_query(fr, fa, cfg_objs) < 0) {
+				FREE_OBJ(o);
 				return (-1);
+			}
 
 		} else
 			o = make_cfg_obj(CFG_FRONTEND, CFG_TPC_DROP, fr, NULL,
