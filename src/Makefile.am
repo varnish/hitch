@@ -12,7 +12,7 @@ nobase_noinst_HEADERS = ringbuffer.h configuration.h shctx.h miniobj.h \
 BUILT_SOURCES = cfg_parser.h
 hitch_SOURCES = configuration.c ringbuffer.c hitch.c vpf.c flopen.c vas.c \
 	cfg_parser.y cfg_lex.l vsb.c
-hitch_LDADD = $(AM_LDFLAGS) -lcrypto -lfl
+hitch_LDADD = $(AM_LDFLAGS) -lcrypto $(LEXLIB)
 if USE_SHCTX
 hitch_SOURCES += shctx.c
 hitch_LDADD += ebtree/libebtree.a
