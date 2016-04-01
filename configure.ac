@@ -34,16 +34,14 @@ AM_MAINTAINER_MODE([disable])
 
 # Checks for libraries.
 PKG_CHECK_EXISTS([libev], [
-  PKG_CHECK_MODULES([EV], libev)], [
+  PKG_CHECK_MODULES([EV], [libev])], [
   AC_SEARCH_LIBS([ev_default_loop], [ev], [], AC_MSG_ERROR([Cannot find libev.]))
 ])
 
 PKG_CHECK_MODULES([SSL], [libssl])
 PKG_CHECK_MODULES([CRYPTO], [libcrypto])
 
-AC_CHECK_MEMBERS([struct stat.st_mtim, struct stat.st_mtimespec], [nsec_avail="true"], [])
-AM_CONDITIONAL(NSEC_AVAIL, [test "x$nsec_avail" == xtrue])
-AM_COND_IF(NSEC_AVAIL, [], AC_MSG_WARN([Nanosecond resolution not available from struct stat]))
+AC_CHECK_MEMBERS([struct stat.st_mtim, struct stat.st_mtimespec])
 
 AC_ARG_ENABLE(sessioncache,
     AC_HELP_STRING([--enable-sessioncache],
@@ -71,11 +69,7 @@ AC_TYPE_UINT32_T
 # Checks for library functions.
 AC_FUNC_FORK
 AC_FUNC_MMAP
-AC_CHECK_FUNCS([inet_ntoa])
 AC_CHECK_FUNCS([accept4])
-
-AC_SUBST([AM_CPPFLAGS])
-AC_SUBST([AM_LDFLAGS])
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([src/Makefile])
