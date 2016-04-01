@@ -13,13 +13,7 @@ AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
 AC_PROG_YACC
-if test "x$ac_cv_prog_YACC" == "x"; then
-  AC_MSG_ERROR([bison/byacc/yacc is needed to build hitch.])
-fi
 AC_PROG_LEX
-if test "x$LEX" == "x:"; then
-  AC_MSG_ERROR([flex/lex is needed to build hitch.])
-fi
 
 AC_ARG_WITH([rst2man],
   AS_HELP_STRING([--with-rst2man=PATH], [Location of rst2man (auto)]),
