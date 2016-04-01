@@ -593,7 +593,7 @@ handle_shcupd(struct ev_loop *loop, ev_io *w, int revents)
 		r -= sizeof(uint32_t);
 		encdate = *((uint32_t *)&msg[r]);
 		if (!(abs((int)(int32_t)now - ntohl(encdate))
-			< SSL_CTX_get_timeout(default_ctx)))
+			< SSL_CTX_get_timeout(default_ctx->ctx)))
 			continue;
 
 		shctx_sess_add(msg, r, now);

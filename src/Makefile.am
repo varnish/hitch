@@ -14,6 +14,7 @@ hitch_SOURCES = configuration.c ringbuffer.c hitch.c vpf.c flopen.c vas.c \
 	cfg_parser.y cfg_lex.l vsb.c
 hitch_LDADD = $(SSL_LIBS) $(CRYPTO_LIBS) $(EV_LIBS)
 if USE_SHCTX
+CFLAGS += -DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX
 hitch_SOURCES += shctx.c
 hitch_LDADD += ebtree/libebtree.a
 AM_CFLAGS += -Iebtree
