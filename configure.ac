@@ -6,7 +6,7 @@ AC_INIT([hitch], [1.2.0-beta1], [support@varnish-software.com])
 AC_CONFIG_SRCDIR([src/configuration.c])
 AC_CONFIG_HEADERS([config.h])
 
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([foreign])
 
 # Checks for programs.
 AC_PROG_CC
