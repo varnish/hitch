@@ -9,6 +9,7 @@
 
 %option nounput noinput
 %option yylineno
+%option noyywrap
 %%
 [ \t\n\r]         ;
 #.*$            ;
