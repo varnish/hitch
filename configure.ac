@@ -37,7 +37,13 @@ PKG_CHECK_EXISTS([libev], [
   PKG_CHECK_MODULES([EV], libev)], [
   AC_SEARCH_LIBS([ev_default_loop], [ev], [], AC_MSG_ERROR([Cannot find libev.]))
 ])
-PKG_CHECK_MODULES([SSL], libssl)
+
+PKG_CHECK_MODULES([OPENSSL], [libssl], [], AC_MSG_ERROR(["OpenSSL not found."]))
+AC_SUBST(OPENSSL_LIBS)
+
+PKG_CHECK_MODULES([LIBCRYPTO], [libcrypto], [], AC_MSG_ERROR(["libcrypto not found."]))
+AC_SUBST([LIBCRYPTO_LIBS])
+
 AC_CHECK_MEMBERS([struct stat.st_mtim, struct stat.st_mtimespec], [nsec_avail="true"], [])
 AM_CONDITIONAL(NSEC_AVAIL, [test "x$nsec_avail" == xtrue])
 AM_COND_IF(NSEC_AVAIL, [], AC_MSG_WARN([Nanosecond resolution not available from struct stat]))
