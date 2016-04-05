@@ -33,10 +33,7 @@ die() {
 }
 
 mk_cfg() {
-    rm -f "$CONFFILE"
-    while read inp; do
-	echo "$inp" >> "$CONFFILE"
-    done
+	cat > "$CONFFILE"
 }
 
 runcurl() {
