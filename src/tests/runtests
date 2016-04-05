@@ -1,15 +1,20 @@
 #!/bin/bash
 # (until we get automake/autoconf configured right.)
 
-set -o errexit
+set -e
 
-for t in test*; do
-	echo -n -e "$t\t"
-	bash $t
-	if [ "$?" != "0" ]; then
-		echo "FAILED"
+TESTDIR="$(dirname "$0")"
+
+cd "$TESTDIR"
+set -- ./test*
+
+for TEST
+do
+	if "$TEST"
+	then
+		printf "%s\tOK\n" "$TEST"
 	else
-		echo "OK"
+		printf "%s\tFAILED\n" "$TEST"
+		false
 	fi
 done
-
