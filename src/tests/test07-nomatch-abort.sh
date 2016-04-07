@@ -1,8 +1,8 @@
-#/bin/bash
+#/bin/sh
 #
 # Test --sni-nomatch-abort
 #
-. common.sh
+. ${TESTDIR}common.sh
 set +o errexit
 
 #PORT2=$(($RANDOM + 1024))
@@ -10,9 +10,9 @@ set +o errexit
 mk_cfg <<EOF
 sni-nomatch-abort = on
 
-pem-file = "$TESTDIR/certs/site1.example.com"
-pem-file = "$TESTDIR/certs/site2.example.com"
-pem-file = "$TESTDIR/certs/default.example.com"
+pem-file = "${CERTSDIR}/site1.example.com"
+pem-file = "${CERTSDIR}/site2.example.com"
+pem-file = "${CERTSDIR}/default.example.com"
 
 backend = "[hitch-tls.org]:80"
 
@@ -24,29 +24,29 @@ frontend = {
 frontend = {
 	host = "$LISTENADDR"
 	port = "$((LISTENPORT+1))"
-	pem-file = "$TESTDIR/certs/site3.example.com"
+	pem-file = "${CERTSDIR}/site3.example.com"
 	sni-nomatch-abort = off
 }
 
 EOF
 
-$HITCH $HITCH_ARGS --config=$CONFFILE
+hitch $HITCH_ARGS --config=$CONFFILE
 test "$?" = "0" || die "Hitch did not start."
 
 # No SNI - should not be affected.
-echo -e "\n" | openssl s_client -prexit -connect $LISTENADDR:$LISTENPORT 2>/dev/null > $DUMPFILE
+echo -e "\n" | openssl s_client -prexit -connect $LISTENADDR:$LISTENPORT >$DUMPFILE 2>&1
 test "$?" = "0" || die "s_client failed"
 grep -q -c "subject=/CN=default.example.com" $DUMPFILE
 test "$?" = "0" || die "s_client got wrong certificate on listen port #1"
 
 # SNI request w/ valid servername
-echo -e "\n" | openssl s_client -servername site1.example.com -prexit -connect $LISTENADDR:$LISTENPORT 2>/dev/null > $DUMPFILE
+echo -e "\n" | openssl s_client -servername site1.example.com -prexit -connect $LISTENADDR:$LISTENPORT >$DUMPFILE 2>&1
 test "$?" = "0" || die "s_client failed"
 grep -q -c "subject=/CN=site1.example.com" $DUMPFILE
 test "$?" = "0" || die "s_client got wrong certificate in listen port #2"
 
 # SNI w/ unknown servername
-echo | openssl s_client -servername invalid.example.com -prexit -connect $LISTENADDR:$LISTENPORT > $DUMPFILE 2>&1
+echo | openssl s_client -servername invalid.example.com -prexit -connect $LISTENADDR:$LISTENPORT >$DUMPFILE 2>&1
 test "$?" != "0" || die "s_client did NOT fail when it should have. "
 grep -q -c "unrecognized name" $DUMPFILE
 test "$?" = "0" || die "Expected 'unrecognized name' error."
@@ -55,13 +55,13 @@ CURL_EXTRA="--resolve site1.example.com:$LISTENPORT:127.0.0.1"
 runcurl site1.example.com $LISTENPORT
 
 # SNI request w/ valid servername
-echo -e "\n" | openssl s_client -servername site1.example.com -prexit -connect $LISTENADDR:$((LISTENPORT+1)) 2>/dev/null > $DUMPFILE
+echo -e "\n" | openssl s_client -servername site1.example.com -prexit -connect $LISTENADDR:$((LISTENPORT+1)) >$DUMPFILE 2>&1
 test "$?" = "0" || die "s_client failed"
 grep -q -c "subject=/CN=site3.example.com" $DUMPFILE
 test "$?" = "0" || die "s_client got wrong certificate in listen port #2"
 
 # SNI w/ unknown servername
-echo | openssl s_client -servername invalid.example.com -prexit -connect $LISTENADDR:$((LISTENPORT+1)) > $DUMPFILE 2>&1
+echo | openssl s_client -servername invalid.example.com -prexit -connect $LISTENADDR:$((LISTENPORT+1)) >$DUMPFILE 2>&1
 test "$?" = "0" || die "s_client failed"
 grep -q -c "subject=/CN=site3.example.com" $DUMPFILE
 test "$?" = "0" || die "s_client got wrong certificate in listen port #2"

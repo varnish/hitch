@@ -6,7 +6,7 @@ AC_INIT([hitch], [1.2.0-beta1], [support@varnish-software.com])
 AC_CONFIG_SRCDIR([src/configuration.c])
 AC_CONFIG_HEADERS([config.h])
 
-AM_INIT_AUTOMAKE([foreign])
+AM_INIT_AUTOMAKE([foreign color-tests parallel-tests])
 
 # Checks for programs.
 AC_PROG_CC
@@ -60,6 +60,9 @@ AC_TYPE_UINT32_T
 AC_FUNC_FORK
 AC_FUNC_MMAP
 AC_CHECK_FUNCS([accept4])
+
+SH_TESTS="$(cd src && echo tests/test*)"
+AC_SUBST(SH_TESTS)
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([src/Makefile])

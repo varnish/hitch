@@ -7,20 +7,18 @@ LISTENPORT=$(($RANDOM + 1024))
 PIDFILE="$(mktemp -u)"
 CONFFILE="$(mktemp -u)"
 DUMPFILE="$(mktemp -u)"
-TESTDIR="$(pwd)"
+CERTSDIR="${TESTDIR}/certs"
+CONFDIR="${TESTDIR}/configs"
 
-HITCH=../hitch
 HITCH_ARGS="--pidfile=$PIDFILE --daemon --quiet"
 
 if [ "$USER" == "root" ]; then
 	HITCH_ARGS="$HITCH_ARGS --user=nobody"
-
 fi
-
 
 cleanup() {
         test -s $PIDFILE && kill `cat "$PIDFILE"`
-        rm -f "$PIDFILE" "$CONFFILE" "$DUMPFILE" 2>/dev/null
+        rm -f "$PIDFILE" "$CONFFILE" "$DUMPFILE"
 }
 trap cleanup EXIT
 
@@ -38,6 +36,6 @@ mk_cfg() {
 
 runcurl() {
 	# Verify that we got a HTTP reply.
-	BUF=$(curl $CURL_EXTRA --silent --insecure https://$1:$2/ 2>&1)
+	curl $CURL_EXTRA -I -X GET --max-time 5 --silent --insecure https://$1:$2/
 	test "$?" = "0" || die "Incorrect HTTP response code."
 }
