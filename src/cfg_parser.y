@@ -28,9 +28,6 @@ static struct front_arg *cur_fa;
 	char	*s;
 }
 
-%debug
-%verbose
-
 %token <i> INT
 %token <i> UINT
 %token <i> BOOL
@@ -46,7 +43,7 @@ static struct front_arg *cur_fa;
 %token TOK_PIDFILE TOK_SNI_NOMATCH_ABORT TOK_SSL TOK_TLS TOK_HOST TOK_PORT
 %token TOK_MATCH_GLOBAL
 
-%parse-param {hitch_config *cfg}
+%parse-param { hitch_config *cfg }
 
 %%
 CFG

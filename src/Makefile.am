@@ -5,7 +5,7 @@ EXTRA_DIST = tests
 
 AM_CPPFLAGS = $(EV_CFLAGS)
 AM_CFLAGS = -O2 -g -std=c99 -fno-strict-aliasing -Wall -W -D_GNU_SOURCE
-AM_YFLAGS = -d
+AM_YFLAGS = -d -t
 
 nobase_noinst_HEADERS = ringbuffer.h configuration.h shctx.h miniobj.h \
 	vqueue.h vpf.h flopen.h uthash.h sysl_tbl.h vas.h vsb.h
