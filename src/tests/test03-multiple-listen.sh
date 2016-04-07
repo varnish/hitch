@@ -1,27 +1,25 @@
-#/bin/bash
+#/bin/sh
 #
 # Test multiple listening sockets.
 #
 # This implements T3 in the original test plan.
-. common.sh
+. ${TESTDIR}common.sh
 
 PORT2=$(($RANDOM + 1024))
 
-$HITCH $HITCH_ARGS --backend=[hitch-tls.org]:80 \
+hitch $HITCH_ARGS --backend=[hitch-tls.org]:80 \
 	"--frontend=[${LISTENADDR}]:$LISTENPORT" \
 	"--frontend=[${LISTENADDR}]:$PORT2" \
-	certs/site1.example.com
+	${CERTSDIR}/site1.example.com
 test "$?" = "0" || die "Hitch did not start."
 
-echo -e "\n" | openssl s_client -prexit -connect $LISTENADDR:$LISTENPORT 2>/dev/null > $DUMPFILE
+echo -e "\n" | openssl s_client -prexit -connect $LISTENADDR:$LISTENPORT >$DUMPFILE 2>&1
 test "$?" = "0" || die "s_client failed"
-#cat $DUMPFILE
 grep -q -c "subject=/CN=site1.example.com" $DUMPFILE
 
 # Second listen port.
-echo -e "\n" | openssl s_client -prexit -connect $LISTENADDR:$PORT2 2>/dev/null > $DUMPFILE
+echo -e "\n" | openssl s_client -prexit -connect $LISTENADDR:$PORT2 >$DUMPFILE 2>&1
 test "$?" = "0" || die "s_client failed"
-#cat $DUMPFILE
 grep -q -c "subject=/CN=site1.example.com" $DUMPFILE
 
 runcurl $LISTENADDR $LISTENPORT

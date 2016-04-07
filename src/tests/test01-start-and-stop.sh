@@ -1,14 +1,13 @@
-#/bin/bash
+#/bin/sh
 # Test basic argument handling.
-. common.sh
+. ${TESTDIR}common.sh
 set +o errexit
 
-$HITCH --help 1>/dev/null
+hitch --help
 test "$?" = "0" || die "--help does not work."
 
-$HITCH --OBVIOUSLY_BROKEN_ARG 2>/dev/null
+hitch --OBVIOUSLY_BROKEN_ARG
 test "$?" = "1" || die "Wrong exit code."
 
-$HITCH --version 1>/dev/null
+hitch --version
 test "$?" = "0" || die "--version does not work"
-

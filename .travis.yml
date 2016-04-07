@@ -1,18 +1,16 @@
 language: c
 
 before_install:
-  - sudo apt-get update -q
-  - sudo apt-get install -qq libev-dev libssl-dev automake python-docutils flex bison
-
+  - sudo apt-get update
+  - sudo apt-get install libev-dev libssl-dev automake python-docutils flex bison
 
 before_script:
   - ./bootstrap
-  - ./configure --prefix=/usr
+  - ./configure
   - make -j4
 
 script:
-#  - make check -j4
-  - ./src/tests/runtests
+  - make -j4 check VERBOSE=1
 
 compiler:
   - clang

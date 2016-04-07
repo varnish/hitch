@@ -1,13 +1,13 @@
-#/bin/bash
+#/bin/sh
 # Test basic argument handling.
 # This implements T2 in the original test plan.
-. common.sh
+. ${TESTDIR}common.sh
 set +o errexit
 
-$HITCH $HITCH_ARGS --backend=[hitch-tls.org]:80 "--frontend=[${LISTENADDR}]:$LISTENPORT" certs/site1.example.com
+hitch $HITCH_ARGS --backend=[hitch-tls.org]:80 "--frontend=[${LISTENADDR}]:$LISTENPORT" ${CERTSDIR}/site1.example.com
 test "$?" = "0" || die "Hitch did not start."
 
-echo -e "\n" | openssl s_client -prexit -connect $LISTENADDR:$LISTENPORT 2>/dev/null > $DUMPFILE
+echo -e "\n" | openssl s_client -prexit -connect $LISTENADDR:$LISTENPORT >$DUMPFILE 2>&1
 test "$?" = "0" || die "s_client failed"
 
 grep -q -c "subject=/CN=site1.example.com" $DUMPFILE
