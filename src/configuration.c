@@ -635,16 +635,19 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		fa = front_arg_new();
 		r = config_param_host_port_wildcard(v,
 		    &fa->ip, &fa->port, &certfile, 1);
-		if (certfile != NULL) {
-			r = config_param_pem_file(certfile, &cert);
-			if (r != 0) {
-				AN(cert);
-				HASH_ADD_KEYPTR(hh, fa->certs, cert->filename,
-				    strlen(cert->filename), cert);
-			}
-			free(certfile);
+		if (r != 0) {
+			if (certfile != NULL) {
+				r = config_param_pem_file(certfile, &cert);
+				if (r != 0) {
+					AN(cert);
+					HASH_ADD_KEYPTR(hh,
+					    fa->certs, cert->filename,
+					    strlen(cert->filename), cert);
+				}
+				free(certfile);
 		}
-		r = front_arg_add(cfg, fa);
+			r = front_arg_add(cfg, fa);
+		}
 	} else if (strcmp(k, CFG_BACKEND) == 0) {
 		free(cfg->BACK_PORT);
 		free(cfg->BACK_IP);
