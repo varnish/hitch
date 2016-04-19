@@ -4,6 +4,14 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.2.0 (2016-04-19)
+------------------------
+
+* Fixes various minor leaks discovered by Coverity
+* #72: Fix a error handling for command line --frontend option.
+* Various autotools improvements
+* Parallel make check
+
 hitch-1.2.0-beta1 (2016-02-25)
 ------------------------------
 
