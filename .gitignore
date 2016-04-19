@@ -21,3 +21,9 @@ Makefile
 /install-sh
 /autom4te.cache
 /hitch.8
+# Flex output files.
+/src/cfg_lex.c
+/src/cfg_parser.c
+/src/cfg_parser.h
+/src/cfg_parser.output
+/ylwrap

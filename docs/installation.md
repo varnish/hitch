@@ -10,6 +10,10 @@ It has been tested the most heavily on Linux/x86_64.
 
 ## Installing from source
 
+Install prerequisites on Debian based systems:
+
+    $ sudo apt-get install libev-dev libssl-dev automake python-docutils flex bison
+
 To install `hitch`:
 
     $ ./bootstrap   # if running from git
@@ -19,6 +23,7 @@ To install `hitch`:
 
 This will install Hitch to /usr/local/, unless you override the destination
 with ./configure --prefix=/foo (as usual)
+
 
 ## Installing from packages
 
