@@ -19,6 +19,8 @@ BUILT_SOURCES = cfg_parser.h
 hitch_SOURCES = configuration.c ringbuffer.c hitch.c vpf.c flopen.c vas.c \
 	cfg_parser.y cfg_lex.l vsb.c
 hitch_LDADD = $(SSL_LIBS) $(CRYPTO_LIBS) $(EV_LIBS)
+CLEANFILES = cfg_parser.h cfg_parser.c cfg_lex.c
+
 if USE_SHCTX
 AM_CFLAGS += -DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX
 hitch_SOURCES += shctx.c
