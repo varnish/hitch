@@ -3,6 +3,12 @@
 . ${TESTDIR}common.sh
 set +o errexit
 
+# This is a somewhat half-assed attempt at getting a usable group since the
+# redhats and debians can't seem to agree on which group user "nobody"
+# should be in.
+GRP=$(id -Gn nobody | cut -d' ' -f1)
+test "$GRP" != "" || die "No usable group found for user nobody."
+
 hitch --test --config=${CONFDIR}/default.cfg ${CERTSDIR}/default.example.com
 test "$?" = "0" || die "default.cfg is not testable."
 
@@ -17,7 +23,7 @@ backlog =a50
 keepalive = 3600
 chroot = ""
 user = "nobody"
-group = "nogroup"
+group = "$GRP"
 quiet = on
 syslog = on
 quiet = on
@@ -38,7 +44,7 @@ backlog = 50
 keepalive = 3600
 chroot = ""
 user = "nobody"
-group = "nogroup"
+group = "$GRP"
 quiet = on
 syslog = on
 syslog-facility = "info"
@@ -46,7 +52,6 @@ daemon = on
 write-ip = off
 write-proxy = on
 EOF
-
 hitch --test --config=$CONFFILE ${CERTSDIR}/default.example.com
 test "$?" = "1" || die "Invalid config test08b parsed correctly."
 
@@ -61,7 +66,7 @@ backlog = 50
 keepalive = 3600
 chroot = ""
 user = "nobody"
-group = "nogroup"
+group = "$GRP"
 quiet = on
 syslog = on
 syslog-facility = "daemon"
@@ -85,7 +90,7 @@ backlog = 50
 keepalive = 3600
 chroot = ""
 user = "nobody"
-group = "nogroup"
+group = "$GRP"
 quiet = on
 syslog = on
 syslog-facility = "daemon"
@@ -93,7 +98,6 @@ daemon = "on"
 write-ip = off
 write-proxy = on
 EOF
-
 hitch --test --config=$CONFFILE ${CERTSDIR}/default.example.com
 test "$?" = "0" || die "Valid config test08d unparseable?"
 
