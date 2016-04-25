@@ -879,7 +879,7 @@ sni_lookup(const char *servername, const sni_name *sn_tab)
 		/* attempt another lookup for wildcard matches */
 		s = strchr(servername, '.');
 		if (s != NULL) {
-			HASH_FIND_STR(sni_names, s, sn);
+			HASH_FIND_STR(sn_tab, s, sn);
 		}
 	}
 
