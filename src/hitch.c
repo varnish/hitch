@@ -71,6 +71,7 @@
 #include <openssl/err.h>
 #include <openssl/engine.h>
 #include <openssl/asn1.h>
+#include <openssl/ocsp.h>
 #include <ev.h>
 
 #ifdef __linux__
@@ -215,6 +216,13 @@ typedef enum _SHUTDOWN_REQUESTOR {
 struct sni_name_s;
 VTAILQ_HEAD(sni_name_head, sni_name_s);
 
+typedef struct sslstaple_s {
+	unsigned	magic;
+#define SSLSTAPLE_MAGIC	0x20fe53fd
+	unsigned char	*staple;
+	int		len;
+} sslstaple;
+
 /* SSL contexts. */
 typedef struct sslctx_s {
 	unsigned		magic;
@@ -222,6 +230,7 @@ typedef struct sslctx_s {
 	char			*filename;
 	SSL_CTX			*ctx;
 	double			mtim;
+	sslstaple		*staple;
 	struct sni_name_head	sni_list;
 	UT_hash_handle		hh;
 } sslctx;
@@ -855,6 +864,26 @@ load_rsa_privatekey(SSL_CTX *ctx, const char *file)
 }
 
 #ifndef OPENSSL_NO_TLSEXT
+int
+ocsp_staple_cb(SSL *ssl, void *priv)
+{
+	sslstaple *staple;
+	unsigned char *buf;
+	CAST_OBJ_NOTNULL(staple, priv, SSLSTAPLE_MAGIC);
+
+	/* SSL_set_tlsext_status_ocsp_resp will issue a free() on the
+	 * provided input, so we need to pass a copy. */
+	buf = malloc(staple->len);
+	AN(buf);
+	memcpy(buf, staple->staple, staple->len);
+
+	if (SSL_set_tlsext_status_ocsp_resp(ssl,
+		buf, staple->len) == 1)
+		return (SSL_TLSEXT_ERR_OK);
+
+	return (SSL_TLSEXT_ERR_NOACK);
+}
+
 static int
 sni_match(const sni_name *sn, const char *srvname)
 {
@@ -966,6 +995,61 @@ sctx_free(sslctx *sc, sni_name **sn_tab)
 	FREE_OBJ(sc);
 }
 
+static int
+ocsp_init(const char *ocspfn, sslctx *ctx)
+{
+	int i, len;
+	BIO *bio;
+	OCSP_RESPONSE *resp;
+	unsigned char *tmp, *buf;
+	sslstaple *staple;
+
+	if (ocspfn == NULL)
+		return (1);
+
+	bio = BIO_new_file(ocspfn, "r");
+	if (bio == NULL) {
+		ERR("Error loading status file '%s'\n", ocspfn);
+		return (1);
+	}
+
+	resp = d2i_OCSP_RESPONSE_bio(bio, NULL);
+	BIO_free(bio);
+
+	i = OCSP_response_status(resp);
+	if (i != OCSP_RESPONSE_STATUS_SUCCESSFUL) {
+		ERR("OCSP response status: %d\n", i); /* XXX: textify */
+		OCSP_RESPONSE_free(resp);
+		return (1);
+	}
+
+	len = i2d_OCSP_RESPONSE(resp, NULL);
+	if (len < 0) {
+		/* ERR_get_error(..) */
+		return (1);
+	}
+	buf = malloc(len);
+	AN(buf);
+	tmp = buf;
+	i = i2d_OCSP_RESPONSE(resp, &tmp);
+	assert(i > 0);
+
+	ALLOC_OBJ(staple, SSLSTAPLE_MAGIC);
+	staple->staple = buf;
+	staple->len = len;
+
+	if (!SSL_CTX_set_tlsext_status_cb(ctx->ctx, ocsp_staple_cb)) {
+		ERR("Error configuring status callback.\n");
+	} else if (!SSL_CTX_set_tlsext_status_arg(ctx->ctx, staple)) {
+		ERR("Error setting status callback argument.\n");
+	}
+
+	ctx->staple = staple;
+	OCSP_RESPONSE_free(resp);
+
+	return (0);
+}
+
 /* Initialize an SSL context */
 static sslctx *
 make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
@@ -1054,6 +1138,13 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	CHECK_OBJ_ORNULL(fr, FRONTEND_MAGIC);
 	if (!SSL_CTX_set_tlsext_servername_arg(ctx, fr)) {
 		ERR("Error setting SNI servername arg.\n");
+	}
+
+	if (cf->ocspfn != NULL) {
+		if (ocsp_init(cf->ocspfn, sc) != 0)
+			ERR("Error loading OCSP response for stapling.\n");
+		else
+			LOG("{core} Loaded OCSP staple '%s'\n", cf->ocspfn);
 	}
 #endif /* OPENSSL_NO_TLSEXT */
 

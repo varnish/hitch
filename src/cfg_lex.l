@@ -70,8 +70,9 @@
 "sni-nomatch-abort"	{ return (TOK_SNI_NOMATCH_ABORT); }
 "host"		{ return (TOK_HOST); }
 "port"		{ return (TOK_PORT); }
-"match-global-certs" { return (TOK_MATCH_GLOBAL); }
-
+"match-global-certs"	{ return (TOK_MATCH_GLOBAL); }
+"cert"			{ return (TOK_PB_CERT); }
+"ocsp-resp-file"	{ return (TOK_PB_OCSP_FILE); }
 
 \"(\\.|[^\\"])*\" {
 	char *s;

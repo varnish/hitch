@@ -15,11 +15,15 @@ int config_param_validate(char *k, char *v, hitch_config *cfg,
     char *file, int line);
 int front_arg_add(hitch_config *cfg, struct front_arg *fa);
 struct front_arg *front_arg_new(void);
-int config_param_pem_file(char *filename, struct cfg_cert_file **cfptr);
-
+struct cfg_cert_file *
+cfg_cert_file_new(void);
+void cfg_cert_file_free(struct cfg_cert_file **cfptr);
+int cfg_cert_vfy(struct cfg_cert_file *cf);
 void yyerror(hitch_config *, const char *);
+void cfg_cert_add(struct cfg_cert_file *cf, struct cfg_cert_file **dst);
 
 static struct front_arg *cur_fa;
+static struct cfg_cert_file *cur_pem;
 
 %}
 
@@ -41,7 +45,7 @@ static struct front_arg *cur_fa;
 %token TOK_BACKEND_CONNECT_TIMEOUT TOK_SSL_HANDSHAKE_TIMEOUT TOK_RECV_BUFSIZE
 %token TOK_SEND_BUFSIZE TOK_LOG_FILENAME TOK_RING_SLOTS TOK_RING_DATA_LEN
 %token TOK_PIDFILE TOK_SNI_NOMATCH_ABORT TOK_SSL TOK_TLS TOK_HOST TOK_PORT
-%token TOK_MATCH_GLOBAL
+%token TOK_MATCH_GLOBAL TOK_PB_CERT TOK_PB_OCSP_FILE
 
 %parse-param { hitch_config *cfg }
 
@@ -122,16 +126,54 @@ FB_REC
 
 FB_HOST: TOK_HOST '=' STRING { cur_fa->ip = strdup($3); };
 FB_PORT: TOK_PORT '=' STRING { cur_fa->port = strdup($3); };
+
+PEM_BLK: PB_RECS;
+
+PB_RECS
+	: PB_REC
+	| PB_RECS PB_REC
+	;
+
+PB_REC
+	: PB_CERT
+	| PB_OCSP_RESP_FILE;
+	;
+
+PB_CERT: TOK_PB_CERT '=' STRING { cur_pem->filename = strdup($3); };
+
+PB_OCSP_RESP_FILE: TOK_PB_OCSP_FILE '=' STRING
+{
+	cur_pem->ocspfn = strdup($3);
+};
+
 FB_CERT: TOK_PEM_FILE '=' STRING
 {
 	int r;
 	struct cfg_cert_file *cert;
-	r = config_param_pem_file($3, &cert);
-	if (r == 0)
+	cert = cfg_cert_file_new();
+	cert->filename = strdup($3);
+	r = cfg_cert_vfy(cert);
+	if (r == 0) {
+		cfg_cert_file_free(&cert);
 		YYABORT;
-	AN(cert);
-	HASH_ADD_KEYPTR(hh, cur_fa->certs, cert->filename,
-	    strlen(cert->filename), cert);
+	}
+	cfg_cert_add(cert, &cur_fa->certs);
+}
+	| TOK_PEM_FILE '=' '{'
+{
+	/* NB: Mid-rule action */
+	AZ(cur_pem);
+	cur_pem = cfg_cert_file_new();
+}
+	PEM_BLK '}'
+{
+	if (cfg_cert_vfy(cur_pem) != 0)
+		cfg_cert_add(cur_pem, &cur_fa->certs);
+	else {
+		cfg_cert_file_free(&cur_pem);
+		YYABORT;
+	}
+	cur_pem = NULL;
 };
 
 FB_MATCH_GLOBAL: TOK_MATCH_GLOBAL '=' BOOL { cur_fa->match_global_certs = $3; };
@@ -186,7 +228,28 @@ PEM_FILE_REC: TOK_PEM_FILE '=' STRING
 	if ($3 && config_param_validate("pem-file", $3, cfg, /* XXX: */ "",
 	    yyget_lineno()) != 0)
 		YYABORT;
+}
+	| TOK_PEM_FILE '=' '{'
+{
+	/* NB: Mid-rule action */
+	AZ(cur_pem);
+	cur_pem = cfg_cert_file_new();
+}
+	PEM_BLK '}'
+{
+	if (cfg_cert_vfy(cur_pem) != 0) {
+		if (cfg->CERT_DEFAULT != NULL) {
+			struct cfg_cert_file *tmp = cfg->CERT_DEFAULT;
+			cfg_cert_add(tmp, &cfg->CERT_FILES);
+		}
+		cfg->CERT_DEFAULT = cur_pem;
+	} else {
+		cfg_cert_file_free(&cur_pem);
+		YYABORT;
+	}
+	cur_pem = NULL;
 };
+
 
 SYSLOG_REC: TOK_SYSLOG '=' BOOL { cfg->SYSLOG = $3; };
 DAEMON_REC: TOK_DAEMON '=' BOOL { cfg->DAEMONIZE = $3; };

@@ -37,6 +37,8 @@ struct cfg_cert_file {
 	unsigned	magic;
 #define CFG_CERT_FILE_MAGIC 0x58c280d2
 	char 		*filename;
+	char		*ocspfn;
+	double		ocsp_mtim;
 	int		mark;
 	double		mtim;
 	UT_hash_handle	hh;
