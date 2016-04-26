@@ -38,6 +38,7 @@ frontend = {
   host = "$LISTENADDR"
   port = "$PORT1"
   pem-file = "$CERTSDIR/wildcard.example.com"
+  sni-nomatch-abort = off
 }
 
 frontend = {
@@ -74,3 +75,15 @@ echo | openssl s_client -servername site1.example.com -prexit -connect $LISTENAD
 test "$?" = "0" || die "s_client failed"
 grep -q -c "/CN=site1.example.com" $DUMPFILE
 test "$?" = "0" || die "s_client got wrong certificate in listen port #2"
+
+# Verify that sni-nomatch-abort = off is respected for frontend #1
+echo | openssl s_client -servername "asdf" -prexit -connect $LISTENADDR:$PORT1 >$DUMPFILE 2>&1
+test "$?" = "0" || die "s_client failed"
+grep -q -c "/CN=\*.example.com" $DUMPFILE
+test "$?" = "0" || die "s_client got wrong certificate in listen port #1"
+
+# And also verify that global setting sni-nomatch-abort = on is respected for other frontend
+echo | openssl s_client -servername "asdf" -prexit -connect $LISTENADDR:$PORT3 >$DUMPFILE 2>&1
+test "$?" != "0" || die "s_client did NOT fail when it should have. "
+grep -q -c "unrecognized name" $DUMPFILE
+test "$?" = "0" || die "Expected 'unrecognized name' error."
