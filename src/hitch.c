@@ -84,6 +84,7 @@
 #include "vpf.h"
 #include "vas.h"
 #include "configuration.h"
+#include "hssl_locks.h"
 
 #ifndef MSG_NOSIGNAL
 # define MSG_NOSIGNAL 0
@@ -1203,6 +1204,7 @@ init_openssl(void)
 	if (CONFIG->ENGINE) {
 		ENGINE *e = NULL;
 		ENGINE_load_builtin_engines();
+		HSSL_Locks_Init();
 		if (!strcmp(CONFIG->ENGINE, "auto"))
 			ENGINE_register_all_complete();
 		else {
