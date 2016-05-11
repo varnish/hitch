@@ -45,6 +45,13 @@ backend = "[127.0.0.1]:6081"
 # type: string
 pem-file = ""
 
+# Alternative pem-file syntax:
+#
+# pem-file = {
+# 	cert = "mycert.pem"
+#	ocsp-resp-file = "ocsp-resp.der"
+# }
+
 # SSL protocol.
 #
 # tls = on
