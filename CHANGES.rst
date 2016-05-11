@@ -4,6 +4,14 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.3.0-beta1 (2016-05-11)
+------------------------------
+
+* Support for OCSP stapling (see configuration.md for details)
+* Initialize OpenSSL locking callback if an engine is loaded
+* #82: Fix a bug relating to wildcard certificate lookup
+
+
 hitch-1.2.0 (2016-04-19)
 ------------------------
 
