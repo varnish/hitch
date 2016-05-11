@@ -55,6 +55,44 @@ If you want to use Diffie-Hellman based ciphers for Perfect Forward Secrecy
 
 Hitch will complain and disable DH unless these parameters are available.
 
+## OCSP stapling
+
+Hitch has support for loading and stapling of OCSP responses. If
+configured, Hitch will include a stapled OCSP response as part of the
+handshake when it recieves a status request from a client.
+
+Retrieving an OCSP response suitable for use with Hitch can be done
+using the following `openssl` command:
+
+    $ openssl ocsp \
+        -url https://ocsp.example.com \
+        -header Host ocsp.example.com \
+        -no_nonce \
+        -resp_text \
+        -issuer issuer.pem \
+        -cert mycert.pem \
+        -respout ocspresp.der
+
+This will produce a DER-encoded OCSP response which can then be loaded
+by Hitch.
+
+The URL of the OCSP responder can be retrieved via
+
+	$ openssl x509 -ocsp_uri -in mycert.pem -noout
+
+the `-issuer` argument needs to point to the OCSP issuer
+certificate. Typically this is the same certificate as the
+intermediate that signed the server certificate.
+
+To configure Hitch to use the OCSP staple, use the following
+incantation when specifying the `pem-file` setting in your Hitch
+configuration file:
+
+    pem-file = {
+        cert = "mycert.pem"
+        ocsp-resp-file = "mycert-ocsp.der"
+    }
+
 
 ## Uninterrupted configuration reload
 

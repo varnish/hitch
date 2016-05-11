@@ -82,6 +82,8 @@
 extern FILE *yyin;
 extern int yyparse(hitch_config *);
 
+void cfg_cert_file_free(struct cfg_cert_file **cfptr);
+
 // END: configuration parameters
 
 static char error_buf[CONFIG_BUF_SIZE];
@@ -202,8 +204,7 @@ config_destroy(hitch_config *cfg)
 		HASH_ITER(hh, fa->certs, cf, cftmp) {
 			CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
 			HASH_DEL(fa->certs, cf);
-			free(cf->filename);
-			FREE_OBJ(cf);
+			cfg_cert_file_free(&cf);
 		}
 		FREE_OBJ(fa);
 	}
@@ -212,14 +213,13 @@ config_destroy(hitch_config *cfg)
 	HASH_ITER(hh, cfg->CERT_FILES, cf, cftmp) {
 		CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
 		HASH_DEL(cfg->CERT_FILES, cf);
-		free(cf->filename);
-		FREE_OBJ(cf);
+		cfg_cert_file_free(&cf);
 	}
 
 	if (cfg->CERT_DEFAULT != NULL) {
-		free(cfg->CERT_DEFAULT->filename);
-		FREE_OBJ(cfg->CERT_DEFAULT);
+		cfg_cert_file_free(&cfg->CERT_DEFAULT);
 	}
+
 	free(cfg->CIPHER_SUITE);
 	free(cfg->ENGINE);
 	free(cfg->PIDFILE);
@@ -397,44 +397,95 @@ config_param_val_long(char *str, long *dst, int positive_only)
 	return 1;
 }
 
+static double
+mtim2double(const struct stat *sb)
+{
+	double d = sb->st_mtime;
+
+#if defined(HAVE_STRUCT_STAT_ST_MTIM)
+	d += sb->st_mtim.tv_nsec * 1e-9;
+#elif defined(HAVE_STRUCT_STAT_ST_MTIMESPEC)
+	d += sb->st_mtimespec.tv_nsec * 1e-9;
+#endif
+	return (d);
+}
+
+struct cfg_cert_file *
+cfg_cert_file_new(void)
+{
+	struct cfg_cert_file *cert;
+	ALLOC_OBJ(cert, CFG_CERT_FILE_MAGIC);
+	AN(cert);
+	return (cert);
+}
+
+void
+cfg_cert_file_free(struct cfg_cert_file **cfptr)
+{
+	struct cfg_cert_file *cf;
+
+	CHECK_OBJ_NOTNULL(*cfptr, CFG_CERT_FILE_MAGIC);
+	cf = *cfptr;
+	free(cf->filename);
+	free(cf->ocspfn);
+	FREE_OBJ(cf);
+	*cfptr = NULL;
+}
+
 int
-config_param_pem_file(char *filename, struct cfg_cert_file **cfptr)
+cfg_cert_vfy(struct cfg_cert_file *cf)
 {
 	struct stat st;
-	struct cfg_cert_file *cert;
 
-	*cfptr = NULL;
+	CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
 
-	if (strlen(filename) <= 0)
+	AN(cf->filename);
+
+	if (cf->filename == NULL || strlen(cf->filename) <= 0)
 		return (0);
 
-	if (stat(filename, &st) != 0) {
+	if (stat(cf->filename, &st) != 0) {
 		config_error_set("Unable to stat x509 "
-		    "certificate PEM file '%s': ", filename,
+		    "certificate PEM file '%s': %s", cf->filename,
 		    strerror(errno));
 		return (0);
 	}
-	if (! S_ISREG(st.st_mode)) {
+	if (!S_ISREG(st.st_mode)) {
 		config_error_set("Invalid x509 certificate "
-		    "PEM file '%s': Not a file.", filename);
+		    "PEM file '%s': Not a file.", cf->filename);
 		return (0);
 	}
+	cf->mtim = mtim2double(&st);
 
-	ALLOC_OBJ(cert, CFG_CERT_FILE_MAGIC);
-	AN(cert);
-	config_assign_str(&cert->filename, filename);
-	cert->mtim = st.st_mtime;
-#if defined(HAVE_STRUCT_STAT_ST_MTIM)
-	cert->mtim += st.st_mtim.tv_nsec * 1e-9;
-#elif defined(HAVE_STRUCT_STAT_ST_MTIMESPEC)
-	cert->mtim += st.st_mtimespec.tv_nsec * 1e-9;
-#endif
+	if (cf->ocspfn != NULL) {
+		if (stat(cf->ocspfn, &st) == -1) {
+			config_error_set("Unable to stat OCSP "
+			    "stapling file '%s': %s", cf->ocspfn,
+			    strerror(errno));
+			return (0);
+		}
+		if (!S_ISREG(st.st_mode)) {
+			config_error_set("Invalid OCSP stapling file "
+			    "'%s': Not a file.", cf->ocspfn);
+			return (0);
+		}
+		cf->ocsp_mtim = mtim2double(&st);
+	}
 
-
-	*cfptr = cert;
 	return (1);
-
 }
+
+void
+cfg_cert_add(struct cfg_cert_file *cf, struct cfg_cert_file **dst)
+{
+	CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
+	AN(dst);
+	CHECK_OBJ_ORNULL(*dst, CFG_CERT_FILE_MAGIC);
+
+	HASH_ADD_KEYPTR(hh, *dst, cf->filename,
+	    strlen(cf->filename), cf);
+}
+
 #ifdef USE_SHARED_CACHE
 /* Parse mcast and ttl options */
 int
@@ -637,16 +688,19 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		    &fa->ip, &fa->port, &certfile, 1);
 		if (r != 0) {
 			if (certfile != NULL) {
-				r = config_param_pem_file(certfile, &cert);
-				if (r != 0) {
-					AN(cert);
-					HASH_ADD_KEYPTR(hh,
-					    fa->certs, cert->filename,
-					    strlen(cert->filename), cert);
-				}
+				cert = cfg_cert_file_new();
+				config_assign_str(&cert->filename, certfile);
+				r = cfg_cert_vfy(cert);
+				if (r != 0)
+					cfg_cert_add(cert, &fa->certs);
+				else
+					cfg_cert_file_free(&cert);
 				free(certfile);
-		}
-			r = front_arg_add(cfg, fa);
+			}
+			if (r != 0)
+				r = front_arg_add(cfg, fa);
+			else
+				FREE_OBJ(fa);
 		}
 	} else if (strcmp(k, CFG_BACKEND) == 0) {
 		free(cfg->BACK_PORT);
@@ -746,17 +800,17 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		r = config_param_val_bool(v, &cfg->PROXY_PROXY_LINE);
 	} else if (strcmp(k, CFG_PEM_FILE) == 0) {
 		struct cfg_cert_file *cert;
-		r = config_param_pem_file(v, &cert);
+		cert = cfg_cert_file_new();
+		config_assign_str(&cert->filename, v);
+		r = cfg_cert_vfy(cert);
 		if (r != 0) {
-			AN(cert);
 			if (cfg->CERT_DEFAULT != NULL) {
 				struct cfg_cert_file *tmp = cfg->CERT_DEFAULT;
-				HASH_ADD_KEYPTR(hh, cfg->CERT_FILES,
-				    tmp->filename, strlen(tmp->filename),
-				    tmp);
+				cfg_cert_add(tmp, &cfg->CERT_FILES);
 			}
 			cfg->CERT_DEFAULT = cert;
-		}
+		} else
+			cfg_cert_file_free(&cert);
 	} else if (strcmp(k, CFG_BACKEND_CONNECT_TIMEOUT) == 0) {
 		r = config_param_val_int(v, &cfg->BACKEND_CONNECT_TIMEOUT, 1);
 	} else if (strcmp(k, CFG_SSL_HANDSHAKE_TIMEOUT) == 0) {
@@ -1214,7 +1268,6 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 			return (1);
 		}
 	}
-
 
 	if (cfg->PMODE == SSL_SERVER && cfg->CERT_DEFAULT == NULL) {
 		struct front_arg *fa, *fatmp;
