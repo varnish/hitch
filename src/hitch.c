@@ -221,6 +221,8 @@ typedef struct sslstaple_s {
 	unsigned	magic;
 #define SSLSTAPLE_MAGIC	0x20fe53fd
 	unsigned char	*staple;
+	char		*filename;
+	double		mtim;
 	int		len;
 } sslstaple;
 
@@ -972,12 +974,24 @@ sni_switch_ctx(SSL *ssl, int *al, void *data)
 #endif /* OPENSSL_NO_TLSEXT */
 
 static void
+sslstaple_free(sslctx *sc)
+{
+	if (sc->staple == NULL)
+		return;
+	free(sc->staple->staple);
+	free(sc->staple->filename);
+	FREE_OBJ(sc->staple);
+}
+
+static void
 sctx_free(sslctx *sc, sni_name **sn_tab)
 {
 	sni_name *sn, *sntmp;
 
 	if (sc == NULL)
 		return;
+
+	sslstaple_free(sc);
 
 	if (sn_tab != NULL)
 		CHECK_OBJ_NOTNULL(*sn_tab, SNI_NAME_MAGIC);
@@ -997,7 +1011,7 @@ sctx_free(sslctx *sc, sni_name **sn_tab)
 }
 
 static int
-ocsp_init(const char *ocspfn, sslctx *ctx)
+ocsp_init(const struct cfg_cert_file *cf, sslctx *sc)
 {
 	int i, len;
 	BIO *bio;
@@ -1005,12 +1019,12 @@ ocsp_init(const char *ocspfn, sslctx *ctx)
 	unsigned char *tmp, *buf;
 	sslstaple *staple;
 
-	if (ocspfn == NULL)
+	if (cf->ocspfn == NULL)
 		return (1);
 
-	bio = BIO_new_file(ocspfn, "r");
+	bio = BIO_new_file(cf->ocspfn, "r");
 	if (bio == NULL) {
-		ERR("Error loading status file '%s'\n", ocspfn);
+		ERR("Error loading status file '%s'\n", cf->ocspfn);
 		return (1);
 	}
 
@@ -1026,7 +1040,7 @@ ocsp_init(const char *ocspfn, sslctx *ctx)
 
 	len = i2d_OCSP_RESPONSE(resp, NULL);
 	if (len < 0) {
-		/* ERR_get_error(..) */
+		ERR_print_errors_fp(stderr);
 		return (1);
 	}
 	buf = malloc(len);
@@ -1034,19 +1048,22 @@ ocsp_init(const char *ocspfn, sslctx *ctx)
 	tmp = buf;
 	i = i2d_OCSP_RESPONSE(resp, &tmp);
 	assert(i > 0);
+	OCSP_RESPONSE_free(resp);
 
 	ALLOC_OBJ(staple, SSLSTAPLE_MAGIC);
 	staple->staple = buf;
 	staple->len = len;
+	staple->mtim = cf->ocsp_mtim;
+	staple->filename = strdup(cf->ocspfn);
+	sc->staple = staple;
 
-	if (!SSL_CTX_set_tlsext_status_cb(ctx->ctx, ocsp_staple_cb)) {
+	if (!SSL_CTX_set_tlsext_status_cb(sc->ctx, ocsp_staple_cb)) {
 		ERR("Error configuring status callback.\n");
-	} else if (!SSL_CTX_set_tlsext_status_arg(ctx->ctx, staple)) {
+		return (1);
+	} else if (!SSL_CTX_set_tlsext_status_arg(sc->ctx, staple)) {
 		ERR("Error setting status callback argument.\n");
+		return (1);
 	}
-
-	ctx->staple = staple;
-	OCSP_RESPONSE_free(resp);
 
 	return (0);
 }
@@ -1142,10 +1159,14 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	}
 
 	if (cf->ocspfn != NULL) {
-		if (ocsp_init(cf->ocspfn, sc) != 0)
+		if (ocsp_init(cf, sc) != 0) {
 			ERR("Error loading OCSP response for stapling.\n");
-		else
+			RSA_free(rsa);
+			sctx_free(sc, NULL);
+			return (NULL);
+		} else {
 			LOG("{core} Loaded OCSP staple '%s'\n", cf->ocspfn);
+		}
 	}
 #endif /* OPENSSL_NO_TLSEXT */
 
@@ -3131,6 +3152,24 @@ frontend_commit(struct cfg_tpc_obj *o)
 static void cert_rollback(struct cfg_tpc_obj *o);
 static void cert_commit(struct cfg_tpc_obj *o);
 
+static int
+ocsp_cfg_changed(const struct cfg_cert_file *cf, const sslctx *sc)
+{
+	if (sc->staple != NULL && cf->ocspfn == NULL)
+		return (1); 	/* Dropped OCSP definition */
+
+	if (sc->staple == NULL && cf->ocspfn != NULL)
+		return (1); 	/* Added OCSP definition */
+
+	if (sc->staple != NULL && cf->ocspfn != NULL) {
+		if (strcmp(sc->staple->filename, cf->ocspfn) != 0
+		    || sc->staple->mtim < cf->ocsp_mtim)
+			return (1); /* Updated */
+	}
+
+	return (0);
+}
+
 /* Query frontend-specific certificates.  */
 static int
 cert_fr_query(struct frontend *fr, struct front_arg *fa,
@@ -3142,7 +3181,8 @@ cert_fr_query(struct frontend *fr, struct front_arg *fa,
 
 	HASH_ITER(hh, fr->ssl_ctxs, sc, sctmp) {
 		HASH_FIND_STR(fa->certs, sc->filename, cf);
-		if (cf != NULL && cf->mtim <= sc->mtim) {
+		if (cf != NULL && cf->mtim <= sc->mtim
+			&& !ocsp_cfg_changed(cf, sc)) {
 			cf->mark = 1;
 		} else {
 			o = make_cfg_obj(CFG_CERT, CFG_TPC_DROP,
@@ -3288,7 +3328,6 @@ dcert_commit(struct cfg_tpc_obj *o)
 	}
 }
 
-
 /* Query reload of certificate files */
 static int
 cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
@@ -3302,7 +3341,8 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 	 * order to not wreak havoc in cert_commit().  */
 	HASH_ITER(hh, ssl_ctxs, sc, sctmp) {
 		HASH_FIND_STR(cfg->CERT_FILES, sc->filename, cf);
-		if (cf != NULL && cf->mtim <= sc->mtim) {
+		if (cf != NULL && cf->mtim <= sc->mtim
+		    && !ocsp_cfg_changed(cf, sc)) {
 			cf->mark = 1;
 		} else {
 			o = make_cfg_obj(CFG_CERT, CFG_TPC_DROP,
@@ -3317,7 +3357,8 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 		cf = cfg->CERT_DEFAULT;
 		CHECK_OBJ_NOTNULL(default_ctx, SSLCTX_MAGIC);
 		if (strcmp(default_ctx->filename, cf->filename) != 0
-		    || cf->mtim > default_ctx->mtim) {
+		    || cf->mtim > default_ctx->mtim
+		    || ocsp_cfg_changed(cf, default_ctx)) {
 			sc = make_ctx(cf);
 			if (sc == NULL)
 				return (-1);
