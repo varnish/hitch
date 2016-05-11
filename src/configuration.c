@@ -204,8 +204,7 @@ config_destroy(hitch_config *cfg)
 		HASH_ITER(hh, fa->certs, cf, cftmp) {
 			CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
 			HASH_DEL(fa->certs, cf);
-			free(cf->filename);
-			FREE_OBJ(cf);
+			cfg_cert_file_free(&cf);
 		}
 		FREE_OBJ(fa);
 	}
