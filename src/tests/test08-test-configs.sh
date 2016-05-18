@@ -67,11 +67,11 @@ keepalive = 3600
 chroot = ""
 user = "nobody"
 group = "$GRP"
-quiet = on
-syslog = on
+quiet = yes
+syslog = True
 syslog-facility = "daemon"
 daemon = on
-write-ip = off
+write-ip = n
 write-proxy = on
 EOF
 

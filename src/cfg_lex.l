@@ -27,15 +27,6 @@
 	return (INT);
 }
 
-"on"|"off"|"true"|"false"|\"on\"|\"off\"|\"true\"|\"false\" {
-	if (!strcmp(yytext, "on") || !strcmp(yytext, "true"))
-		yylval.i = 1;
-	else if (!strcmp(yytext, "off") || !strcmp(yytext, "false"))
-		yylval.i = 0;
-	return (BOOL);
-
-}
-
 "frontend"	{ return (TOK_FRONTEND); }
 "backend"	{ return (TOK_BACKEND); }
 "quiet"		{ return (TOK_QUIET); }
@@ -73,6 +64,16 @@
 "match-global-certs"	{ return (TOK_MATCH_GLOBAL); }
 "cert"			{ return (TOK_PB_CERT); }
 "ocsp-resp-file"	{ return (TOK_PB_OCSP_FILE); }
+
+(?i:"yes"|"y"|"on"|"true"|"t"|\"yes\"|\"y\"|\"on\"|\"true\"|\"t\") {
+	yylval.i = 1;
+	return (BOOL);
+}
+
+(?i:"no"|"n"|"off"|"false"|"f"|\"no\"|\"n\"|\"off\"|\"false\"|\"f\") {
+	yylval.i = 0;
+	return (BOOL);
+}
 
 \"(\\.|[^\\"])*\" {
 	char *s;
