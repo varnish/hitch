@@ -1,6 +1,6 @@
 # Creating a SSL/TLS key and certificate
 
-To work hitch minimum requires a PEM file with:
+The minimum requirement for hitch to work is a PEM file with:
 
   - an RSA key
   - a certificate
