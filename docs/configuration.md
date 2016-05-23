@@ -59,7 +59,7 @@ Hitch will complain and disable DH unless these parameters are available.
 
 Hitch has support for loading and stapling of OCSP responses. If
 configured, Hitch will include a stapled OCSP response as part of the
-handshake when it recieves a status request from a client.
+handshake when it receives a status request from a client.
 
 Retrieving an OCSP response suitable for use with Hitch can be done
 using the following `openssl` command:
