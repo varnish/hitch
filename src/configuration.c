@@ -1107,6 +1107,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		{ "help", 0, NULL, 'h' },
 		{ 0, 0, 0, 0 }
 	};
+#define SHORT_OPTS "c:e:Ob:f:n:B:C:U:p:P:M:k:r:u:g:qstVh"
 
 	if (argc == 1) {
 		config_print_usage(argv[0]);
@@ -1114,11 +1115,28 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		return (1);
 	}
 
+	/* First do a pass over the args string to see if there was a
+	 * config file present. If so, apply its options first in
+	 * order to let them be overridden by the command line.  */
+	while (1) {
+		int option_index = 0;
+		c = getopt_long(argc, argv, SHORT_OPTS,
+			long_options, &option_index);
+		if (c == -1)
+			break;
+		else if (c == CFG_PARAM_CFGFILE) {
+			if (config_file_parse(optarg, cfg) != 0) {
+				*retval = 1;
+				return (1);
+			}
+		}
+	}
+
+	optind = 1;
 	while (1) {
 		int ret = 0;
 		int option_index = 0;
-		c = getopt_long(argc, argv,
-			"c:e:Ob:f:n:B:C:U:p:P:M:k:r:u:g:qstVh",
+		c = getopt_long(argc, argv, SHORT_OPTS,
 			long_options, &option_index);
 
 		if (c == -1)
@@ -1128,10 +1146,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		case 0:
 			break;
 		case CFG_PARAM_CFGFILE:
-			if (config_file_parse(optarg, cfg) != 0) {
-				*retval = 1;
-				return (1);
-			}
+			/* Handled above */
 			break;
 		case CFG_PARAM_SYSLOG_FACILITY:
 			ret = config_param_validate(CFG_SYSLOG_FACILITY, optarg, cfg, NULL, 0);
