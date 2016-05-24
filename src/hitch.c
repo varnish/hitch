@@ -527,7 +527,11 @@ init_dh(SSL_CTX *ctx, const char *cert)
 	}
 
 	LOG("{core} Using DH parameters from %s\n", cert);
-	SSL_CTX_set_tmp_dh(ctx, dh);
+	if (!SSL_CTX_set_tmp_dh(ctx, dh)) {
+		ERR("{core} Error setting temp DH params\n");
+		ERR_print_errors_fp(stderr);
+		return (-1);
+	}
 	LOG("{core} DH initialized with %d bit key\n", 8*DH_size(dh));
 	DH_free(dh);
 	return (0);
