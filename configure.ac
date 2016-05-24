@@ -61,7 +61,7 @@ AC_FUNC_FORK
 AC_FUNC_MMAP
 AC_CHECK_FUNCS([accept4])
 
-SH_TESTS="$(cd src && echo tests/test*)"
+SH_TESTS="$(cd $srcdir/src && echo tests/test*.sh)"
 AC_SUBST(SH_TESTS)
 
 AC_CONFIG_FILES([Makefile])
