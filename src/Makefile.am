@@ -8,7 +8,7 @@ AM_CFLAGS = -O2 -g -std=c99 -fno-strict-aliasing -Wall -W -D_GNU_SOURCE
 AM_YFLAGS = -d -t
 
 TESTS_ENVIRONMENT = \
-	TESTDIR=$(abs_top_builddir)/src/tests/; export TESTDIR; \
+	TESTDIR=$(abs_top_srcdir)/src/tests/; export TESTDIR; \
 	PATH=$(abs_top_builddir)/src:$$PATH; export PATH;
 TESTS = @SH_TESTS@
 TEST_EXTENSIONS = .sh
