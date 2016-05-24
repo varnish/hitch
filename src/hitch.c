@@ -516,14 +516,14 @@ init_dh(SSL_CTX *ctx, const char *cert)
 	bio = BIO_new_file(cert, "r");
 	if (!bio) {
 		ERR_print_errors_fp(stderr);
-		return -1;
+		return (-1);
 	}
 
 	dh = PEM_read_bio_DHparams(bio, NULL, NULL, NULL);
 	BIO_free(bio);
 	if (!dh) {
 		LOG("{core} Note: no DH parameters found in %s\n", cert);
-		return -1;
+		return (-1);
 	}
 
 	LOG("{core} Using DH parameters from %s\n", cert);
