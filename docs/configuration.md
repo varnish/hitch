@@ -28,6 +28,10 @@ The recommended default is:
 
 If you need to support legacy clients, consider the "HIGH" cipher group.
 
+Hitch cipher list string format is identical to that of other servers, so you can use
+tools like https://mozilla.github.io/server-side-tls/ssl-config-generator/ to generate a
+set of ciphers that suits your needs.
+
 Normally you do not have to change this.
 
 
