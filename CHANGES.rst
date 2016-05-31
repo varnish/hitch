@@ -4,13 +4,27 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.3.0-beta2 (2016-05-31)
+------------------------------
+
+* Options given on the command line now take presedence over
+  configuration file settings. I.e. there is no longer a need to
+  specify ``--config`` first to get this behavior.
+* Config file regression: "yes" and "no" are now accepted by the
+  config file parser as boolean values.
+* Documentation improvements and spelling fixes.
+* Various minor autotools build fixes.
+
 hitch-1.3.0-beta1 (2016-05-11)
 ------------------------------
 
 * Support for OCSP stapling (see configuration.md for details)
-* Initialize OpenSSL locking callback if an engine is loaded
-* #82: Fix a bug relating to wildcard certificate lookup
-
+* Initialize OpenSSL locking callback if an engine is loaded. Some SSL
+  accelerator cards have their custom SSL engine running in a
+  multithreaded context. For these to work correctly, Hitch needs to
+  initialize a set of mutexes utilized by the OpenSSL library.
+* #82: A mistake in the SNI lookup code caused us to inspect the wrong
+  list when looking for wildcard certificate matches.
 
 hitch-1.2.0 (2016-04-19)
 ------------------------
