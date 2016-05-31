@@ -51,8 +51,14 @@ test "$?" != "0" || die "s_client did NOT fail when it should have. "
 grep -q -c "unrecognized name" $DUMPFILE
 test "$?" = "0" || die "Expected 'unrecognized name' error."
 
-CURL_EXTRA="--resolve site1.example.com:$LISTENPORT:127.0.0.1"
-runcurl site1.example.com $LISTENPORT
+
+HAVE_CURL_RESOLVE=$(curl --help | grep -c -- '--resolve')
+
+# Disable this part of the test case if the curl version is ancient
+if [ $HAVE_CURL_RESOLVE != "0" ]; then
+    CURL_EXTRA="--resolve site1.example.com:$LISTENPORT:127.0.0.1"
+    runcurl site1.example.com $LISTENPORT
+fi
 
 # SNI request w/ valid servername
 echo -e "\n" | openssl s_client -servername site1.example.com -prexit -connect $LISTENADDR:$((LISTENPORT+1)) >$DUMPFILE 2>&1
