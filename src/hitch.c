@@ -1033,6 +1033,10 @@ ocsp_init(const struct cfg_cert_file *cf, sslctx *sc)
 
 	resp = d2i_OCSP_RESPONSE_bio(bio, NULL);
 	BIO_free(bio);
+	if (resp == NULL) {
+		ERR("Error parsing OCSP staple in '%s'\n", cf->ocspfn);
+		return (1);
+	}
 
 	i = OCSP_response_status(resp);
 	if (i != OCSP_RESPONSE_STATUS_SUCCESSFUL) {
