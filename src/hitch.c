@@ -493,17 +493,6 @@ fail(const char *s)
 	exit(1);
 }
 
-void
-die(char *fmt, ...)
-{
-	va_list args;
-	va_start(args, fmt);
-	vfprintf(stderr, fmt, args);
-	va_end(args);
-
-	exit(1);
-}
-
 #ifndef OPENSSL_NO_DH
 static int
 init_dh(SSL_CTX *ctx, const char *cert)
