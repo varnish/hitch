@@ -333,6 +333,12 @@ typedef struct proxystate {
 	int			connect_port;	/* local port for connection */
 } proxystate;
 
+/* declare printf like functions: */
+static void WLOG(int level, const char *fmt, ...)
+	__attribute__((format(printf, 2, 3)));
+static void logproxy(int level, const proxystate* ps, const char *fmt, ...)
+	__attribute__((format(printf, 3, 4)));
+
 static void
 VWLOG(int level, const char *fmt, va_list ap)
 {
