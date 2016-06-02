@@ -737,8 +737,7 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 			} else {
 				if (! S_ISDIR(st.st_mode)) {
 					config_error_set("Bad chroot directory "
-					    "'%s': Not a directory.", v,
-					    strerror(errno));
+					    "'%s': Not a directory", v);
 					r = 0;
 				} else {
 					config_assign_str(&cfg->CHROOT, v);
