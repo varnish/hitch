@@ -89,6 +89,10 @@ void cfg_cert_file_free(struct cfg_cert_file **cfptr);
 static char error_buf[CONFIG_BUF_SIZE];
 static char tmp_buf[150];
 
+/* declare static printf like functions: */
+static void config_error_set(char *fmt, ...)
+	__attribute__((format(printf, 1, 2)));
+
 static void
 config_error_set(char *fmt, ...)
 {
@@ -737,8 +741,7 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 			} else {
 				if (! S_ISDIR(st.st_mode)) {
 					config_error_set("Bad chroot directory "
-					    "'%s': Not a directory.", v,
-					    strerror(errno));
+					    "'%s': Not a directory", v);
 					r = 0;
 				} else {
 					config_assign_str(&cfg->CHROOT, v);

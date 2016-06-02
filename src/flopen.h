@@ -31,7 +31,7 @@
 #ifndef FLOPEN_H_INCLUDED
 #define FLOPEN_H_INCLUDED
 
-int flopen(const char *, int, ...);
+int flopen(const char *, int, ...) __attribute__((format(printf, 1, 3)));
 int fltest(int fd, pid_t *pid);
 
 #endif

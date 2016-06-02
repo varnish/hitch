@@ -332,6 +332,12 @@ typedef struct proxystate {
 	int			connect_port;	/* local port for connection */
 } proxystate;
 
+/* declare printf like functions: */
+static void WLOG(int level, const char *fmt, ...)
+	__attribute__((format(printf, 2, 3)));
+static void logproxy(int level, const proxystate* ps, const char *fmt, ...)
+	__attribute__((format(printf, 3, 4)));
+
 static void
 VWLOG(int level, const char *fmt, va_list ap)
 {
@@ -489,17 +495,6 @@ static void
 fail(const char *s)
 {
 	ERR("%s: %s\n", s, strerror(errno));
-	exit(1);
-}
-
-void
-die(char *fmt, ...)
-{
-	va_list args;
-	va_start(args, fmt);
-	vfprintf(stderr, fmt, args);
-	va_end(args);
-
 	exit(1);
 }
 
