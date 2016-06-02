@@ -2871,8 +2871,13 @@ do_wait(void)
 				fail("waitpid");
 		} else {
 			if (WIFEXITED(status)) {
-				ERR("{core} Child %d exited with status %d.\n",
-				    pid, WEXITSTATUS(status));
+				if (WEXITSTATUS(status) == 0)
+					LOG("{core} Child %d exited "
+					    "successfully.\n", pid);
+				else
+					ERR("{core} Child %d exited with "
+					    "status %d.\n", pid,
+					    WEXITSTATUS(status));
 				replace_child_with_pid(pid);
 			} else if (WIFSIGNALED(status)) {
 				ERR("{core} Child %d was terminated by "
