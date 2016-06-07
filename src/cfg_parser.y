@@ -45,7 +45,7 @@ static struct cfg_cert_file *cur_pem;
 %token TOK_BACKEND_CONNECT_TIMEOUT TOK_SSL_HANDSHAKE_TIMEOUT TOK_RECV_BUFSIZE
 %token TOK_SEND_BUFSIZE TOK_LOG_FILENAME TOK_RING_SLOTS TOK_RING_DATA_LEN
 %token TOK_PIDFILE TOK_SNI_NOMATCH_ABORT TOK_SSL TOK_TLS TOK_HOST TOK_PORT
-%token TOK_MATCH_GLOBAL TOK_PB_CERT TOK_PB_OCSP_FILE
+%token TOK_MATCH_GLOBAL TOK_PB_CERT TOK_PB_OCSP_FILE TOK_OCSP_VERIFY
 
 %parse-param { hitch_config *cfg }
 
@@ -84,6 +84,7 @@ CFG_RECORD
 	| WRITE_PROXY_V2_REC
 	| PROXY_PROXY_REC
 	| SNI_NOMATCH_ABORT_REC
+	| OCSP_VERIFY
 	;
 
 FRONTEND_REC
@@ -137,6 +138,7 @@ PB_RECS
 PB_REC
 	: PB_CERT
 	| PB_OCSP_RESP_FILE;
+	| OCSP_VERIFY
 	;
 
 PB_CERT: TOK_PB_CERT '=' STRING { cur_pem->filename = strdup($3); };
@@ -144,6 +146,14 @@ PB_CERT: TOK_PB_CERT '=' STRING { cur_pem->filename = strdup($3); };
 PB_OCSP_RESP_FILE: TOK_PB_OCSP_FILE '=' STRING
 {
 	cur_pem->ocspfn = strdup($3);
+};
+
+OCSP_VERIFY: TOK_OCSP_VERIFY '=' BOOL
+{
+	if (cur_pem != NULL)
+		cur_pem->ocsp_vfy = $3;
+	else
+		cfg->OCSP_VFY = $3;
 };
 
 FB_CERT: TOK_PEM_FILE '=' STRING

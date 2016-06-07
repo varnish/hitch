@@ -40,6 +40,7 @@ struct cfg_cert_file {
 	char		*ocspfn;
 	double		ocsp_mtim;
 	int		mark;
+	int		ocsp_vfy;
 	double		mtim;
 	UT_hash_handle	hh;
 };
@@ -105,6 +106,7 @@ struct __hitch_config {
     char *PIDFILE;
     int SNI_NOMATCH_ABORT;
     int TEST;
+    int OCSP_VFY;
 };
 
 typedef struct __hitch_config hitch_config;
