@@ -151,6 +151,7 @@ config_new(void)
 	fa->pspec = strdup("default");
 	HASH_ADD_KEYPTR(hh, r->LISTEN_ARGS, fa->pspec, strlen(fa->pspec), fa);
 	r->LISTEN_DEFAULT = fa;
+	r->OCSP_VFY = 1;
 
 #ifdef USE_SHARED_CACHE
 	r->SHARED_CACHE       = 0;
@@ -420,6 +421,7 @@ cfg_cert_file_new(void)
 	struct cfg_cert_file *cert;
 	ALLOC_OBJ(cert, CFG_CERT_FILE_MAGIC);
 	AN(cert);
+	cert->ocsp_vfy = -1;
 	return (cert);
 }
 
