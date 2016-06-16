@@ -1014,6 +1014,40 @@ sctx_free(sslctx *sc, sni_name **sn_tab)
 }
 
 static int
+ocsp_verify(sslctx *sc, OCSP_RESPONSE *resp,
+    const struct cfg_cert_file *cf, int do_verify)
+{
+	OCSP_BASICRESP *br;
+	X509_STORE *store;
+	STACK_OF(X509) *chain = NULL;
+	int i;
+	int verify_flags = OCSP_TRUSTOTHER;
+
+	if (!do_verify)
+		verify_flags |= OCSP_NOVERIFY;
+
+	store = SSL_CTX_get_cert_store(sc->ctx);
+	AN(store);
+
+	AN(SSL_CTX_get0_chain_certs(sc->ctx, &chain));
+
+	br = OCSP_response_get1_basic(resp);
+	if (br == NULL) {
+		ERR("{core} OCSP_response_get1_basic failed (%s)\n",
+		    cf->ocspfn);
+		return (1);
+	}
+	i = OCSP_basic_verify(br, chain, store, verify_flags);
+	if (i <= 0) {
+		ERR("{core} Staple %s verification failed\n", cf->ocspfn);
+		ERR_print_errors_fp(stderr); /* XXX */
+		return (1);
+	}
+
+	return (0);
+}
+
+static int
 ocsp_init(const struct cfg_cert_file *cf, sslctx *sc)
 {
 	int i, len;
@@ -1021,6 +1055,10 @@ ocsp_init(const struct cfg_cert_file *cf, sslctx *sc)
 	OCSP_RESPONSE *resp;
 	unsigned char *tmp, *buf;
 	sslstaple *staple;
+	int do_verify = cf->ocsp_vfy;
+
+	if (do_verify < 0)
+		do_verify = CONFIG->OCSP_VFY;
 
 	if (cf->ocspfn == NULL)
 		return (1);
@@ -1055,7 +1093,7 @@ ocsp_init(const struct cfg_cert_file *cf, sslctx *sc)
 	tmp = buf;
 	i = i2d_OCSP_RESPONSE(resp, &tmp);
 	assert(i > 0);
-	OCSP_RESPONSE_free(resp);
+
 
 	ALLOC_OBJ(staple, SSLSTAPLE_MAGIC);
 	staple->staple = buf;
@@ -1066,12 +1104,20 @@ ocsp_init(const struct cfg_cert_file *cf, sslctx *sc)
 
 	if (!SSL_CTX_set_tlsext_status_cb(sc->ctx, ocsp_staple_cb)) {
 		ERR("Error configuring status callback.\n");
+		OCSP_RESPONSE_free(resp);
 		return (1);
 	} else if (!SSL_CTX_set_tlsext_status_arg(sc->ctx, staple)) {
 		ERR("Error setting status callback argument.\n");
+		OCSP_RESPONSE_free(resp);
 		return (1);
 	}
 
+	if (ocsp_verify(sc, resp, cf, do_verify) != 0) {
+		OCSP_RESPONSE_free(resp);
+		return (1);
+	}
+
+	OCSP_RESPONSE_free(resp);
 	return (0);
 }
 
@@ -1109,6 +1155,7 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 
 	SSL_CTX_set_options(ctx, ssloptions);
 	SSL_CTX_set_info_callback(ctx, info_callback);
+	AN(SSL_CTX_set_default_verify_paths(ctx));
 
 	if (ciphers != NULL) {
 		if (SSL_CTX_set_cipher_list(ctx, ciphers) != 1) {
