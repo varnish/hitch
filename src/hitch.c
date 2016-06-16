@@ -1029,8 +1029,11 @@ ocsp_verify(sslctx *sc, OCSP_RESPONSE *resp,
 	store = SSL_CTX_get_cert_store(sc->ctx);
 	AN(store);
 
+#ifdef SSL_CTRL_GET_CHAIN_CERTS
 	AN(SSL_CTX_get0_chain_certs(sc->ctx, &chain));
-
+#else
+	chain = sc->ctx->extra_certs;
+#endif
 	br = OCSP_response_get1_basic(resp);
 	if (br == NULL) {
 		ERR("{core} OCSP_response_get1_basic failed (%s)\n",
