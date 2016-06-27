@@ -1102,17 +1102,17 @@ ocsp_init(const struct cfg_cert_file *cf, sslctx *sc)
 	staple->filename = strdup(cf->ocspfn);
 	sc->staple = staple;
 
+	if (ocsp_verify(sc, resp, cf, do_verify) != 0) {
+		OCSP_RESPONSE_free(resp);
+		return (1);
+	}
+
 	if (!SSL_CTX_set_tlsext_status_cb(sc->ctx, ocsp_staple_cb)) {
 		ERR("Error configuring status callback.\n");
 		OCSP_RESPONSE_free(resp);
 		return (1);
 	} else if (!SSL_CTX_set_tlsext_status_arg(sc->ctx, staple)) {
 		ERR("Error setting status callback argument.\n");
-		OCSP_RESPONSE_free(resp);
-		return (1);
-	}
-
-	if (ocsp_verify(sc, resp, cf, do_verify) != 0) {
 		OCSP_RESPONSE_free(resp);
 		return (1);
 	}
