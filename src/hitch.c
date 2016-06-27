@@ -886,6 +886,8 @@ ocsp_staple_cb(SSL *ssl, void *priv)
 	if (SSL_set_tlsext_status_ocsp_resp(ssl,
 		buf, staple->len) == 1)
 		return (SSL_TLSEXT_ERR_OK);
+	else
+		free(buf);
 
 	return (SSL_TLSEXT_ERR_NOACK);
 }
