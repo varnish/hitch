@@ -85,6 +85,7 @@
 #include "vas.h"
 #include "configuration.h"
 #include "hssl_locks.h"
+#include "asn_gentm.h"
 
 #ifndef MSG_NOSIGNAL
 # define MSG_NOSIGNAL 0
@@ -222,6 +223,7 @@ typedef struct sslstaple_s {
 	unsigned char	*staple;
 	char		*filename;
 	double		mtim;
+	double		nextupd;
 	int		len;
 } sslstaple;
 
@@ -233,6 +235,7 @@ typedef struct sslctx_s {
 	SSL_CTX			*ctx;
 	double			mtim;
 	sslstaple		*staple;
+	X509			*x509;
 	struct sni_name_head	sni_list;
 	UT_hash_handle		hh;
 } sslctx;
@@ -1015,13 +1018,36 @@ sctx_free(sslctx *sc, sni_name **sn_tab)
 	FREE_OBJ(sc);
 }
 
+static X509 *
+find_issuer(X509 *subj, STACK_OF(X509) *chain)
+{
+	int i;
+	X509 *x;
+
+	AN(subj);
+
+	for (i = 0; i < sk_X509_num(chain); i++) {
+		x = sk_X509_value(chain, i);
+		if (X509_check_issued(x, subj) == X509_V_OK)
+			return (x);
+	}
+
+	/* todo: look in cert store?  */
+
+	return (NULL);
+}
+
 static int
 ocsp_verify(sslctx *sc, OCSP_RESPONSE *resp,
     const struct cfg_cert_file *cf, int do_verify)
 {
-	OCSP_BASICRESP *br;
+	OCSP_BASICRESP *br = NULL;
 	X509_STORE *store;
 	STACK_OF(X509) *chain = NULL;
+	OCSP_CERTID *cid = NULL;
+	int status = -1, reason;
+	ASN1_GENERALIZEDTIME *nextupd;
+	X509 *issuer;
 	int i;
 	int verify_flags = OCSP_TRUSTOTHER;
 
@@ -1040,16 +1066,50 @@ ocsp_verify(sslctx *sc, OCSP_RESPONSE *resp,
 	if (br == NULL) {
 		ERR("{core} OCSP_response_get1_basic failed (%s)\n",
 		    cf->ocspfn);
-		return (1);
+		goto err;
 	}
 	i = OCSP_basic_verify(br, chain, store, verify_flags);
 	if (i <= 0) {
 		ERR("{core} Staple %s verification failed\n", cf->ocspfn);
 		ERR_print_errors_fp(stderr); /* XXX */
-		return (1);
+		goto err;
 	}
 
+	issuer = find_issuer(sc->x509, chain);
+	if (issuer == NULL) {
+		ERR("{core} Unable to find issuer for staple %s\n.",
+		    cf->ocspfn);
+		goto err;
+	}
+
+	cid = OCSP_cert_to_id(NULL, sc->x509, issuer);
+	if (cid == NULL)
+		goto err;
+
+	if (OCSP_resp_find_status(br, cid, &status, &reason,
+		NULL, NULL, &nextupd) != 1) {
+		ERR("{core} OCSP_resp_find_status failed: Unable to "
+		    "find OCSP response with a matching certid\n");
+		goto err;
+	}
+
+	if (status != V_OCSP_CERTSTATUS_GOOD) {
+		/* OCSP_cert_status_str */
+		goto err;
+	}
+
+	sc->staple->nextupd = asn1_gentime_parse(nextupd);
+
+	OCSP_CERTID_free(cid);
+	OCSP_BASICRESP_free(br);
 	return (0);
+
+err:
+	if (cid != NULL)
+		OCSP_CERTID_free(cid);
+	if (br != NULL)
+		OCSP_BASICRESP_free(br);
+	return (1);
 }
 
 static int
@@ -1084,14 +1144,13 @@ ocsp_init(const struct cfg_cert_file *cf, sslctx *sc)
 	i = OCSP_response_status(resp);
 	if (i != OCSP_RESPONSE_STATUS_SUCCESSFUL) {
 		ERR("OCSP response status: %d\n", i); /* XXX: textify */
-		OCSP_RESPONSE_free(resp);
-		return (1);
+		goto err;
 	}
 
 	len = i2d_OCSP_RESPONSE(resp, NULL);
 	if (len < 0) {
-		ERR_print_errors_fp(stderr);
-		return (1);
+		ERR_print_errors_fp(stderr); /* todo */
+		goto err;
 	}
 	buf = malloc(len);
 	AN(buf);
@@ -1099,8 +1158,8 @@ ocsp_init(const struct cfg_cert_file *cf, sslctx *sc)
 	i = i2d_OCSP_RESPONSE(resp, &tmp);
 	assert(i > 0);
 
-
 	ALLOC_OBJ(staple, SSLSTAPLE_MAGIC);
+	AN(staple);
 	staple->staple = buf;
 	staple->len = len;
 	staple->mtim = cf->ocsp_mtim;
@@ -1108,22 +1167,26 @@ ocsp_init(const struct cfg_cert_file *cf, sslctx *sc)
 	sc->staple = staple;
 
 	if (ocsp_verify(sc, resp, cf, do_verify) != 0) {
-		OCSP_RESPONSE_free(resp);
-		return (1);
+		goto err;
 	}
 
 	if (!SSL_CTX_set_tlsext_status_cb(sc->ctx, ocsp_staple_cb)) {
 		ERR("Error configuring status callback.\n");
-		OCSP_RESPONSE_free(resp);
-		return (1);
+		goto err;
 	} else if (!SSL_CTX_set_tlsext_status_arg(sc->ctx, staple)) {
 		ERR("Error setting status callback argument.\n");
-		OCSP_RESPONSE_free(resp);
-		return (1);
+		goto err;
 	}
 
 	OCSP_RESPONSE_free(resp);
 	return (0);
+
+err:
+	if (resp != NULL)
+		OCSP_RESPONSE_free(resp);
+	if (sc->staple != NULL)
+		FREE_OBJ(sc->staple);
+	return (1);
 }
 
 /* Initialize an SSL context */
@@ -1215,6 +1278,12 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	CHECK_OBJ_ORNULL(fr, FRONTEND_MAGIC);
 	if (!SSL_CTX_set_tlsext_servername_arg(ctx, fr)) {
 		ERR("Error setting SNI servername arg.\n");
+	}
+
+	if (load_cert_ctx(sc) != 0) {
+		RSA_free(rsa);
+		sctx_free(sc, NULL);
+		return (NULL);
 	}
 
 	if (cf->ocspfn != NULL) {
@@ -1348,7 +1417,7 @@ load_cert_ctx(sslctx *so)
 	x509_entry = X509_NAME_get_entry(x509_name, i);
 	AN(x509_entry);
 	PUSH_CTX(x509_entry->value, ctx);
-	X509_free(x509);
+	so->x509 = x509;
 	return (0);
 }
 #endif /* OPENSSL_NO_TLSEXT */
@@ -1404,7 +1473,6 @@ init_certs(void) {
 		if (default_ctx == NULL)
 			exit(1);
 #ifndef OPENSSL_NO_TLSEXT
-		load_cert_ctx(default_ctx);
 		insert_sni_names(default_ctx, &sni_names);
 #endif
 	}
@@ -1420,7 +1488,6 @@ init_certs(void) {
 			HASH_ADD_KEYPTR(hh, ssl_ctxs, cf->filename,
 			    strlen(cf->filename), so);
 #ifndef OPENSSL_NO_TLSEXT
-			load_cert_ctx(so);
 			insert_sni_names(so, &sni_names);
 #endif
 		}
@@ -1643,7 +1710,6 @@ create_frontend(const struct front_arg *fa)
 		HASH_ADD_KEYPTR(hh, fr->ssl_ctxs,
 		    cf->filename, strlen(cf->filename), so);
 #ifndef OPENSSL_NO_TLSEXT
-		load_cert_ctx(so);
 		insert_sni_names(so, &fr->sni_names);
 #endif
 	}
@@ -3256,10 +3322,6 @@ cert_fr_query(struct frontend *fr, struct front_arg *fa,
 		sc = make_ctx_fr(cf, fr, fa);
 		if (sc == NULL)
 			return (-1);
-		if (load_cert_ctx(sc) != 0) {
-			sctx_free(sc, NULL);
-			return (-1);
-		}
 		o = make_cfg_obj(CFG_CERT, CFG_TPC_NEW,
 		    sc, fr, cert_rollback, cert_commit);
 		VTAILQ_INSERT_TAIL(cfg_objs, o, list);
@@ -3421,10 +3483,6 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 			sc = make_ctx(cf);
 			if (sc == NULL)
 				return (-1);
-			if (load_cert_ctx(sc) != 0) {
-				sctx_free(sc, NULL);
-				return (-1);
-			}
 			o = make_cfg_obj(CFG_CERT, CFG_TPC_NEW,
 			    sc, NULL, dcert_rollback, dcert_commit);
 			VTAILQ_INSERT_TAIL(cfg_objs, o, list);
@@ -3437,10 +3495,6 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 		sc = make_ctx(cf);
 		if (sc == NULL)
 			return (-1);
-		if (load_cert_ctx(sc) != 0) {
-			sctx_free(sc, NULL);
-			return (-1);
-		}
 		o = make_cfg_obj(CFG_CERT, CFG_TPC_NEW,
 		    sc, NULL, cert_rollback, cert_commit);
 		VTAILQ_INSERT_TAIL(cfg_objs, o, list);

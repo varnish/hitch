@@ -245,6 +245,9 @@ err:
 double
 asn1_gentime_parse(const ASN1_GENERALIZEDTIME *d) {
 	struct tm t;
+	if (d == NULL)
+		return (-1.0);
+
 	if (asn1_generalizedtime_to_tm(&t, d) == 0)
 		return (-1.0);
 
