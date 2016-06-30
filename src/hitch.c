@@ -3070,7 +3070,9 @@ sigh_terminate (int __attribute__ ((unused)) signo)
 				    strerror(errno));
 			}
 		}
-		/* LOG("Shutdown complete.\n"); */
+
+		if (ocsp_proc_pid != 0)
+			kill(ocsp_proc_pid, SIGTERM);
 	}
 
 	/* this is it, we're done... */
@@ -3613,6 +3615,9 @@ reconfigure(int argc, char **argv)
 			} while (i == -1 && errno == EINTR);
 		}
 	}
+
+	(void) kill(ocsp_proc_pid, SIGTERM);
+	start_ocsp_proc();
 
 	config_destroy(CONFIG);
 	CONFIG = cfg_new;
