@@ -2832,19 +2832,46 @@ handle_connections(int mgt_fd)
 	_exit(1);
 }
 
+static void
+ocsp_mktask(sslctx *sc, ocspquery *oq);
 
 static void
-ocsp_mktask(sslctx *sc)
+ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 {
 	ocspquery *oq;
+	(void) loop;
+	(void) revents;
+
+	CAST_OBJ_NOTNULL(oq, w->data, OCSPQUERY_MAGIC);
+
+	fprintf(stderr, "foo bar baz\n");
+
+	/* todo: query ocsp responder */
+
+	ocsp_mktask(oq->sctx, oq);
+}
+
+static void
+ocsp_mktask(sslctx *sc, ocspquery *oq)
+{
+	double refresh = -1.0;
+	struct timespec tv;
+	double tnow;
 	STACK_OF(OPENSSL_STRING) *sk_uri;
 
-	ALLOC_OBJ(oq, OCSPQUERY_MAGIC);
-	AN(oq);
+	AZ(clock_gettime(CLOCK_REALTIME, &tv));
+	tnow = tv.tv_sec + 1e-9 * tv.tv_nsec;
 
 	if (sc->staple != NULL) {
-		/* there is already a staple. Schedule refresh. */
-		/* .. */
+		CHECK_OBJ_NOTNULL(sc->staple, SSLSTAPLE_MAGIC);
+		if (sc->staple->nextupd > 0) {
+			refresh = sc->staple->nextupd - tnow - 600;
+			if (refresh < 0)
+				refresh = 0.0;
+		}
+		else
+			refresh = 1800;
+
 	} else {
 		sk_uri = X509_get1_ocsp(sc->x509);
 		if (sk_uri == NULL
@@ -2852,8 +2879,25 @@ ocsp_mktask(sslctx *sc)
 			/* no responder to query. */
 			return;
 		}
-		/* we have a responder. Schedule a refresh. */
+		/* schedule for immediate retrieval */
+		refresh = 0.0;
 	}
+
+	if (oq == NULL) {
+		ALLOC_OBJ(oq, OCSPQUERY_MAGIC);
+		AN(oq);
+	}
+	CHECK_OBJ_NOTNULL(oq, OCSPQUERY_MAGIC);
+	oq->sctx = sc;
+
+	assert(refresh >= 0.0);
+	ev_timer_init(&oq->ev_t_refresh,
+	    ocsp_query_responder, refresh, 0.);
+	oq->ev_t_refresh.data = oq;
+	ev_timer_start(loop, &oq->ev_t_refresh);
+
+	fprintf(stderr, "refresh of ocsp staple for %s scheduled in"
+	    " %.0lf seconds\n", sc->filename, refresh);
 }
 
 /*
@@ -2862,25 +2906,39 @@ ocsp_mktask(sslctx *sc)
 static void
 handle_ocsp_task(void) {
 	struct frontend *fr;
+	struct listen_sock *ls;
 	sslctx *sc, *sctmp;
+	ev_timer timer_ppid_check;
+
+	/* we don't accept incoming connections for this process.  */
+	VTAILQ_FOREACH(fr, &frontends, list) {
+		CHECK_OBJ_NOTNULL(fr, FRONTEND_MAGIC);
+		VTAILQ_FOREACH(ls, &fr->socks, list) {
+			CHECK_OBJ_NOTNULL(ls, LISTEN_SOCK_MAGIC);
+			ev_io_stop(loop, &ls->listener);
+			close(ls->sock);
+		}
+	}
 
 	loop = ev_default_loop(EVFLAG_AUTO);
 
 	/* Create ocspquery work items for any eligible ocsp queries */
 
 	HASH_ITER(hh, ssl_ctxs, sc, sctmp) {
-		ocsp_mktask(sc);
+		ocsp_mktask(sc, NULL);
 	}
 
 	VTAILQ_FOREACH(fr, &frontends, list) {
 		HASH_ITER(hh, fr->ssl_ctxs, sc, sctmp) {
-			ocsp_mktask(sc);
+			ocsp_mktask(sc, NULL);
 		}
 	}
 
-	ocsp_mktask(default_ctx);
+	ocsp_mktask(default_ctx, NULL);
 
-	fprintf(stderr, "Hello from OCSP task.\n");
+	ev_timer_init(&timer_ppid_check, check_ppid, 1.0, 1.0);
+	ev_timer_start(loop, &timer_ppid_check);
+
 	ev_loop(loop, 0);
 
 	_exit(0);
