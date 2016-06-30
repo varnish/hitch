@@ -2891,10 +2891,7 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 
 	/* todo: query ocsp responder */
 
-
 	OCSP_REQUEST_free(req);
-        /* from my reading of the openssl docs, this will also free
-	 * the associated certificate id (?) */
 
 	ocsp_mktask(oq->sctx, oq);
 }
