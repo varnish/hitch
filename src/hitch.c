@@ -2916,8 +2916,7 @@ ocsp_mktask(sslctx *sc, ocspquery *oq)
 			refresh = sc->staple->nextupd - tnow - 600;
 			if (refresh < 0)
 				refresh = 0.0;
-		}
-		else
+		} else
 			refresh = 1800;
 
 	} else {
