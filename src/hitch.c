@@ -114,7 +114,7 @@
 /* Globals */
 static struct ev_loop *loop;
 
-/* Child proc's read side of mgt->child pipe(2) */
+/* Worker proc's read side of mgt->worker pipe(2) */
 static ev_io mgt_rd;
 
 static struct addrinfo *backaddr;
@@ -125,34 +125,34 @@ static SSL_SESSION *client_session;
 /* The current number of active client connections. */
 static uint64_t n_conns;
 
-/* Current generation of child processes. Bumped after a sighup prior
+/* Current generation of worker processes. Bumped after a sighup prior
  * to launching new children. */
-static unsigned child_gen;
+static unsigned worker_gen;
 
 static unsigned n_sighup;
 static unsigned n_sigchld;
 
-enum child_state_e {
-	CHILD_ACTIVE,
-	CHILD_EXITING
+enum worker_state_e {
+	WORKER_ACTIVE,
+	WORKER_EXITING
 };
 
-static enum child_state_e child_state;
+static enum worker_state_e worker_state;
 
-struct child_proc {
+struct worker_proc {
 	unsigned			magic;
-#define CHILD_PROC_MAGIC		0xbc7fe9e6
+#define WORKER_PROC_MAGIC		0xbc7fe9e6
 
-	/* Writer end of pipe(2) for mgt -> child ipc */
+	/* Writer end of pipe(2) for mgt -> worker ipc */
 	int				pfd;
 	pid_t				pid;
 	unsigned			gen;
 	int				core_id;
-	VTAILQ_ENTRY(child_proc)	list;
+	VTAILQ_ENTRY(worker_proc)	list;
 };
 
-VTAILQ_HEAD(child_proc_head, child_proc);
-static struct child_proc_head child_procs;
+VTAILQ_HEAD(worker_proc_head, worker_proc);
+static struct worker_proc_head worker_procs;
 struct sslctx_s;
 struct sni_name_s;
 
@@ -1753,9 +1753,9 @@ safe_enable_io(proxystate *ps, ev_io *w)
 static void
 check_exit_state(void)
 {
-	if (child_state == CHILD_EXITING && n_conns == 0) {
-		LOGL("Child %d (gen: %d) in state EXITING "
-		    "is now exiting.\n", core_id, child_gen);
+	if (worker_state == WORKER_EXITING && n_conns == 0) {
+		LOGL("Worker %d (gen: %d) in state EXITING "
+		    "is now exiting.\n", core_id, worker_gen);
 		_exit(0);
 	}
 }
@@ -2598,7 +2598,7 @@ handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 	if (r  == -1) {
 		if (errno == EWOULDBLOCK || errno == EAGAIN)
 			return;
-		SOCKERR("Error in mgt->child read operation. "
+		SOCKERR("Error in mgt->worker read operation. "
 		    "Restarting process.");
 		/* If something went wrong here, the process will be
 		 * left in utter limbo as to whether it should keep
@@ -2610,9 +2610,9 @@ handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 		_exit(1);
 	}
 
-	if (cg != child_gen) {
+	if (cg != worker_gen) {
 		/* This means this process has reached its retirement age. */
-		child_state = CHILD_EXITING;
+		worker_state = WORKER_EXITING;
 
 		/* Stop accepting new connections. */
 		VTAILQ_FOREACH(fr, &frontends, list) {
@@ -2627,8 +2627,8 @@ handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 		check_exit_state();
 	}
 
-	LOGL("Child %d (gen: %d): State %s\n", core_id, child_gen,
-	    (child_state == CHILD_EXITING) ? "EXITING" : "ACTIVE");
+	LOGL("Worker %d (gen: %d): State %s\n", core_id, worker_gen,
+	    (worker_state == WORKER_EXITING) ? "EXITING" : "ACTIVE");
 }
 
 static void
@@ -2769,7 +2769,7 @@ handle_connections(int mgt_fd)
 	struct listen_sock *ls;
 	struct sigaction sa;
 
-	child_state = CHILD_ACTIVE;
+	worker_state = WORKER_ACTIVE;
 	LOGL("{core} Process %d online\n", core_id);
 
 	/* child cannot create new children... */
@@ -2817,7 +2817,7 @@ handle_connections(int mgt_fd)
 	ev_io_start(loop, &mgt_rd);
 
 	ev_loop(loop, 0);
-	ERR("Child %d (gen: %d) exiting.\n", core_id, child_gen);
+	ERR("Worker %d (gen: %d) exiting.\n", core_id, worker_gen);
 	_exit(1);
 }
 
@@ -2861,7 +2861,7 @@ init_globals(void)
 	struct addrinfo hints;
 
 	VTAILQ_INIT(&frontends);
-	VTAILQ_INIT(&child_procs);
+	VTAILQ_INIT(&worker_procs);
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
@@ -2906,21 +2906,21 @@ init_globals(void)
 /* Forks COUNT children starting with START_INDEX.  We keep a struct
  * child_proc per child so the parent can manage it later. */
 void
-start_children(int start_index, int count)
+start_workers(int start_index, int count)
 {
-	struct child_proc *c;
+	struct worker_proc *c;
 	int pfd[2];
 
-	/* don't do anything if we're not allowed to create new children */
+	/* don't do anything if we're not allowed to create new workers */
 	if (!create_workers)
 		return;
 
 	for (core_id = start_index;
 	    core_id < start_index + count; core_id++) {
-		ALLOC_OBJ(c, CHILD_PROC_MAGIC);
+		ALLOC_OBJ(c, WORKER_PROC_MAGIC);
 		AZ(pipe(pfd));
 		c->pfd = pfd[1];
-		c->gen = child_gen;
+		c->gen = worker_gen;
 		c->pid = fork();
 		c->core_id = core_id;
 		if (c->pid == -1) {
@@ -2941,7 +2941,7 @@ start_children(int start_index, int count)
 			exit(0);
 		} else { /* parent. Track new child. */
 			close(pfd[0]);
-			VTAILQ_INSERT_TAIL(&child_procs, c, list);
+			VTAILQ_INSERT_TAIL(&worker_procs, c, list);
 		}
 	}
 }
@@ -2950,15 +2950,15 @@ start_children(int start_index, int count)
 void
 replace_child_with_pid(pid_t pid)
 {
-	struct child_proc *c, *cp;
+	struct worker_proc *c, *cp;
 
 	/* find old child's slot and put a new child there */
-	VTAILQ_FOREACH_SAFE(c, &child_procs, list, cp) {
+	VTAILQ_FOREACH_SAFE(c, &worker_procs, list, cp) {
 		if (c->pid == pid) {
-			VTAILQ_REMOVE(&child_procs, c, list);
+			VTAILQ_REMOVE(&worker_procs, c, list);
 			/* Only replace if it matches current generation. */
-			if (c->gen == child_gen)
-				start_children(c->core_id, 1);
+			if (c->gen == worker_gen)
+				start_workers(c->core_id, 1);
 			FREE_OBJ(c);
 			return;
 		}
@@ -2971,12 +2971,12 @@ replace_child_with_pid(pid_t pid)
 static void
 do_wait(void)
 {
-	struct child_proc *c, *ctmp;
+	struct worker_proc *c, *ctmp;
 	int status;
 	int pid;
 
 
-	VTAILQ_FOREACH_SAFE(c, &child_procs, list, ctmp) {
+	VTAILQ_FOREACH_SAFE(c, &worker_procs, list, ctmp) {
 		pid = waitpid(c->pid, &status, WNOHANG);
 		if (pid == 0) {
 			/* child has not exited */
@@ -3012,7 +3012,7 @@ sigchld_handler(int signum)
 static void
 sigh_terminate (int __attribute__ ((unused)) signo)
 {
-	struct child_proc *c;
+	struct worker_proc *c;
 	/* don't create any more children */
 	create_workers = 0;
 
@@ -3021,7 +3021,7 @@ sigh_terminate (int __attribute__ ((unused)) signo)
 		LOGL("{core} Received signal %d, shutting down.\n", signo);
 
 		/* kill all children */
-		VTAILQ_FOREACH(c, &child_procs, list) {
+		VTAILQ_FOREACH(c, &worker_procs, list) {
 			/* LOG("Stopping worker pid %d.\n", c->pid); */
 			if (c->pid > 1 &&
 			    kill(c->pid, SIGTERM) != 0) {
@@ -3506,7 +3506,7 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 static void
 reconfigure(int argc, char **argv)
 {
-	struct child_proc *c;
+	struct worker_proc *c;
 	hitch_config *cfg_new;
 	int i, rv;
 	struct cfg_tpc_obj_head cfg_objs;
@@ -3554,17 +3554,17 @@ reconfigure(int argc, char **argv)
 	LOGL("{core} Config reloaded in %.2lf seconds. "
 	    "Starting new child processes.\n", t1 - t0);
 
-	child_gen++;
-	start_children(0, CONFIG->NCORES);
-	VTAILQ_FOREACH(c, &child_procs, list) {
-		if (c->gen != child_gen) {
+	worker_gen++;
+	start_workers(0, CONFIG->NCORES);
+	VTAILQ_FOREACH(c, &worker_procs, list) {
+		if (c->gen != worker_gen) {
 			errno = 0;
 			do {
-				i = write(c->pfd, &child_gen,
-				    sizeof(child_gen));
+				i = write(c->pfd, &worker_gen,
+				    sizeof(worker_gen));
 				if (i == -1 && errno != EINTR) {
 					ERR("WARNING: {core} Unable to "
-					    "gracefully reload child %d"
+					    "gracefully reload worker %d"
 					    " (%s).\n",
 					    c->pid, strerror(errno));
 					(void)kill(c->pid, SIGTERM);
@@ -3682,7 +3682,7 @@ main(int argc, char **argv)
 		atexit(remove_pfh);
 	}
 
-	start_children(0, CONFIG->NCORES);
+	start_workers(0, CONFIG->NCORES);
 
 #ifdef USE_SHARED_CACHE
 	if (CONFIG->SHCUPD_PORT) {
