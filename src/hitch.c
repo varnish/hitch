@@ -2832,6 +2832,46 @@ handle_connections(int mgt_fd)
 	_exit(1);
 }
 
+static OCSP_REQUEST *
+ocsp_mkreq(ocspquery *oq)
+{
+	OCSP_REQUEST *req;
+	OCSP_CERTID *cid;
+	STACK_OF(X509) *chain = NULL;
+	X509 *issuer;
+
+	CHECK_OBJ_NOTNULL(oq, OCSPQUERY_MAGIC);
+	CHECK_OBJ_NOTNULL(oq->sctx, SSLCTX_MAGIC);
+
+#ifdef SSL_CTRL_GET_CHAIN_CERTS
+	AN(SSL_CTX_get0_chain_certs(oq->sctx->ctx, &chain));
+#else
+	chain = oq->sctx->ctx->extra_certs;
+#endif
+	issuer = find_issuer(oq->sctx->x509, chain);
+	if (issuer == NULL) {
+		ERR("{ocsp} Unable to find issuer for cert %s\n.",
+		    oq->sctx->filename);
+		INCOMPL();
+	}
+
+	cid = OCSP_cert_to_id(NULL, oq->sctx->x509, issuer);
+	if (cid == NULL) {
+		INCOMPL();
+	}
+
+	req = OCSP_REQUEST_new();
+	if (req == NULL) {
+		INCOMPL();
+	}
+
+	if (OCSP_request_add0_id(req, cid) == 0) {
+		INCOMPL();
+	}
+
+	return (req);
+}
+
 static void
 ocsp_mktask(sslctx *sc, ocspquery *oq);
 
@@ -2839,11 +2879,14 @@ static void
 ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 {
 	ocspquery *oq;
+	OCSP_REQUEST *req;
 	(void) loop;
 	(void) revents;
 
 	CAST_OBJ_NOTNULL(oq, w->data, OCSPQUERY_MAGIC);
 
+	req = ocsp_mkreq(oq);
+	(void) req;
 	fprintf(stderr, "foo bar baz\n");
 
 	/* todo: query ocsp responder */
