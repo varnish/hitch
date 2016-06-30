@@ -241,6 +241,16 @@ typedef struct sslctx_s {
 	UT_hash_handle		hh;
 } sslctx;
 
+
+typedef struct ocspquery_s {
+	unsigned	magic;
+#define OCSPQUERY_MAGIC	0xb91c4eb1
+	ev_timer	ev_t_refresh;
+	sslctx		*sctx;
+
+	/*  */
+} ocspquery;
+
 /* SNI lookup objects */
 typedef struct sni_name_s {
 	unsigned		magic;
@@ -2823,16 +2833,56 @@ handle_connections(int mgt_fd)
 }
 
 
+static void
+ocsp_mktask(sslctx *sc)
+{
+	ocspquery *oq;
+	STACK_OF(OPENSSL_STRING) *sk_uri;
+
+	ALLOC_OBJ(oq, OCSPQUERY_MAGIC);
+	AN(oq);
+
+	if (sc->staple != NULL) {
+		/* there is already a staple. Schedule refresh. */
+		/* .. */
+	} else {
+		sk_uri = X509_get1_ocsp(sc->x509);
+		if (sk_uri == NULL
+		    || sk_OPENSSL_STRING_num(sk_uri) == 0) {
+			/* no responder to query. */
+			return;
+		}
+		/* we have a responder. Schedule a refresh. */
+	}
+}
+
 /*
    OCSP requestor process.
 */
 static void
 handle_ocsp_task(void) {
+	struct frontend *fr;
+	sslctx *sc, *sctmp;
+
+
 	loop = ev_default_loop(EVFLAG_AUTO);
 
+	/* Create ocspquery work items for any eligible ocsp queries */
+
+	HASH_ITER(hh, ssl_ctxs, sc, sctmp) {
+		ocsp_mktask(sc);
+	}
+
+	VTAILQ_FOREACH(fr, &frontends, list) {
+		HASH_ITER(hh, fr->ssl_ctxs, sc, sctmp) {
+			ocsp_mktask(sc);
+		}
+	}
+
+	ocsp_mktask(default_ctx);
+
 	fprintf(stderr, "Hello from OCSP task.\n");
-	while (1)
-		pause();
+	ev_loop(loop, 0);
 
 	_exit(0);
 }
