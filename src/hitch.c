@@ -119,6 +119,7 @@ static ev_io mgt_rd;
 
 static struct addrinfo *backaddr;
 static pid_t master_pid;
+static pid_t ocsp_proc_pid;
 static int core_id;
 static SSL_SESSION *client_session;
 
@@ -2821,6 +2822,21 @@ handle_connections(int mgt_fd)
 	_exit(1);
 }
 
+
+/*
+   OCSP requestor process.
+*/
+static void
+handle_ocsp_task(void) {
+	loop = ev_default_loop(EVFLAG_AUTO);
+
+	fprintf(stderr, "Hello from OCSP task.\n");
+	while (1)
+		pause();
+
+	_exit(0);
+}
+
 void
 change_root()
 {
@@ -2946,6 +2962,24 @@ start_workers(int start_index, int count)
 	}
 }
 
+void
+start_ocsp_proc(void)
+{
+	ocsp_proc_pid = fork();
+
+	if (ocsp_proc_pid == -1) {
+		ERR("{core}: fork() failed: %s: Exiting.\n", strerror(errno));
+		exit(1);
+	} else if (ocsp_proc_pid == 0) {
+		/* child */
+		handle_ocsp_task();
+	}
+
+	/* child proc should never return. */
+	AN(ocsp_proc_pid);
+}
+
+
 /* Forks a new child to replace the old, dead, one with the given PID.*/
 void
 replace_child_with_pid(pid_t pid)
@@ -2975,30 +3009,36 @@ do_wait(void)
 	int status;
 	int pid;
 
+#define WAIT_PID(p, action) do {					\
+	pid = waitpid(p, &status, WNOHANG);				\
+	if (pid == 0) {							\
+		/* child has not exited */				\
+		continue;						\
+	}								\
+	else if (pid == -1) {						\
+		if (errno == EINTR)					\
+			ERR("{core} Interrupted waitpid\n");		\
+		else							\
+			fail("waitpid");				\
+	} else {							\
+		if (WIFEXITED(status)) {				\
+			ERR("{core} Child %d exited with status %d.\n",	\
+			    pid, WEXITSTATUS(status));			\
+			action;						\
+		} else if (WIFSIGNALED(status)) {			\
+			ERR("{core} Child %d was terminated by "	\
+			    "signal %d.\n", pid, WTERMSIG(status));	\
+			action;						\
+		}							\
+	}								\
+	} while (0)
 
 	VTAILQ_FOREACH_SAFE(c, &worker_procs, list, ctmp) {
-		pid = waitpid(c->pid, &status, WNOHANG);
-		if (pid == 0) {
-			/* child has not exited */
-			continue;
-		}
-		else if (pid == -1) {
-			if (errno == EINTR)
-				ERR("{core} Interrupted waitpid\n");
-			else
-				fail("waitpid");
-		} else {
-			if (WIFEXITED(status)) {
-				ERR("{core} Child %d exited with status %d.\n",
-				    pid, WEXITSTATUS(status));
-				replace_child_with_pid(pid);
-			} else if (WIFSIGNALED(status)) {
-				ERR("{core} Child %d was terminated by "
-				    "signal %d.\n", pid, WTERMSIG(status));
-				replace_child_with_pid(pid);
-			}
-		}
+		WAIT_PID(c->pid, replace_child_with_pid(pid));
 	}
+
+	/* also check if the ocsp worker killed itself */
+	WAIT_PID(ocsp_proc_pid, start_ocsp_proc());
 }
 
 static void
@@ -3683,6 +3723,9 @@ main(int argc, char **argv)
 	}
 
 	start_workers(0, CONFIG->NCORES);
+
+	/* todo: make this conditional on an option */
+	start_ocsp_proc();
 
 #ifdef USE_SHARED_CACHE
 	if (CONFIG->SHCUPD_PORT) {
