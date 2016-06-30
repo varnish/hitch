@@ -2864,7 +2864,6 @@ handle_ocsp_task(void) {
 	struct frontend *fr;
 	sslctx *sc, *sctmp;
 
-
 	loop = ev_default_loop(EVFLAG_AUTO);
 
 	/* Create ocspquery work items for any eligible ocsp queries */
@@ -3021,7 +3020,13 @@ start_ocsp_proc(void)
 		ERR("{core}: fork() failed: %s: Exiting.\n", strerror(errno));
 		exit(1);
 	} else if (ocsp_proc_pid == 0) {
-		/* child */
+		if (CONFIG->UID >= 0 || CONFIG->GID >= 0)
+			drop_privileges();
+		if (geteuid() == 0) {
+			ERR("{core} ERROR: "
+			    "Refusing to run workers as root.\n");
+			_exit(1);
+		}
 		handle_ocsp_task();
 	}
 
