@@ -107,6 +107,7 @@ struct __hitch_config {
     int SNI_NOMATCH_ABORT;
     int TEST;
     int OCSP_VFY;
+    int OCSP_AUTO_QUERY;
 };
 
 typedef struct __hitch_config hitch_config;

@@ -3088,7 +3088,8 @@ do_wait(void)
 	}
 
 	/* also check if the ocsp worker killed itself */
-	WAIT_PID(ocsp_proc_pid, start_ocsp_proc());
+	if (CONFIG->OCSP_AUTO_QUERY)
+		WAIT_PID(ocsp_proc_pid, start_ocsp_proc());
 }
 
 static void
@@ -3666,8 +3667,10 @@ reconfigure(int argc, char **argv)
 		}
 	}
 
-	(void) kill(ocsp_proc_pid, SIGTERM);
-	start_ocsp_proc();
+	if (CONFIG->OCSP_AUTO_QUERY) {
+		(void) kill(ocsp_proc_pid, SIGTERM);
+		start_ocsp_proc();
+	}
 
 	config_destroy(CONFIG);
 	CONFIG = cfg_new;
@@ -3779,8 +3782,8 @@ main(int argc, char **argv)
 
 	start_workers(0, CONFIG->NCORES);
 
-	/* todo: make this conditional on an option */
-	start_ocsp_proc();
+	if (CONFIG->OCSP_AUTO_QUERY)
+		start_ocsp_proc();
 
 #ifdef USE_SHARED_CACHE
 	if (CONFIG->SHCUPD_PORT) {
