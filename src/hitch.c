@@ -71,6 +71,7 @@
 #include <openssl/engine.h>
 #include <openssl/asn1.h>
 #include <openssl/ocsp.h>
+#include <openssl/evp.h>
 #include <ev.h>
 
 #ifdef __linux__
@@ -86,6 +87,7 @@
 #include "configuration.h"
 #include "hssl_locks.h"
 #include "asn_gentm.h"
+#include "vsb.h"
 
 #ifndef MSG_NOSIGNAL
 # define MSG_NOSIGNAL 0
@@ -1471,7 +1473,7 @@ init_openssl(void)
 {
 	SSL_library_init();
 	SSL_load_error_strings();
-
+	OpenSSL_add_all_digests();
 
 	if (CONFIG->ENGINE) {
 		ENGINE *e = NULL;
@@ -2893,6 +2895,110 @@ ocsp_mkreq(ocspquery *oq)
 	return (req);
 }
 
+static char *
+ocsp_fn(const char *certfn)
+{
+	EVP_MD_CTX *mdctx = NULL;
+	unsigned char md_val[EVP_MAX_MD_SIZE];
+	unsigned int i, md_len;
+	struct vsb *vsb;
+	const char *ocsp_dir = "/tmp"; /* XXX: todo */
+	char *res;
+
+	mdctx = EVP_MD_CTX_create();
+	if (mdctx == NULL) {
+		ERR("{ocsp} EVP_MD_CTX_create failed\n");
+		goto err;
+	}
+	if (EVP_DigestInit_ex(mdctx, EVP_md5(), NULL) != 1) {
+		ERR("{ocsp} EVP_DigestInit_ex in ocsp_fn() failed\n");
+		goto err;
+	}
+	if (EVP_DigestUpdate(mdctx, certfn, strlen(certfn)) != 1) {
+		ERR("{ocsp} EVP_DigestUpdate in ocsp_fn() failed\n");
+		goto err;
+	}
+	if (EVP_DigestFinal_ex(mdctx, md_val, &md_len) != 1) {
+		ERR("{ocsp} EVP_DigestFinal_ex in ocsp_fn() failed\n");
+		goto err;
+	}
+
+	EVP_MD_CTX_destroy(mdctx);
+
+	vsb = VSB_new_auto();
+	AN(vsb);
+	VSB_cat(vsb, ocsp_dir);
+	VSB_putc(vsb, '/');
+	for (i = 0; i < md_len; i++)
+		VSB_printf(vsb, "%02x", md_val[i]);
+	VSB_finish(vsb);
+	res = strdup(VSB_data(vsb));
+	AN(res);
+	VSB_delete(vsb);
+	return (res);
+
+err:
+	if (mdctx != NULL)
+		EVP_MD_CTX_destroy(mdctx);
+	return (NULL);
+}
+
+static int
+ocsp_proc_persist(sslctx *sc)
+{
+	char *dstfile = NULL;
+	int fd = -1;
+	struct vsb *tmpfn;
+
+	CHECK_OBJ_NOTNULL(sc, SSLCTX_MAGIC);
+	CHECK_OBJ_NOTNULL(sc->staple, SSLSTAPLE_MAGIC);
+	dstfile = ocsp_fn(sc->filename);
+	if (dstfile == NULL)
+		return (1);
+	printf("dstfile = %s\n", dstfile);
+
+	tmpfn = VSB_new_auto();
+	AN(tmpfn);
+	VSB_printf(tmpfn, "%s.XXXXXX", dstfile);
+	VSB_finish(tmpfn);
+	fd = mkstemp(VSB_data(tmpfn));
+	if (fd < 0) {
+		ERR("{ocsp} ocsp_proc_persist: mkstemp: %s\n", strerror(errno));
+		goto err;
+	}
+
+	if (write(fd, sc->staple->staple, sc->staple->len) != sc->staple->len) {
+		ERR("{ocsp} ocsp_proc_persist: write: %s\n", strerror(errno));
+		goto err;
+	}
+
+	if(close(fd) != 0) {
+		ERR("{ocsp} ocsp_proc_persist: close: %s\n", strerror(errno));
+		goto err;
+	}
+
+	if (rename(VSB_data(tmpfn), dstfile) != 0) {
+		ERR("{ocsp} ocsp_proc_persist: rename: %s: %s\n",
+		    strerror(errno), dstfile);
+		goto err;
+	}
+
+	/* worker procs notified via ev_stat (inotify/stat) */
+
+	VSB_delete(tmpfn);
+	free(dstfile);
+	return (0);
+
+err:
+	if (fd >= 0)
+		(void) close(fd);
+	unlink(VSB_data(tmpfn));
+	VSB_delete(tmpfn);
+	free(dstfile);
+	return (1);
+}
+
+
 static void
 ocsp_mktask(sslctx *sc, ocspquery *oq, double refresh_hint);
 
@@ -3025,10 +3131,13 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 		ocsp_init_resp(oq->sctx, resp);
 		LOG("{ocsp} Retrieved new staple for cert %s\n",
 		    oq->sctx->filename);
+		ocsp_proc_persist(oq->sctx);
 	}
 
 	OCSP_REQ_CTX_free(rctx);
 	OCSP_REQUEST_free(req);
+	if (resp)
+		OCSP_RESPONSE_free(resp);
 	BIO_free_all(cbio);
 	if (ctx)
 		SSL_CTX_free(ctx);
