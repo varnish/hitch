@@ -2902,8 +2902,13 @@ ocsp_fn(const char *certfn)
 	unsigned char md_val[EVP_MAX_MD_SIZE];
 	unsigned int i, md_len;
 	struct vsb *vsb;
-	const char *ocsp_dir = "/tmp"; /* XXX: todo */
+	const char *ocsp_dir = CONFIG->OCSP_DIR;
 	char *res;
+
+	if (ocsp_dir == NULL) {
+		ERR("{ocsp} Error: OCSP directory not specified.\n");
+		return (NULL);
+	}
 
 	mdctx = EVP_MD_CTX_create();
 	if (mdctx == NULL) {
@@ -2955,15 +2960,14 @@ ocsp_proc_persist(sslctx *sc)
 	dstfile = ocsp_fn(sc->filename);
 	if (dstfile == NULL)
 		return (1);
-	printf("dstfile = %s\n", dstfile);
-
 	tmpfn = VSB_new_auto();
 	AN(tmpfn);
 	VSB_printf(tmpfn, "%s.XXXXXX", dstfile);
 	VSB_finish(tmpfn);
 	fd = mkstemp(VSB_data(tmpfn));
 	if (fd < 0) {
-		ERR("{ocsp} ocsp_proc_persist: mkstemp: %s\n", strerror(errno));
+		ERR("{ocsp} ocsp_proc_persist: mkstemp: %s: %s\n",
+		    VSB_data(tmpfn), strerror(errno));
 		goto err;
 	}
 

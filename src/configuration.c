@@ -224,6 +224,7 @@ config_destroy(hitch_config *cfg)
 	free(cfg->CIPHER_SUITE);
 	free(cfg->ENGINE);
 	free(cfg->PIDFILE);
+	free(cfg->OCSP_DIR);
 
 #ifdef USE_SHARED_CACHE
 	free(cfg->SHCUPD_IP);

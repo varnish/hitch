@@ -108,6 +108,7 @@ struct __hitch_config {
     int TEST;
     int OCSP_VFY;
     int OCSP_AUTO_QUERY;
+    char *OCSP_DIR;
 };
 
 typedef struct __hitch_config hitch_config;

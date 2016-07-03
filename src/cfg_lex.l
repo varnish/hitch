@@ -66,6 +66,7 @@
 "ocsp-resp-file"	{ return (TOK_PB_OCSP_FILE); }
 "ocsp-verify-staple"	{ return (TOK_OCSP_VERIFY); }
 "ocsp-auto-query"	{ return (TOK_OCSP_QUERY); }
+"ocsp-dir"		{ return (TOK_OCSP_DIR); }
 
 (?i:"yes"|"y"|"on"|"true"|"t"|\"yes\"|\"y\"|\"on\"|\"true\"|\"t\") {
 	yylval.i = 1;
