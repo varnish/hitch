@@ -240,6 +240,7 @@ typedef struct sslctx_s {
 	int			staple_vfy;
 	char			*staple_fn;
 	X509			*x509;
+	ev_stat			*ev_staple;
 	struct sni_name_head	sni_list;
 	UT_hash_handle		hh;
 } sslctx;
@@ -1188,6 +1189,58 @@ static char *
 ocsp_fn(const char *certfn);
 
 static int
+ocsp_init_file(const char *ocspfn, sslctx *sc, int is_cached);
+
+static void
+ocsp_stat_cb(struct ev_loop *loop, ev_stat *w, int revents)
+{
+	sslctx *sc;
+	sslstaple *oldstaple;
+
+	CAST_OBJ_NOTNULL(sc, w->data, SSLCTX_MAGIC);
+
+	if (w->attr.st_nlink) {
+		oldstaple = sc->staple;
+		sc->staple = NULL;
+		AN(sc->staple_fn);
+
+		if (ocsp_init_file(sc->staple_fn, sc, 1) != 0) {
+			sc->staple = oldstaple;
+			return;
+		}
+
+		sslstaple_free(&oldstaple);
+		LOG("{core} Loaded cached OCSP staple for cert '%s'\n",
+		    sc->filename);
+
+	}
+}
+
+void
+ocsp_ev_stat(sslctx *sc)
+{
+	char *fn;
+	STACK_OF(OPENSSL_STRING) *sk_uri;
+	sk_uri = X509_get1_ocsp(sc->x509);
+
+	if (sk_uri == NULL
+	   || sk_OPENSSL_STRING_num(sk_uri) == 0) {
+		return;
+	}
+
+	fn = ocsp_fn(sc->filename);
+	if (fn == NULL)
+		return;
+
+	sc->staple_fn = fn;
+	sc->ev_staple = malloc(sizeof *sc->ev_staple);
+	sc->ev_staple->data = sc;
+	AN(sc->ev_staple);
+	ev_stat_init(sc->ev_staple, ocsp_stat_cb, fn, 0);
+}
+
+
+static int
 ocsp_init_file(const char *ocspfn, sslctx *sc, int is_cached)
 {
 	BIO *bio;
@@ -1348,9 +1401,8 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 		}
 	}
 
-	if (CONFIG->OCSP_AUTO_QUERY) {
-		/* schedule ev_stat */
-	}
+	if (CONFIG->OCSP_AUTO_QUERY)
+		ocsp_ev_stat(sc);
 
 #endif /* OPENSSL_NO_TLSEXT */
 
@@ -2822,6 +2874,7 @@ static void
 handle_connections(int mgt_fd)
 {
 	struct frontend *fr;
+	sslctx *sc, *sctmp;
 	struct listen_sock *ls;
 	struct sigaction sa;
 
@@ -2866,6 +2919,23 @@ handle_connections(int mgt_fd)
 			ls->listener.data = fr;
 			ev_io_start(loop, &ls->listener);
 		}
+	}
+
+	if (CONFIG->OCSP_AUTO_QUERY) {
+		HASH_ITER(hh, ssl_ctxs, sc, sctmp) {
+			if (sc->ev_staple)
+				ev_stat_start(loop, sc->ev_staple);
+		}
+
+		VTAILQ_FOREACH(fr, &frontends, list) {
+			HASH_ITER(hh, fr->ssl_ctxs, sc, sctmp) {
+			    if (sc->ev_staple)
+				    ev_stat_start(loop, sc->ev_staple);
+			}
+		}
+
+		if (default_ctx->ev_staple)
+			ev_stat_start(loop, default_ctx->ev_staple);
 	}
 
 	AZ(setnonblocking(mgt_fd));
