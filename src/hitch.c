@@ -1230,6 +1230,7 @@ ocsp_ev_stat(sslctx *sc)
 {
 	char *fn;
 	STACK_OF(OPENSSL_STRING) *sk_uri;
+	AN(sc->x509);
 	sk_uri = X509_get1_ocsp(sc->x509);
 
 	if (sk_uri == NULL
@@ -1506,6 +1507,8 @@ load_cert_ctx(sslctx *so)
 	x509 = PEM_read_bio_X509_AUX(f, NULL, NULL, NULL);
 	BIO_free(f);
 
+	so->x509 = x509;
+
 	/* First, look for Subject Alternative Names. */
 	names = X509_get_ext_d2i(x509, NID_subject_alt_name, NULL, NULL);
 	for (i = 0; i < sk_GENERAL_NAME_num(names); i++) {
@@ -1517,7 +1520,6 @@ load_cert_ctx(sslctx *so)
 	if (sk_GENERAL_NAME_num(names) > 0) {
 		sk_GENERAL_NAME_pop_free(names, GENERAL_NAME_free);
 		/* If we found some, don't bother looking any further. */
-		X509_free(x509);
 		return (0);
 	} else if (names != NULL) {
 		sk_GENERAL_NAME_pop_free(names, GENERAL_NAME_free);
@@ -1529,13 +1531,12 @@ load_cert_ctx(sslctx *so)
 	if (i < 0) {
 		ERR("Could not find Subject Alternative Names"
 		    " or a CN on cert %s\n", so->filename);
-		X509_free(x509);
 		return (1);
 	}
 	x509_entry = X509_NAME_get_entry(x509_name, i);
 	AN(x509_entry);
 	PUSH_CTX(x509_entry->value, ctx);
-	so->x509 = x509;
+
 	return (0);
 }
 #endif /* OPENSSL_NO_TLSEXT */
@@ -3322,6 +3323,7 @@ ocsp_mktask(sslctx *sc, ocspquery *oq, double refresh_hint)
 			refresh = 1800;
 
 	} else {
+		AN(sc->x509);
 		sk_uri = X509_get1_ocsp(sc->x509);
 		if (sk_uri == NULL
 		    || sk_OPENSSL_STRING_num(sk_uri) == 0) {
