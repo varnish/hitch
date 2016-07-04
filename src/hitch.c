@@ -1184,27 +1184,31 @@ err:
 
 }
 
+static char *
+ocsp_fn(const char *certfn);
+
 static int
-ocsp_init_file(const struct cfg_cert_file *cf, sslctx *sc)
+ocsp_init_file(const char *ocspfn, sslctx *sc, int is_cached)
 {
 	BIO *bio;
 	OCSP_RESPONSE *resp;
 
-	if (cf->ocspfn == NULL) {
-		/* ... */
+	if (ocspfn == NULL) {
 		return (1);
 	}
 
-	bio = BIO_new_file(cf->ocspfn, "r");
+	bio = BIO_new_file(ocspfn, "r");
 	if (bio == NULL) {
-		ERR("Error loading status file '%s'\n", cf->ocspfn);
+		if (is_cached)
+			return (1);
+		ERR("Error loading status file '%s'\n", ocspfn);
 		return (1);
 	}
 
 	resp = d2i_OCSP_RESPONSE_bio(bio, NULL);
 	BIO_free(bio);
 	if (resp == NULL) {
-		ERR("Error parsing OCSP staple in '%s'\n", cf->ocspfn);
+		ERR("Error parsing OCSP staple in '%s'\n", ocspfn);
 		return (1);
 	}
 
@@ -1212,7 +1216,6 @@ ocsp_init_file(const struct cfg_cert_file *cf, sslctx *sc)
 		goto err;
 
 	CHECK_OBJ_NOTNULL(sc->staple, SSLSTAPLE_MAGIC);
-	sc->staple->mtim = cf->ocsp_mtim;
 	OCSP_RESPONSE_free(resp);
 	return (0);
 
@@ -1320,16 +1323,35 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 		return (NULL);
 	}
 
-	if (cf->ocspfn != NULL) {
-		if (ocsp_init_file(cf, sc) != 0) {
-			ERR("Error loading OCSP response for stapling.\n");
+	if (CONFIG->OCSP_DIR) {
+		char *fn = ocsp_fn(sc->filename);
+		/* attempt loading of cached ocsp staple */
+		if (fn != NULL && ocsp_init_file(fn, sc, 1) == 0) {
+			LOG("{core} Loaded cached OCSP staple for cert '%s'\n",
+			    sc->filename);
+			sc->staple_fn = fn;
+		} else
+			free(fn);
+	}
+
+	if (sc->staple == NULL && cf->ocspfn != NULL) {
+		if (ocsp_init_file(cf->ocspfn, sc, 0) != 0) {
+			ERR("Error loading OCSP response %s for stapling.\n",
+			    cf->ocspfn);
 			RSA_free(rsa);
 			sctx_free(sc, NULL);
 			return (NULL);
 		} else {
 			LOG("{core} Loaded OCSP staple '%s'\n", cf->ocspfn);
+			sc->staple_fn = strdup(cf->ocspfn);
+			sc->staple->mtim = cf->ocsp_mtim;
 		}
 	}
+
+	if (CONFIG->OCSP_AUTO_QUERY) {
+		/* schedule ev_stat */
+	}
+
 #endif /* OPENSSL_NO_TLSEXT */
 
 #ifdef USE_SHARED_CACHE
