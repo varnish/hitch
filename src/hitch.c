@@ -1142,7 +1142,7 @@ err:
 static int
 ocsp_init_resp(sslctx *sc, OCSP_RESPONSE *resp)
 {
-	sslstaple *staple;
+	sslstaple *staple = NULL;
 	int len, i;
 	unsigned char *tmp, *buf;
 
