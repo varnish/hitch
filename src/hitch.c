@@ -63,6 +63,7 @@
 #include <ctype.h>
 #include <sched.h>
 #include <signal.h>
+#include <time.h>
 
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
