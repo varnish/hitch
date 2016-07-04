@@ -421,6 +421,9 @@ WLOG(int level, const char *fmt, ...)
 		}						\
 	} while (0)
 
+static void
+log_ssl_error(proxystate *ps, const char *what, ...);
+
 
 static void
 logproxy(int level, const proxystate* ps, const char *fmt, ...)
@@ -532,7 +535,7 @@ init_dh(SSL_CTX *ctx, const char *cert)
 
 	bio = BIO_new_file(cert, "r");
 	if (!bio) {
-		ERR_print_errors_fp(stderr);
+		log_ssl_error(NULL, "{core} BIO_new_file");
 		return (-1);
 	}
 
@@ -545,8 +548,7 @@ init_dh(SSL_CTX *ctx, const char *cert)
 
 	LOG("{core} Using DH parameters from %s\n", cert);
 	if (!SSL_CTX_set_tmp_dh(ctx, dh)) {
-		ERR("{core} Error setting temp DH params\n");
-		ERR_print_errors_fp(stderr);
+		log_ssl_error(NULL, "{core} Error setting temp DH params");
 		return (-1);
 	}
 	LOG("{core} DH initialized with %d bit key\n", 8*DH_size(dh));
@@ -875,7 +877,7 @@ load_rsa_privatekey(SSL_CTX *ctx, const char *file)
 
 	bio = BIO_new_file(file, "r");
 	if (!bio) {
-		ERR_print_errors_fp(stderr);
+		log_ssl_error(NULL, "{core} BIO_new_file");
 		return NULL;
 	}
 
@@ -1088,9 +1090,8 @@ ocsp_verify(sslctx *sc, OCSP_RESPONSE *resp, double *nextupd)
 	}
 	i = OCSP_basic_verify(br, chain, store, verify_flags);
 	if (i <= 0) {
-		ERR("{core} Staple verification failed for cert %s\n",
-		    sc->filename);
-		ERR_print_errors_fp(stderr); /* XXX */
+		log_ssl_error(NULL, "{core} Staple verification failed "
+		    "for cert %s\n", sc->filename);
 		goto err;
 	}
 
@@ -1102,18 +1103,24 @@ ocsp_verify(sslctx *sc, OCSP_RESPONSE *resp, double *nextupd)
 	}
 
 	cid = OCSP_cert_to_id(NULL, sc->x509, issuer);
-	if (cid == NULL)
+	if (cid == NULL) {
+		ERR("{core} OCSP_cert_to_id failed\n");
 		goto err;
+	}
 
 	if (OCSP_resp_find_status(br, cid, &status, &reason,
 		NULL, NULL, &asn_nextupd) != 1) {
 		ERR("{core} OCSP_resp_find_status failed: Unable to "
-		    "find OCSP response with a matching certid\n");
+		    "find OCSP response with a matching certificate id\n");
 		goto err;
 	}
 
 	if (status != V_OCSP_CERTSTATUS_GOOD) {
-		/* OCSP_cert_status_str */
+		ERR("{core} Certificate %s has status %s\n", sc->filename,
+		    OCSP_cert_status_str(status));
+		if (status == V_OCSP_CERTSTATUS_REVOKED)
+			ERR("{core} Certificate %s revocation reason: %s\n",
+			    sc->filename, OCSP_crl_reason_str(reason));
 		goto err;
 	}
 
@@ -1140,14 +1147,14 @@ ocsp_init_resp(sslctx *sc, OCSP_RESPONSE *resp)
 
 	i = OCSP_response_status(resp);
 	if (i != OCSP_RESPONSE_STATUS_SUCCESSFUL) {
-		ERR("OCSP response status: %d (cert %s)\n",
-		    i, sc->filename); /* XXX: textify */
+		ERR("{core} Error: OCSP response for cert %s has status %s\n",
+		    sc->filename, OCSP_response_status_str(i));
 		goto err;
 	}
 
 	len = i2d_OCSP_RESPONSE(resp, NULL);
 	if (len < 0) {
-		ERR_print_errors_fp(stderr); /* todo */
+		log_ssl_error(NULL, "{core} i2d_OCSP_RESPONSE");
 		goto err;
 	}
 	buf = malloc(len);
@@ -1197,6 +1204,8 @@ ocsp_stat_cb(struct ev_loop *loop, ev_stat *w, int revents)
 	sslctx *sc;
 	sslstaple *oldstaple;
 
+	(void) revents;
+	(void) loop;
 	CAST_OBJ_NOTNULL(sc, w->data, SSLCTX_MAGIC);
 
 	if (w->attr.st_nlink) {
@@ -1212,7 +1221,6 @@ ocsp_stat_cb(struct ev_loop *loop, ev_stat *w, int revents)
 		sslstaple_free(&oldstaple);
 		LOG("{core} Loaded cached OCSP staple for cert '%s'\n",
 		    sc->filename);
-
 	}
 }
 
@@ -1316,7 +1324,7 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 
 	if (ciphers != NULL) {
 		if (SSL_CTX_set_cipher_list(ctx, ciphers) != 1) {
-			ERR_print_errors_fp(stderr);
+			log_ssl_error(NULL, "{core} SSL_CTX_set_cipher_list");
 		}
 	}
 
@@ -1336,8 +1344,8 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 
 	/* SSL_SERVER Mode stuff */
 	if (SSL_CTX_use_certificate_chain_file(ctx, cf->filename) <= 0) {
-		ERR("Error loading certificate file %s\n", cf->filename);
-		ERR_print_errors_fp(stderr);
+		log_ssl_error(NULL,
+		    "Error loading certificate file %s\n", cf->filename);
 		sctx_free(sc, NULL);
 		return (NULL);
 	}
@@ -1350,7 +1358,8 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	}
 
 	if (SSL_CTX_use_RSAPrivateKey(ctx, rsa) <= 0) {
-		ERR_print_errors_fp(stderr);
+		log_ssl_error(NULL, "SSL_CTX_use_RSAPrivateKey: %s",
+		    cf->filename);
 		RSA_free(rsa);
 		sctx_free(sc, NULL);
 		return (NULL);
@@ -1559,7 +1568,8 @@ init_openssl(void)
 			if ((e = ENGINE_by_id(CONFIG->ENGINE)) == NULL ||
 			    !ENGINE_init(e) ||
 			    !ENGINE_set_default(e, ENGINE_METHOD_ALL)) {
-				ERR_print_errors_fp(stderr);
+				log_ssl_error(NULL,
+				    "{core} ENGINE initialization failed");
 				exit(1);
 			}
 			LOG("{core} will use OpenSSL engine %s.\n",
@@ -2317,15 +2327,25 @@ client_proxy_proxy(struct ev_loop *loop, ev_io *w, int revents)
 }
 
 static void
-log_ssl_error (proxystate* ps, const char* what)
+log_ssl_error(proxystate *ps, const char *what, ...)
 {
+	va_list ap;
 	int e;
-	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
+	char buf[256];
+	char whatbuf[1024];
+
+	CHECK_OBJ_ORNULL(ps, PROXYSTATE_MAGIC);
+
+	va_start(ap, what);
+	vsnprintf(whatbuf, sizeof(whatbuf), what, ap);
+	va_end(ap);
 
 	while ((e = ERR_get_error())) {
-		char buf[1024];
 		ERR_error_string_n(e, buf, sizeof(buf));
-		ERRPROXY(ps, "%s: %s\n", what, buf);
+		if (ps)
+			ERRPROXY(ps, "%s: %s\n", whatbuf, buf);
+		else
+			ERR("%s: %s\n", whatbuf, buf);
 	}
 }
 
@@ -2967,21 +2987,28 @@ ocsp_mkreq(ocspquery *oq)
 	if (issuer == NULL) {
 		ERR("{ocsp} Unable to find issuer for cert %s\n.",
 		    oq->sctx->filename);
-		INCOMPL();
+		return (NULL);
 	}
 
 	cid = OCSP_cert_to_id(NULL, oq->sctx->x509, issuer);
 	if (cid == NULL) {
-		INCOMPL();
+		ERR("{ocsp} OCSP_cert_to_id failed for cert %s\n",
+		    oq->sctx->filename);
+		return (NULL);
 	}
 
 	req = OCSP_REQUEST_new();
 	if (req == NULL) {
-		INCOMPL();
+		ERR("{ocsp} OCSP_REQUEST_new failed\n");
+		OCSP_CERTID_free(cid);
+		return (NULL);
 	}
 
-	if (OCSP_request_add0_id(req, cid) == 0) {
-		INCOMPL();
+	if (OCSP_request_add0_id(req, cid) == NULL) {
+		ERR("{ocsp} OCSP_request_add0_id failed\n");
+		OCSP_CERTID_free(cid);
+		OCSP_REQUEST_free(req);
+		return (NULL);
 	}
 
 	return (req);
@@ -3102,12 +3129,12 @@ static void
 ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 {
 	ocspquery *oq;
-	OCSP_REQUEST *req;
-	OCSP_REQ_CTX *rctx;
+	OCSP_REQUEST *req = NULL;
+	OCSP_REQ_CTX *rctx = NULL;
 	STACK_OF(OPENSSL_STRING) *sk_uri;
 	char *host = NULL, *port = NULL, *path = NULL;
 	int https = 0;
-	BIO *cbio, *sbio;
+	BIO *cbio = NULL, *sbio;
 	SSL_CTX *ctx = NULL;
 	OCSP_RESPONSE *resp = NULL;
 	fd_set fds;
@@ -3127,13 +3154,19 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 		&host, &port, &path, &https));
 
 	req = ocsp_mkreq(oq);
+	if (req == NULL) {
+		/* If we weren't able to create a request, there is no
+		 * use in scheduling a retry. */
+		goto err;
+	}
 
 	/* printf("host: %s port: %s path: %s ssl: %d\n", */
 	/*     host, port, path, https); */
 
 	cbio = BIO_new_connect(host);
 	if (cbio == NULL) {
-		INCOMPL();
+		refresh_hint = 60;
+		goto retry;
 	}
 
 	if (port == NULL) {
@@ -3142,44 +3175,56 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 		else
 			port = "80";
 	}
-	BIO_set_conn_port(cbio, port);
+	AN(BIO_set_conn_port(cbio, port));
 
 	if (https) {
 		ctx = SSL_CTX_new(SSLv23_client_method());
-		if (ctx == NULL)
-			INCOMPL();
+		AN(ctx);
 		SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2);
 		SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv3);
 		SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
 		sbio = BIO_new_ssl(ctx, 1);
+		if (sbio == NULL) {
+			ERR("{ocsp} BIO_new_ssl failed: %s\n", strerror(errno));
+			refresh_hint = 60;
+			goto retry;
+		}
 		cbio = BIO_push(sbio, cbio);
+		AN(cbio);
 	}
 
 	rctx = OCSP_sendreq_new(cbio, path, req, 0);
+	if (rctx == NULL) {
+		ERR("{ocsp} OCSP_sendreq_new failed\n");
+		refresh_hint = 60;
+		goto retry;
+	}
 	OCSP_REQ_CTX_add1_header(rctx, "Host", host);
 
 	/* set non-blocking */
 	BIO_set_nbio(cbio, 1);
 	n = BIO_do_connect(cbio);
 	if (n <= 0 && !BIO_should_retry(cbio)) {
-		/* error connecting */
-		INCOMPL();
+		ERR("{ocsp} Error connecting to %s:%s\n", host, port);
+		refresh_hint = 300;
+		goto retry;
 	}
 
-	if (BIO_get_fd(cbio, &fd) < 0) {
-		INCOMPL();
-	}
+	assert(BIO_get_fd(cbio, &fd) >= 0);
 
 	if (n <= 0) {
 		FD_ZERO(&fds);
 		FD_SET(fd, &fds);
 		tv.tv_usec = 0;
-		tv.tv_sec = 4;
-		/* wait for connect to finish, with a timeout of 4s */
+		tv.tv_sec = 10;
+		/* wait for connect to finish, with a timeout of 10s */
 		n = select(fd + 1, NULL, (void *) &fds, NULL, &tv);
 		if (n == 0) {
 			/* connect timeout */
-			INCOMPL();
+			ERR("{ocsp} Error: Connection to %s:%s timed out.\n",
+			    host, port);
+			refresh_hint = 300;
+			goto retry;
 		}
 	}
 
@@ -3187,7 +3232,10 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 		n = OCSP_sendreq_nbio(&resp, rctx);
 		if (n == 0) {
 			/* this is an error, and we can't continue */
-			INCOMPL(); /* todo */
+			ERR("{ocsp} OCSP_sendreq_nbio failed for %s:%s.\n",
+			    host, port);
+			refresh_hint = 300;
+			goto retry;
 		} else if (n == 1) {
 			/* complete */
 			break;
@@ -3198,25 +3246,32 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 
 		/* TODO: expose timeouts as settings */
 		tv.tv_usec = 0;
-		tv.tv_sec = 8;
+		tv.tv_sec = 20;
 
 		if (BIO_should_read(cbio))
 			n = select(fd + 1, (void *) &fds, NULL, NULL, &tv);
 		else if (BIO_should_write(cbio))
 			n = select(fd + 1, NULL, (void *) &fds, NULL, &tv);
 		else {
-			/* unhandled/unexpected retry condition */
-			INCOMPL();
+			/* BIO_should_io_special? */
+			refresh_hint = 300;
+			goto retry;
 		}
 
 		if (n == -1) {
-			/* select failed */
-			INCOMPL();
+			if (errno == EINTR)
+				continue;
+			ERR("{ocsp} select: %s\n", strerror(errno));
+			refresh_hint = 300;
+			goto retry;
 		}
 
 		if (n == 0) {
 			/* timeout */
-			INCOMPL();
+			ERR("{ocsp} Error: transmission timout for %s:%s\n",
+			    host, port);
+			refresh_hint = 300;
+			goto retry;
 		}
 	}
 
@@ -3230,15 +3285,19 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 		ocsp_proc_persist(oq->sctx);
 	}
 
-	OCSP_REQ_CTX_free(rctx);
-	OCSP_REQUEST_free(req);
+retry:
+	ocsp_mktask(oq->sctx, oq, refresh_hint);
+err:
+	if (rctx)
+		OCSP_REQ_CTX_free(rctx);
+	if (req)
+		OCSP_REQUEST_free(req);
 	if (resp)
 		OCSP_RESPONSE_free(resp);
-	BIO_free_all(cbio);
+	if (cbio)
+		BIO_free_all(cbio);
 	if (ctx)
 		SSL_CTX_free(ctx);
-
-	ocsp_mktask(oq->sctx, oq, refresh_hint);
 }
 
 static void
@@ -3272,8 +3331,8 @@ ocsp_mktask(sslctx *sc, ocspquery *oq, double refresh_hint)
 		refresh = 0.0;
 	}
 
-	if (refresh_hint > 0)
-		refresh += refresh_hint;
+	if (refresh < refresh_hint)
+		refresh = refresh_hint;
 
 	if (oq == NULL) {
 		ALLOC_OBJ(oq, OCSPQUERY_MAGIC);
