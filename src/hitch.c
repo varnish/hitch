@@ -110,6 +110,11 @@
 #endif
 #endif
 
+#ifndef SO_MAX_PACING_RATE
+#define SO_MAX_PACING_RATE 47
+#endif
+
+
 /* Globals */
 static struct ev_loop *loop;
 
