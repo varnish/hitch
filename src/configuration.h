@@ -99,6 +99,8 @@ struct __hitch_config {
     int SSL_HANDSHAKE_TIMEOUT;
     int RECV_BUFSIZE;
     int SEND_BUFSIZE;
+    int PACE_FRONTEND;
+    int PACE_BACKEND;
     char* LOG_FILENAME;
     int RING_SLOTS;
     int RING_DATA_LEN;

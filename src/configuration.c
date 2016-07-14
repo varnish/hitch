@@ -62,6 +62,8 @@
 #define CFG_RING_DATA_LEN "ring-data-len"
 #define CFG_PIDFILE "pidfile"
 #define CFG_SNI_NOMATCH_ABORT "sni-nomatch-abort"
+#define CFG_PACE_FRONTEND "limit-frontend"
+#define CFG_PACE_BACKEND "limit-backend"
 
 #ifdef USE_SHARED_CACHE
 	#define CFG_SHARED_CACHE "shared-cache"
@@ -177,6 +179,9 @@ config_new(void)
 
 	r->RECV_BUFSIZE = -1;
 	r->SEND_BUFSIZE = -1;
+
+	r->PACE_FRONTEND = -1;
+	r->PACE_BACKEND = -1;
 
 	r->LOG_FILENAME = NULL;
 	r->PIDFILE = NULL;
@@ -676,6 +681,10 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		if (strlen(v) > 0) {
 			config_assign_str(&cfg->CIPHER_SUITE, v);
 		}
+	} else if (strcmp(k, CFG_PACE_FRONTEND) == 0) {
+		r = config_param_val_int(v, &cfg->PACE_FRONTEND, 1);
+	} else if (strcmp(k, CFG_PACE_BACKEND) == 0) {
+		r = config_param_val_int(v, &cfg->PACE_BACKEND, 1);
 	} else if (strcmp(k, CFG_SSL_ENGINE) == 0) {
 		if (strlen(v) > 0) {
 			config_assign_str(&cfg->ENGINE, v);
@@ -1042,6 +1051,12 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "      --proxy-proxy          Proxy HaProxy's PROXY (IPv4 or IPv6) protocol line\n" );
 	fprintf(out, "                             before actual data (PROXY v1 only)\n");
 	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->PROXY_PROXY_LINE));
+#ifdef __linux__
+	fprintf(out, "      --limit-frontend=n     Rate-limit frontend send rate (in bytes/s) (Default: %s)\n",
+		config_disp_bool(cfg->PACE_FRONTEND));
+	fprintf(out, "      --limit-backend=n      Rate-limit backend send rate (in bytes/s) (Default: %s)\n",
+		config_disp_bool(cfg->PACE_BACKEND));
+#endif  /* __linux__ */
 	fprintf(out, "      --sni-nomatch-abort    Abort handshake when client "
 			"submits an unrecognized SNI server name\n" );
 	fprintf(out, "                             (Default: %s)\n",
@@ -1105,6 +1120,10 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		{ CFG_WRITE_PROXY, 0, &cfg->WRITE_PROXY_LINE_V2, 1 },
 		{ CFG_PROXY_PROXY, 0, &cfg->PROXY_PROXY_LINE, 1 },
 		{ CFG_SNI_NOMATCH_ABORT, 0, &cfg->SNI_NOMATCH_ABORT, 1 },
+#ifdef __linux__
+		{ CFG_PACE_FRONTEND, required_argument, NULL, '8' },
+		{ CFG_PACE_BACKEND, required_argument, NULL, '9' },
+#endif  /* __linux__ */
 		{ "test", 0, NULL, 't' },
 		{ "version", 0, NULL, 'V' },
 		{ "help", 0, NULL, 'h' },
@@ -1213,6 +1232,14 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		case 't':
 			cfg->TEST = 1;
 			break;
+#ifdef __linux__
+		case '8':
+			ret = config_param_validate(CFG_PACE_FRONTEND, optarg, cfg, NULL, 0);
+			break;
+		case '9':
+			ret = config_param_validate(CFG_PACE_BACKEND, optarg, cfg, NULL, 0);
+			break;
+#endif  /* __linux__ */
 		case 'V':
 			printf("%s %s\n", basename(argv[0]), VERSION);
 			*retval = 0;

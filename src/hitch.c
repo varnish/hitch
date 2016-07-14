@@ -1492,7 +1492,31 @@ frontend_listen(const struct front_arg *fa, struct listen_sock_head *slist)
 				goto creat_frontend_err;
 			}
 		}
+#ifdef __linux__
 
+		if (CONFIG->PACE_FRONTEND > 0) {
+			LOG("f was set\n");
+			r = setsockopt(ls->sock, SOL_SOCKET, SO_MAX_PACING_RATE,
+			    &CONFIG->PACE_FRONTEND,
+			    sizeof(CONFIG->PACE_FRONTEND));
+			if (r < 0) {
+				ERR("{setsockopt-pace-frontend}: %s: %s\n",
+				    strerror(errno), fa->pspec);
+				goto creat_frontend_err;
+			}
+		}
+		if (CONFIG->PACE_BACKEND > 0) {
+			LOG("b was set\n");
+			r = setsockopt(ls->sock, SOL_SOCKET, SO_MAX_PACING_RATE,
+			    &CONFIG->PACE_BACKEND,
+			    sizeof(CONFIG->PACE_BACKEND));
+			if (r < 0) {
+				ERR("{setsockopt-pace-backend}: %s: %s\n",
+				    strerror(errno), fa->pspec);
+				goto creat_frontend_err;
+			}
+		}
+#endif  /* __linux__ */
 		if (bind(ls->sock, it->ai_addr, it->ai_addrlen)) {
 			ERR("{bind-socket}: %s: %s\n", strerror(errno),
 			    fa->pspec);

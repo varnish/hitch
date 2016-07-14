@@ -180,5 +180,14 @@ sni-nomatch-abort = off
 #     pem-file = "/etc/hitch/certs/mycert.pem"
 #
 # }
+#
+# Enforce output transfer rate limiting with socket pacing on Linux systems.
+#
+# Unit is bytes per second.
+#
+# type: integer
+#
+#limit-frontend = 10000000
+#limit-backend = 10000000
 
 # EOF
