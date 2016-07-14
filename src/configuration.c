@@ -143,9 +143,9 @@ config_new(void)
 	r->ENGINE             = NULL;
 	r->BACKLOG            = 100;
 	r->SNI_NOMATCH_ABORT  = 0;
-	r->CERT_DEFAULT = NULL;
-	r->CERT_FILES = NULL;
-	r->LISTEN_ARGS = NULL;
+	r->CERT_DEFAULT	      = NULL;
+	r->CERT_FILES         = NULL;
+	r->LISTEN_ARGS        = NULL;
 	ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
 	fa->port = strdup("8443");
 	fa->pspec = strdup("default");
