@@ -38,6 +38,8 @@
 "workers"		{ return (TOK_WORKERS); }
 "backlog"		{ return (TOK_BACKLOG); }
 "keepalive"		{ return (TOK_KEEPALIVE); }
+"limit-frontend"	{ return (TOK_PACE_FRONTEND); }
+"limit-backend"	{ return (TOK_PACE_BACKEND); }
 "chroot"		{ return (TOK_CHROOT); }
 "user"		{ return (TOK_USER); }
 "group"		{ return (TOK_GROUP); }
