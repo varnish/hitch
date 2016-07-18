@@ -3327,7 +3327,8 @@ ocsp_mktask(sslctx *sc, ocspquery *oq, double refresh_hint)
 		sk_uri = X509_get1_ocsp(sc->x509);
 		if (sk_uri == NULL
 		    || sk_OPENSSL_STRING_num(sk_uri) == 0) {
-			/* no responder to query. */
+			LOG("{ocsp} Note: No OCSP responder URI found "
+			    "for cert %s\n", sc->filename);
 			return;
 		}
 		/* schedule for immediate retrieval */
