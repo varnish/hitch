@@ -1160,6 +1160,7 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	if (ciphers != NULL) {
 		if (SSL_CTX_set_cipher_list(ctx, ciphers) != 1) {
 			ERR_print_errors_fp(stderr);
+			return (NULL);
 		}
 	}
 
