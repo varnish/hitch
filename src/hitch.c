@@ -3195,14 +3195,6 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 		AN(cbio);
 	}
 
-	rctx = OCSP_sendreq_new(cbio, path, req, 0);
-	if (rctx == NULL) {
-		ERR("{ocsp} OCSP_sendreq_new failed\n");
-		refresh_hint = 60;
-		goto retry;
-	}
-	OCSP_REQ_CTX_add1_header(rctx, "Host", host);
-
 	/* set non-blocking */
 	BIO_set_nbio(cbio, 1);
 	n = BIO_do_connect(cbio);
@@ -3228,6 +3220,23 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 			refresh_hint = 300;
 			goto retry;
 		}
+	}
+
+	rctx = OCSP_sendreq_new(cbio, path, req, 0);
+	if (rctx == NULL) {
+		ERR("{ocsp} OCSP_sendreq_new failed\n");
+		refresh_hint = 60;
+		goto retry;
+	}
+	if (OCSP_REQ_CTX_add1_header(rctx, "Host", host) == 0) {
+		ERR("{ocsp} OCSP_REQ_CTX_add1_header failed\n");
+		refresh_hint = 60;
+		goto retry;
+	}
+	if (OCSP_REQ_CTX_set1_req(rctx, req) == 0) {
+		ERR("{ocsp} OCSP_REQ_CTX_set1_req failed\n");
+		refresh_hint = 60;
+		goto retry;
 	}
 
 	while (1) {
