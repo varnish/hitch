@@ -216,6 +216,12 @@ typedef enum _SHUTDOWN_REQUESTOR {
 	SHUTDOWN_SSL
 } SHUTDOWN_REQUESTOR;
 
+static const char *SHUTDOWN_STR[] = {
+	[SHUTDOWN_HARD] = "SHUTDOWN_HARD",
+	[SHUTDOWN_CLEAR] = "SHUTDOWN_CLEAR",
+	[SHUTDOWN_SSL] = "SHUTDOWN_SSL",
+};
+
 #ifndef OPENSSL_NO_TLSEXT
 
 struct sni_name_s;
@@ -1890,7 +1896,7 @@ static void
 shutdown_proxy(proxystate *ps, SHUTDOWN_REQUESTOR req)
 {
 	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
-	LOGPROXY(ps, "proxy shutdown req=%d\n", req);
+	LOGPROXY(ps, "proxy shutdown req=%s\n", SHUTDOWN_STR[req]);
 	if (ps->want_shutdown || req == SHUTDOWN_HARD) {
 		ev_io_stop(loop, &ps->ev_w_ssl);
 		ev_io_stop(loop, &ps->ev_r_ssl);
@@ -2363,6 +2369,7 @@ client_handshake(struct ev_loop *loop, ev_io *w, int revents)
 {
 	(void)revents;
 	int t;
+	const char *errtok;
 	proxystate *ps;
 
 	CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
@@ -2373,7 +2380,16 @@ client_handshake(struct ev_loop *loop, ev_io *w, int revents)
 		end_handshake(ps);
 	} else {
 		int err = SSL_get_error(ps->ssl, t);
-		LOGPROXY(ps,"ssl client handshake err=%d\n",err);
+		switch (err) {
+#define SSL_ERR(a)				\
+			case a: errtok = #a; break;
+#include "ssl_err.h"
+#undef SSL_ERR
+		default:
+			errtok = "<undefined>";
+		}
+
+		LOGPROXY(ps,"ssl client handshake err=%s\n",errtok);
 		if (err == SSL_ERROR_WANT_READ) {
 			ev_io_stop(loop, &ps->ev_w_handshake);
 			ev_io_start(loop, &ps->ev_r_handshake);
