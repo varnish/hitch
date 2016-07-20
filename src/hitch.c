@@ -3164,6 +3164,7 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 	if (req == NULL) {
 		/* If we weren't able to create a request, there is no
 		 * use in scheduling a retry. */
+		FREE_OBJ(oq);
 		goto err;
 	}
 
