@@ -1229,24 +1229,28 @@ void
 ocsp_ev_stat(sslctx *sc)
 {
 	char *fn;
-	STACK_OF(OPENSSL_STRING) *sk_uri;
+	STACK_OF(OPENSSL_STRING) *sk_uri = NULL;
 	AN(sc->x509);
 	sk_uri = X509_get1_ocsp(sc->x509);
 
 	if (sk_uri == NULL
 	   || sk_OPENSSL_STRING_num(sk_uri) == 0) {
-		return;
+		goto err;
 	}
 
 	fn = ocsp_fn(sc->filename);
 	if (fn == NULL)
-		return;
+		goto err;
 
 	sc->staple_fn = fn;
 	sc->ev_staple = malloc(sizeof *sc->ev_staple);
 	sc->ev_staple->data = sc;
 	AN(sc->ev_staple);
 	ev_stat_init(sc->ev_staple, ocsp_stat_cb, fn, 0);
+
+err:
+	if (sk_uri != NULL)
+		X509_email_free(sk_uri);
 }
 
 
@@ -1394,8 +1398,7 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 			LOG("{core} Loaded cached OCSP staple for cert '%s'\n",
 			    sc->filename);
 			sc->staple_fn = fn;
-		} else
-			free(fn);
+		}
 	}
 
 	if (sc->staple == NULL && cf->ocspfn != NULL) {
@@ -3154,6 +3157,7 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 
 	AN(OCSP_parse_url(sk_OPENSSL_STRING_value(sk_uri, 0),
 		&host, &port, &path, &https));
+	X509_email_free(sk_uri);
 
 	req = ocsp_mkreq(oq);
 	if (req == NULL) {
@@ -3333,13 +3337,15 @@ ocsp_mktask(sslctx *sc, ocspquery *oq, double refresh_hint)
 	} else {
 		AN(sc->x509);
 		sk_uri = X509_get1_ocsp(sc->x509);
-		if (sk_uri == NULL
-		    || sk_OPENSSL_STRING_num(sk_uri) == 0) {
+		if (sk_uri == NULL || sk_OPENSSL_STRING_num(sk_uri) == 0) {
 			LOG("{ocsp} Note: No OCSP responder URI found "
 			    "for cert %s\n", sc->filename);
+			if (sk_uri != NULL)
+				X509_email_free(sk_uri);
 			return;
 		}
 		/* schedule for immediate retrieval */
+		X509_email_free(sk_uri);
 		refresh = 0.0;
 	}
 
