@@ -244,12 +244,12 @@ err:
 
 double
 asn1_gentime_parse(const ASN1_GENERALIZEDTIME *d) {
-	struct tm t;
+	struct tm tm = {0};
 	if (d == NULL)
 		return (-1.0);
 
-	if (asn1_generalizedtime_to_tm(&t, d) == 0)
+	if (asn1_generalizedtime_to_tm(&tm, d) == 0)
 		return (-1.0);
 
-	return (double) (mktime(&t));
+	return (double) (mktime(&tm));
 }
