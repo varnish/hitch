@@ -1242,6 +1242,7 @@ ocsp_ev_stat(sslctx *sc)
 	if (fn == NULL)
 		goto err;
 
+	free(sc->staple_fn);
 	sc->staple_fn = fn;
 	sc->ev_staple = malloc(sizeof *sc->ev_staple);
 	sc->ev_staple->data = sc;
