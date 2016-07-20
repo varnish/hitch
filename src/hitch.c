@@ -2501,10 +2501,6 @@ ssl_read(struct ev_loop *loop, ev_io *w, int revents)
 		} else {
 			if (err == SSL_ERROR_SSL) {
 				log_ssl_error(ps, "SSL_read error");
-			} else {
-				LOG("{%s} SSL_read error: %d\n",
-				    w->fd == ps->fd_up ? "client" : "backend",
-				    err);
 			}
 			handle_fatal_ssl_error(ps, err,
 			    w->fd == ps->fd_up ? 0 : 1);
