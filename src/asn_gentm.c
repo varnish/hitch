@@ -244,7 +244,8 @@ err:
 
 double
 asn1_gentime_parse(const ASN1_GENERALIZEDTIME *d) {
-	struct tm tm = {0};
+	struct tm tm = { .tm_min = 0 };
+
 	if (d == NULL)
 		return (-1.0);
 
