@@ -3330,7 +3330,6 @@ ocsp_mktask(sslctx *sc, ocspquery *oq, double refresh_hint)
 				refresh = 0.0;
 		} else
 			refresh = 1800;
-
 	} else {
 		AN(sc->x509);
 		sk_uri = X509_get1_ocsp(sc->x509);
@@ -3360,8 +3359,8 @@ ocsp_mktask(sslctx *sc, ocspquery *oq, double refresh_hint)
 	oq->ev_t_refresh.data = oq;
 	ev_timer_start(loop, &oq->ev_t_refresh);
 
-	/* fprintf(stderr, "refresh of ocsp staple for %s scheduled in" */
-	/*     " %.0lf seconds\n", sc->filename, refresh); */
+	LOG("{ocsp} Refresh of OCSP staple for %s scheduled in "
+	    "%.0lf seconds\n", sc->filename, refresh);
 }
 
 /*
