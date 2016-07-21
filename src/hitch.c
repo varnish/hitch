@@ -3313,10 +3313,14 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 		/* fetch failed.  Retry later. */
 		refresh_hint = 600.0;
 	} else {
-		ocsp_init_resp(oq->sctx, resp);
-		LOG("{ocsp} Retrieved new staple for cert %s\n",
-		    oq->sctx->filename);
-		ocsp_proc_persist(oq->sctx);
+		if (ocsp_init_resp(oq->sctx, resp) == 0) {
+			LOG("{ocsp} Retrieved new staple for cert %s\n",
+			    oq->sctx->filename);
+			ocsp_proc_persist(oq->sctx);
+		} else {
+			refresh_hint = 300;
+			goto retry;
+		}
 	}
 
 retry:
