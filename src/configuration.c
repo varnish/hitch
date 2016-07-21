@@ -1300,5 +1300,22 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		}
 	}
 
+	if (cfg->OCSP_DIR != NULL) {
+		struct stat sb;
+		if (stat(cfg->OCSP_DIR, &sb) != 0) {
+			config_error_set("ocsp-dir: Unable to stat directory"
+			    " '%s': %s'.", cfg->OCSP_DIR, strerror(errno));
+			*retval = 1;
+			return (1);
+		} else {
+			if (!S_ISDIR(sb.st_mode)) {
+				config_error_set("Bad ocsp-dir "
+				    "'%s': Not a directory.", cfg->OCSP_DIR);
+				*retval = 1;
+				return (1);
+			}
+		}
+	}
+
 	return (0);
 }

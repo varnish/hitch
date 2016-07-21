@@ -3103,8 +3103,13 @@ ocsp_proc_persist(sslctx *sc)
 	VSB_finish(tmpfn);
 	fd = mkstemp(VSB_data(tmpfn));
 	if (fd < 0) {
-		ERR("{ocsp} ocsp_proc_persist: mkstemp: %s: %s\n",
-		    VSB_data(tmpfn), strerror(errno));
+		if (errno == EACCES)
+			ERR("{ocsp} Error: ocsp-dir '%s' is not "
+			    "writable for the configured user\n",
+			    CONFIG->OCSP_DIR);
+		else
+			ERR("{ocsp} ocsp_proc_persist: mkstemp: %s: %s\n",
+			    VSB_data(tmpfn), strerror(errno));
 		goto err;
 	}
 
