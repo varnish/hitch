@@ -1268,13 +1268,6 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		cfg->QUIET = 1;
 	}
 
-	if (cfg->OCSP_AUTO_QUERY && cfg->OCSP_DIR == NULL) {
-		config_error_set("Error: Cannot configure 'ocsp-auto-query'"
-		    " without also setting 'ocsp-dir'.");
-		*retval = 1;
-		return (1);
-	}
-
 #ifdef USE_SHARED_CACHE
 	if (cfg->SHCUPD_IP != NULL && ! cfg->SHARED_CACHE) {
 		config_error_set("Shared cache update listener is defined,"

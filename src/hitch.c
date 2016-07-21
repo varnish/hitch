@@ -1422,7 +1422,7 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 		}
 	}
 
-	if (CONFIG->OCSP_AUTO_QUERY)
+	if (CONFIG->OCSP_DIR != NULL)
 		ocsp_ev_stat(sc);
 
 #endif /* OPENSSL_NO_TLSEXT */
@@ -2959,7 +2959,7 @@ handle_connections(int mgt_fd)
 		}
 	}
 
-	if (CONFIG->OCSP_AUTO_QUERY) {
+	if (CONFIG->OCSP_DIR != NULL) {
 		HASH_ITER(hh, ssl_ctxs, sc, sctmp) {
 			if (sc->ev_staple)
 				ev_stat_start(loop, sc->ev_staple);
@@ -3634,7 +3634,7 @@ do_wait(void)
 	}
 
 	/* also check if the ocsp worker killed itself */
-	if (CONFIG->OCSP_AUTO_QUERY)
+	if (CONFIG->OCSP_DIR != NULL)
 		WAIT_PID(ocsp_proc_pid, start_ocsp_proc());
 }
 
@@ -4213,7 +4213,7 @@ reconfigure(int argc, char **argv)
 		}
 	}
 
-	if (CONFIG->OCSP_AUTO_QUERY) {
+	if (CONFIG->OCSP_DIR != NULL) {
 		(void) kill(ocsp_proc_pid, SIGTERM);
 		start_ocsp_proc();
 	}
@@ -4328,8 +4328,11 @@ main(int argc, char **argv)
 
 	start_workers(0, CONFIG->NCORES);
 
-	if (CONFIG->OCSP_AUTO_QUERY)
+	if (CONFIG->OCSP_DIR != NULL)
 		start_ocsp_proc();
+	else
+		LOGL("{core} No `ocsp-dir` configured: Automatic retrieval"
+		    " of OCSP staples will be disabled.\n");
 
 #ifdef USE_SHARED_CACHE
 	if (CONFIG->SHCUPD_PORT) {

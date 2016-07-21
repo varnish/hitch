@@ -59,7 +59,7 @@ If you want to use Diffie-Hellman based ciphers for Perfect Forward Secrecy
 
 Hitch will complain and disable DH unless these parameters are available.
 
-## Automated OCSP stapling
+## Automatic OCSP staple retrieval
 
 Hitch has support for automated retrieval of OCSP responses from an
 OCSP responder.
@@ -68,11 +68,10 @@ If the loaded certificate contains an OCSP responder address and it
 also has the required issuer certificate as part of its chain, Hitch
 will automatically retrieve and refresh OCSP staples.
 
-To set this up, specify the following settings in your configuration
-file to:
+To set this up, specify the following setting in your configuration
+file:
 
-	ocsp-auto-query = on
-	ocsp-dir = "/var/cache/hitch-ocsp"
+	ocsp-dir = "/var/lib/hitch-ocsp"
 
 The `ocsp-dir` directory must be read/write accessible by the
 configured hitch user, and should not be read or write accessible by
