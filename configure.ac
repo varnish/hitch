@@ -42,6 +42,11 @@ AC_ARG_ENABLE(sessioncache,
 		   [Enable TLS session cache. (default is off)]),
     [use_shctx="$withval"],
     [use_shctx=no])
+if test x"$use_shctx" != xno; then
+  if test ! -e 'src/ebtree/ebtree.h'; then
+    AC_MSG_ERROR([Must clone https://github.com/haproxy/ebtree to src/ebtree/])
+  fi
+fi
 AM_CONDITIONAL(USE_SHCTX, test xno != x"$use_shctx")
 
 # Checks for header files.
