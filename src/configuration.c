@@ -147,7 +147,7 @@ config_new(void)
 	fa->pspec = strdup("default");
 	HASH_ADD_KEYPTR(hh, r->LISTEN_ARGS, fa->pspec, strlen(fa->pspec), fa);
 	r->LISTEN_DEFAULT = fa;
-	r->OCSP_VFY = 1;
+	r->OCSP_VFY = 0;
 
 #ifdef USE_SHARED_CACHE
 	r->SHARED_CACHE       = 0;
