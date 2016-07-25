@@ -3148,6 +3148,16 @@ err:
 static void
 ocsp_mktask(sslctx *sc, ocspquery *oq, double refresh_hint);
 
+
+static double
+time_now(void)
+{
+	struct timespec tv;
+
+	AZ(clock_gettime(CLOCK_REALTIME, &tv));
+	return (tv.tv_sec + 1e-9 * tv.tv_nsec);
+}
+
 static void
 ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 {
@@ -3160,6 +3170,7 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 	BIO *cbio = NULL, *sbio;
 	SSL_CTX *ctx = NULL;
 	OCSP_RESPONSE *resp = NULL;
+	double resp_tmo;
 	fd_set fds;
 	struct timeval tv;
 	int n, fd;
@@ -3242,6 +3253,12 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 			    host, port);
 			refresh_hint = 300;
 			goto retry;
+		} else if (n < 0) {
+			ERR("{ocsp} Error: Connecting to %s:%s failed: "
+			    "select: %s\n",
+			    host, port, strerror(errno));
+			refresh_hint = 300;
+			goto retry;
 		}
 	}
 
@@ -3262,7 +3279,9 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 		goto retry;
 	}
 
+	resp_tmo = time_now() + CONFIG->OCSP_RESP_TMO;
 	while (1) {
+		double tnow;
 		n = OCSP_sendreq_nbio(&resp, rctx);
 		if (n == 0) {
 			/* this is an error, and we can't continue */
@@ -3278,9 +3297,9 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 		FD_ZERO(&fds);
 		FD_SET(fd, &fds);
 
-		/* TODO: expose timeouts as settings */
-		tv.tv_usec = 0;
-		tv.tv_sec = 20;
+		tnow = time_now();
+		tv.tv_sec = resp_tmo - tnow;
+		tv.tv_usec = ((resp_tmo - tnow) - tv.tv_sec) * 1e6;
 
 		if (BIO_should_read(cbio))
 			n = select(fd + 1, (void *) &fds, NULL, NULL, &tv);
@@ -3295,15 +3314,18 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 		if (n == -1) {
 			if (errno == EINTR)
 				continue;
-			ERR("{ocsp} select: %s\n", strerror(errno));
+			ERR("{ocsp} Error: Transmission failed:"
+			    " select: %s\n", strerror(errno));
 			refresh_hint = 300;
 			goto retry;
 		}
 
 		if (n == 0) {
 			/* timeout */
-			ERR("{ocsp} Error: transmission timout for %s:%s\n",
-			    host, port);
+			ERR("{ocsp} Error: Transmission timout for %s:%s. "
+			    "Consider increasing parameter 'ocsp-resp-tmo'"
+			    " [current value: %.3fs]\n",
+			    host, port, CONFIG->OCSP_RESP_TMO);
 			refresh_hint = 300;
 			goto retry;
 		}
@@ -3342,12 +3364,10 @@ static void
 ocsp_mktask(sslctx *sc, ocspquery *oq, double refresh_hint)
 {
 	double refresh = -1.0;
-	struct timespec tv;
 	double tnow;
 	STACK_OF(OPENSSL_STRING) *sk_uri;
 
-	AZ(clock_gettime(CLOCK_REALTIME, &tv));
-	tnow = tv.tv_sec + 1e-9 * tv.tv_nsec;
+	tnow = time_now();
 
 	if (sc->staple != NULL) {
 		CHECK_OBJ_NOTNULL(sc->staple, SSLSTAPLE_MAGIC);
