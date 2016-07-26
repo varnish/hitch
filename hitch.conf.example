@@ -182,6 +182,9 @@ sni-nomatch-abort = off
 # Timeout for connecting to an OCSP responder (in seconds)
 # ocsp-connect-tmo = 4;
 
+# Verification of OCSP responses
+# ocsp-verify-staple = off
+
 # frontend = {
 #
 # # match-global-certs: Also search globally defined PEM files for SNI
