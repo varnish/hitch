@@ -3243,14 +3243,15 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 	if (n <= 0) {
 		FD_ZERO(&fds);
 		FD_SET(fd, &fds);
-		tv.tv_usec = 0;
-		tv.tv_sec = 10;
-		/* wait for connect to finish, with a timeout of 10s */
+		tv.tv_sec = CONFIG->OCSP_CONN_TMO;
+		tv.tv_usec = (CONFIG->OCSP_CONN_TMO - tv.tv_sec) * 1e6;
 		n = select(fd + 1, NULL, (void *) &fds, NULL, &tv);
 		if (n == 0) {
 			/* connect timeout */
-			ERR("{ocsp} Error: Connection to %s:%s timed out.\n",
-			    host, port);
+			ERR("{ocsp} Error: Connection to %s:%s timed out. "
+			    "Hit parameter 'ocsp-connect-tmo"
+			    " [current value: %.3fs]\n",
+			    CONFIG->OCSP_CONN_TMO, host, port);
 			refresh_hint = 300;
 			goto retry;
 		} else if (n < 0) {
