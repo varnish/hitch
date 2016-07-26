@@ -50,7 +50,7 @@ a non-privileged user `hitch` can setuid() to.
 PEM files should contain the key file, the certificate from the CA and any
 intermediate CAs needed.
 
-    $ cat example.com.key intermediate.pem example.com.crt > example.com.pem
+    $ cat example.com.key example.com.crt intermediate.pem > example.com.pem
 
 If you want to use Diffie-Hellman based ciphers for Perfect Forward Secrecy
 (PFS), you need to add some parameters for that as well:
