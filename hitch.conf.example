@@ -167,6 +167,21 @@ proxy-proxy = off
 # type: boolean
 sni-nomatch-abort = off
 
+## OCSP settings
+#
+# Directory where Hitch will store and read OCSP responses for
+# stapling. Directory must be readable and writable for the configured
+# hitch user. Setting this option enables automatic retrieval and
+# updating of OCSP responses.
+#
+# ocsp-dir = "/var/lib/hitch-ocsp"
+
+# Timeout for fetching an OCSP response from a responder (in seconds)
+# ocsp-resp-tmo = 10;
+
+# Timeout for connecting to an OCSP responder (in seconds)
+# ocsp-connect-tmo = 4;
+
 # frontend = {
 #
 # # match-global-certs: Also search globally defined PEM files for SNI

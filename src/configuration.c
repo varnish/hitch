@@ -62,6 +62,7 @@
 #define CFG_RING_DATA_LEN "ring-data-len"
 #define CFG_PIDFILE "pidfile"
 #define CFG_SNI_NOMATCH_ABORT "sni-nomatch-abort"
+#define CFG_OCSP_DIR "ocsp-dir"
 
 #ifdef USE_SHARED_CACHE
 	#define CFG_SHARED_CACHE "shared-cache"
@@ -151,7 +152,9 @@ config_new(void)
 	fa->pspec = strdup("default");
 	HASH_ADD_KEYPTR(hh, r->LISTEN_ARGS, fa->pspec, strlen(fa->pspec), fa);
 	r->LISTEN_DEFAULT = fa;
-	r->OCSP_VFY = 1;
+	r->OCSP_VFY = 0;
+	r->OCSP_RESP_TMO = 10.0;
+	r->OCSP_CONN_TMO = 4.0;
 
 #ifdef USE_SHARED_CACHE
 	r->SHARED_CACHE       = 0;
@@ -228,6 +231,7 @@ config_destroy(hitch_config *cfg)
 	free(cfg->CIPHER_SUITE);
 	free(cfg->ENGINE);
 	free(cfg->PIDFILE);
+	free(cfg->OCSP_DIR);
 
 #ifdef USE_SHARED_CACHE
 	free(cfg->SHCUPD_IP);
@@ -838,6 +842,8 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		r = config_param_val_int(v, &cfg->RING_DATA_LEN, 1);
 	} else if (strcmp(k, CFG_SNI_NOMATCH_ABORT) == 0) {
 		r = config_param_val_bool(v, &cfg->SNI_NOMATCH_ABORT);
+	} else if (strcmp(k, CFG_OCSP_DIR) == 0) {
+		config_assign_str(&cfg->OCSP_DIR, v);
 	} else {
 		fprintf(
 			stderr,
@@ -1048,6 +1054,9 @@ config_print_usage_fd(char *prog, FILE *out)
 			"submits an unrecognized SNI server name\n" );
 	fprintf(out, "                             (Default: %s)\n",
 			config_disp_bool(cfg->SNI_NOMATCH_ABORT));
+	fprintf(out, "      --ocsp-dir=DIR         Set OCSP staple cache directory\n");
+	fprintf(out, "                             This enables automated retrieval and stapling of OCSP responses\n");
+	fprintf(out, "                             (Default: \"%s\")\n", config_disp_str(cfg->OCSP_DIR));
 	fprintf(out, "\n");
 	fprintf(out, "  -t  --test                 Test configuration and exit\n");
 	fprintf(out, "  -p  --pidfile=FILE         PID file\n");
@@ -1107,12 +1116,13 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		{ CFG_WRITE_PROXY, 0, &cfg->WRITE_PROXY_LINE_V2, 1 },
 		{ CFG_PROXY_PROXY, 0, &cfg->PROXY_PROXY_LINE, 1 },
 		{ CFG_SNI_NOMATCH_ABORT, 0, &cfg->SNI_NOMATCH_ABORT, 1 },
+		{ CFG_OCSP_DIR, 1, NULL, 'o' },
 		{ "test", 0, NULL, 't' },
 		{ "version", 0, NULL, 'V' },
 		{ "help", 0, NULL, 'h' },
 		{ 0, 0, 0, 0 }
 	};
-#define SHORT_OPTS "c:e:Ob:f:n:B:C:U:p:P:M:k:r:u:g:qstVh"
+#define SHORT_OPTS "c:e:Ob:f:n:B:C:U:p:P:M:k:r:u:g:qstVho:"
 
 	if (argc == 1) {
 		config_print_usage(argv[0]);
@@ -1225,6 +1235,9 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 			*retval = 0;
 			return (1);
 			break;
+		case 'o':
+			ret = config_param_validate(CFG_OCSP_DIR, optarg, cfg, NULL, 0);
+			break;
 
 		default:
 			config_error_set("Invalid command line parameters. "
@@ -1298,6 +1311,23 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 				*retval = 1;
 				return (1);
 
+			}
+		}
+	}
+
+	if (cfg->OCSP_DIR != NULL) {
+		struct stat sb;
+		if (stat(cfg->OCSP_DIR, &sb) != 0) {
+			config_error_set("ocsp-dir: Unable to stat directory"
+			    " '%s': %s'.", cfg->OCSP_DIR, strerror(errno));
+			*retval = 1;
+			return (1);
+		} else {
+			if (!S_ISDIR(sb.st_mode)) {
+				config_error_set("Bad ocsp-dir "
+				    "'%s': Not a directory.", cfg->OCSP_DIR);
+				*retval = 1;
+				return (1);
 			}
 		}
 	}

@@ -65,6 +65,9 @@
 "cert"			{ return (TOK_PB_CERT); }
 "ocsp-resp-file"	{ return (TOK_PB_OCSP_FILE); }
 "ocsp-verify-staple"	{ return (TOK_OCSP_VERIFY); }
+"ocsp-resp-tmo"		{ return (TOK_OCSP_RESP_TMO); }
+"ocsp-connect-tmo"	{ return (TOK_OCSP_CONN_TMO); }
+"ocsp-dir"		{ return (TOK_OCSP_DIR); }
 
 (?i:"yes"|"y"|"on"|"true"|"t"|\"yes\"|\"y\"|\"on\"|\"true\"|\"t\") {
 	yylval.i = 1;
