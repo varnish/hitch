@@ -62,6 +62,7 @@
 #define CFG_RING_DATA_LEN "ring-data-len"
 #define CFG_PIDFILE "pidfile"
 #define CFG_SNI_NOMATCH_ABORT "sni-nomatch-abort"
+#define CFG_OCSP_DIR "ocsp-dir"
 
 #ifdef USE_SHARED_CACHE
 	#define CFG_SHARED_CACHE "shared-cache"
@@ -838,6 +839,8 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		r = config_param_val_int(v, &cfg->RING_DATA_LEN, 1);
 	} else if (strcmp(k, CFG_SNI_NOMATCH_ABORT) == 0) {
 		r = config_param_val_bool(v, &cfg->SNI_NOMATCH_ABORT);
+	} else if (strcmp(k, CFG_OCSP_DIR) == 0) {
+		config_assign_str(&cfg->OCSP_DIR, v);
 	} else {
 		fprintf(
 			stderr,
@@ -1048,6 +1051,9 @@ config_print_usage_fd(char *prog, FILE *out)
 			"submits an unrecognized SNI server name\n" );
 	fprintf(out, "                             (Default: %s)\n",
 			config_disp_bool(cfg->SNI_NOMATCH_ABORT));
+	fprintf(out, "      --ocsp-dir=DIR         Set OCSP staple cache directory\n");
+	fprintf(out, "                             This enables automated retrieval and stapling of OCSP responses\n");
+	fprintf(out, "                             (Default: \"%s\")\n", config_disp_str(cfg->OCSP_DIR));
 	fprintf(out, "\n");
 	fprintf(out, "  -t  --test                 Test configuration and exit\n");
 	fprintf(out, "  -p  --pidfile=FILE         PID file\n");
@@ -1107,12 +1113,13 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		{ CFG_WRITE_PROXY, 0, &cfg->WRITE_PROXY_LINE_V2, 1 },
 		{ CFG_PROXY_PROXY, 0, &cfg->PROXY_PROXY_LINE, 1 },
 		{ CFG_SNI_NOMATCH_ABORT, 0, &cfg->SNI_NOMATCH_ABORT, 1 },
+		{ CFG_OCSP_DIR, 1, NULL, 'o' },
 		{ "test", 0, NULL, 't' },
 		{ "version", 0, NULL, 'V' },
 		{ "help", 0, NULL, 'h' },
 		{ 0, 0, 0, 0 }
 	};
-#define SHORT_OPTS "c:e:Ob:f:n:B:C:U:p:P:M:k:r:u:g:qstVh"
+#define SHORT_OPTS "c:e:Ob:f:n:B:C:U:p:P:M:k:r:u:g:qstVho:"
 
 	if (argc == 1) {
 		config_print_usage(argv[0]);
@@ -1224,6 +1231,9 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 			config_print_usage(argv[0]);
 			*retval = 0;
 			return (1);
+			break;
+		case 'o':
+			ret = config_param_validate(CFG_OCSP_DIR, optarg, cfg, NULL, 0);
 			break;
 
 		default:
