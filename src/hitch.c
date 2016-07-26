@@ -357,6 +357,16 @@ typedef struct proxystate {
 	int			connect_port;	/* local port for connection */
 } proxystate;
 
+
+static double
+time_now(void)
+{
+	struct timespec tv;
+
+	AZ(clock_gettime(CLOCK_REALTIME, &tv));
+	return (tv.tv_sec + 1e-9 * tv.tv_nsec);
+}
+
 /* declare printf like functions: */
 static void WLOG(int level, const char *fmt, ...)
 	__attribute__((format(printf, 2, 3)));
@@ -899,6 +909,11 @@ ocsp_staple_cb(SSL *ssl, void *priv)
 	unsigned char *buf;
 	CAST_OBJ_NOTNULL(staple, priv, SSLSTAPLE_MAGIC);
 
+	if (staple->nextupd != -1 &&
+	    staple->nextupd < time_now()) {
+		return (SSL_TLSEXT_ERR_NOACK);
+	}
+
 	/* SSL_set_tlsext_status_ocsp_resp will issue a free() on the
 	 * provided input, so we need to pass a copy. */
 	buf = malloc(staple->len);
@@ -1064,7 +1079,7 @@ ocsp_verify(sslctx *sc, OCSP_RESPONSE *resp, double *nextupd)
 	STACK_OF(X509) *chain = NULL;
 	OCSP_CERTID *cid = NULL;
 	int status = -1, reason;
-	ASN1_GENERALIZEDTIME *asn_nextupd;
+	ASN1_GENERALIZEDTIME *asn_nextupd = NULL;
 	X509 *issuer;
 	int i;
 	int do_verify = sc->staple_vfy;
@@ -1126,7 +1141,11 @@ ocsp_verify(sslctx *sc, OCSP_RESPONSE *resp, double *nextupd)
 		goto err;
 	}
 
-	*nextupd = asn1_gentime_parse(asn_nextupd);
+	if (asn_nextupd != NULL)
+		*nextupd = asn1_gentime_parse(asn_nextupd);
+	else {
+		*nextupd = -1.0;
+	}
 
 	OCSP_CERTID_free(cid);
 	OCSP_BASICRESP_free(br);
@@ -3143,16 +3162,6 @@ err:
 
 static void
 ocsp_mktask(sslctx *sc, ocspquery *oq, double refresh_hint);
-
-
-static double
-time_now(void)
-{
-	struct timespec tv;
-
-	AZ(clock_gettime(CLOCK_REALTIME, &tv));
-	return (tv.tv_sec + 1e-9 * tv.tv_nsec);
-}
 
 static void
 ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
