@@ -64,14 +64,17 @@ Hitch will complain and disable DH unless these parameters are available.
 Hitch has support for automated retrieval of OCSP responses from an
 OCSP responder.
 
-If the loaded certificate contains an OCSP responder address and it
-also has the required issuer certificate as part of its chain, Hitch
-will automatically retrieve and refresh OCSP staples.
-
 To set this up, specify the following setting in your configuration
 file:
 
 	ocsp-dir = "/var/lib/hitch-ocsp"
+
+This can also be configured via the command line option
+``--ocsp-dir=mydir``.
+
+If the loaded certificate contains an OCSP responder address and it
+also has the required issuer certificate as part of its chain, Hitch
+will automatically retrieve and refresh OCSP staples.
 
 The `ocsp-dir` directory must be read/write accessible by the
 configured hitch user, and should not be read or write accessible by
@@ -79,6 +82,28 @@ any other user.
 
 The staples are fetched asynchronously, and will be loaded and ready
 for stapling as soon as they are available.
+
+The variables ``ocsp-connect-tmo`` and ``ocsp-resp-tmo`` controls
+respectively the connect timeout and fetch transmission timeout when
+Hitch is talking to an OCSP responder.
+
+## Verification of OCSP staples
+
+Hitch will optionally verify the OCSP staple, this can be done by
+specifying
+
+	ocsp-verify-staple = on
+
+in the configuration file.
+
+If you are running with a custom CA, the verification certificates can
+be changed by setting the `SSL_CERT_FILE` or `SSL_CERT_DIR`
+environment variables. `SSL_CERT_FILE` can point to a single pem file
+containing a chain of certificates, while the `SSL_CERT_DIR` can be a
+comma-separated list of directories containing pem file with symlinks
+by their hash key (see the man page of c_rehash from the OpenSSL
+library for more information).
+
 
 
 ## OCSP stapling from manually pre-loaded files

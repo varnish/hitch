@@ -4,6 +4,18 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.3.0-beta3 (2016-07-26)
+------------------------------
+
+* Fully automated retrieval and refreshes of OCSP responses (see
+  configuration.md for details).
+* New parameters ``ocsp-dir``, ``ocsp-resp-tmo`` and ``ocsp-connect-tmo``.
+* Cleanup of various log messages.
+* Verification of OCSP staples. Enabled by setting
+  ``ocsp-verify-staple = on``.
+* Make rst2man an optional requirement (#93). Thanks to Barry Allard.
+* Don't staple expired OCSP responses
+
 hitch-1.3.0-beta2 (2016-05-31)
 ------------------------------
 
