@@ -3130,6 +3130,7 @@ ocsp_proc_persist(sslctx *sc)
 
 	if (write(fd, sc->staple->staple, sc->staple->len) != sc->staple->len) {
 		ERR("{ocsp} ocsp_proc_persist: write: %s\n", strerror(errno));
+		(void) close(fd);
 		goto err;
 	}
 
@@ -3151,8 +3152,6 @@ ocsp_proc_persist(sslctx *sc)
 	return (0);
 
 err:
-	if (fd >= 0)
-		(void) close(fd);
 	unlink(VSB_data(tmpfn));
 	VSB_delete(tmpfn);
 	free(dstfile);
