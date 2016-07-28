@@ -3643,7 +3643,7 @@ do_wait(void)
 	pid = waitpid(p, &status, WNOHANG);				\
 	if (pid == 0) {							\
 		/* child has not exited */				\
-		continue;						\
+		break;							\
 	}								\
 	else if (pid == -1) {						\
 		if (errno == EINTR)					\
