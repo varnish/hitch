@@ -2386,6 +2386,8 @@ client_handshake(struct ev_loop *loop, ev_io *w, int revents)
 	int t;
 	const char *errtok;
 	proxystate *ps;
+	int errno_val;
+
 
 	CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
 
@@ -2394,6 +2396,7 @@ client_handshake(struct ev_loop *loop, ev_io *w, int revents)
 	if (t == 1) {
 		end_handshake(ps);
 	} else {
+		errno_val = errno;
 		int err = SSL_get_error(ps->ssl, t);
 		switch (err) {
 #define SSL_ERR(a)				\
@@ -2414,6 +2417,11 @@ client_handshake(struct ev_loop *loop, ev_io *w, int revents)
 		} else if (err == SSL_ERROR_ZERO_RETURN) {
 			LOG("{%s} Connection closed (in handshake)\n",
 			    w->fd == ps->fd_up ? "client" : "backend");
+			shutdown_proxy(ps, SHUTDOWN_SSL);
+		} else if (err == SSL_ERROR_SYSCALL) {
+			LOG("{%s} SSL socket error in handshake: %s\n",
+			    w->fd == ps->fd_up ? "client" : "backend",
+			    strerror(errno_val));
 			shutdown_proxy(ps, SHUTDOWN_SSL);
 		} else {
 			if (err == SSL_ERROR_SSL) {
