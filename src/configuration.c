@@ -514,7 +514,7 @@ config_param_shcupd_mcastif(char *str, char **iface, char **ttl)
 		if (!strcmp(str, "*"))
 			*iface = NULL;
 		else
-			*iface = str;
+			*iface = strdup(str);
 		*ttl = NULL;
 		return 1;
 	}
@@ -523,9 +523,9 @@ config_param_shcupd_mcastif(char *str, char **iface, char **ttl)
 	}
 	else {
 		*sp = 0;
-		*iface = str;
+		*iface = strdup(str);
 	}
-	*ttl = sp + 1;
+	*ttl = strdup(sp + 1);
 
 	return 1;
 }
