@@ -3437,6 +3437,7 @@ handle_ocsp_task(void) {
 		}
 	}
 
+	(void) umask(027);
 	loop = ev_default_loop(EVFLAG_AUTO);
 
 	/* Create ocspquery work items for any eligible ocsp queries */
