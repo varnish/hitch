@@ -4390,18 +4390,16 @@ main(int argc, char **argv)
 	LOGL("{core} %s initialization complete\n", PACKAGE_STRING);
 	for (;;) {
 #ifdef USE_SHARED_CACHE
-            if (CONFIG->SHCUPD_PORT) {
-                while (n_sighup == 0 && n_sigchld == 0) {
-                    /* event loop to receive cache updates */
-                    ev_loop(loop, EVRUN_ONCE);
-                }
-            } else {
-                pause();
-            }
+		if (CONFIG->SHCUPD_PORT) {
+			while (n_sighup == 0 && n_sigchld == 0) {
+				/* event loop to receive cache updates */
+				ev_loop(loop, EVRUN_ONCE);
+			}
+		} else
 #else
+			pause();
 		/* Sleep and let the children work.
 		 * Parent will be woken up if a signal arrives */
-		pause();
 #endif /* USE_SHARED_CACHE */
 
 		while (n_sighup != 0) {
