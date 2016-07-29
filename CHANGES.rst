@@ -14,7 +14,8 @@ hitch-1.3.0-beta3 (2016-07-26)
 * Verification of OCSP staples. Enabled by setting
   ``ocsp-verify-staple = on``.
 * Make rst2man an optional requirement (#93). Thanks to Barry Allard.
-* Don't staple expired OCSP responses
+* Avoid stapling expired OCSP responses
+* A few fixes to the shared cache updating code. Thanks to Piyush Dewnani
 
 hitch-1.3.0-beta2 (2016-05-31)
 ------------------------------
