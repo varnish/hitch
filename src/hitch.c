@@ -4374,7 +4374,7 @@ main(int argc, char **argv)
 	if (CONFIG->OCSP_DIR != NULL)
 		start_ocsp_proc();
 	else
-		LOGL("{core} No `ocsp-dir` configured: Automatic retrieval"
+		LOGL("{core} No 'ocsp-dir' configured: Automatic retrieval"
 		    " of OCSP staples will be disabled.\n");
 
 #ifdef USE_SHARED_CACHE
