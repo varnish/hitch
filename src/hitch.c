@@ -133,8 +133,8 @@ static uint64_t n_conns;
  * to launching new children. */
 static unsigned worker_gen;
 
-static unsigned n_sighup;
-static unsigned n_sigchld;
+static volatile unsigned n_sighup;
+static volatile unsigned n_sigchld;
 
 enum worker_state_e {
 	WORKER_ACTIVE,
@@ -4384,15 +4384,25 @@ main(int argc, char **argv)
 		ev_io_init(&shcupd_listener, handle_shcupd, shcupd_socket,
 		    EV_READ);
 		ev_io_start(loop, &shcupd_listener);
-		ev_loop(loop, 0);
 	}
 #endif /* USE_SHARED_CACHE */
 
 	LOGL("{core} %s initialization complete\n", PACKAGE_STRING);
 	for (;;) {
+#ifdef USE_SHARED_CACHE
+            if (CONFIG->SHCUPD_PORT) {
+                while (n_sighup == 0 && n_sigchld == 0) {
+                    /* event loop to receive cache updates */
+                    ev_loop(loop, EVRUN_ONCE);
+                }
+            } else {
+                pause();
+            }
+#else
 		/* Sleep and let the children work.
 		 * Parent will be woken up if a signal arrives */
 		pause();
+#endif /* USE_SHARED_CACHE */
 
 		while (n_sighup != 0) {
 			n_sighup = 0;
