@@ -1265,8 +1265,8 @@ ocsp_ev_stat(sslctx *sc)
 	free(sc->staple_fn);
 	sc->staple_fn = fn;
 	sc->ev_staple = malloc(sizeof *sc->ev_staple);
-	sc->ev_staple->data = sc;
 	AN(sc->ev_staple);
+	sc->ev_staple->data = sc;
 	ev_stat_init(sc->ev_staple, ocsp_stat_cb, fn, 0);
 
 err:
