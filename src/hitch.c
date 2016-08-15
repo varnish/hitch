@@ -2995,7 +2995,7 @@ handle_connections(int mgt_fd)
 			}
 		}
 
-		if (default_ctx->ev_staple)
+		if (default_ctx != NULL && default_ctx->ev_staple != NULL)
 			ev_stat_start(loop, default_ctx->ev_staple);
 	}
 
@@ -3460,7 +3460,8 @@ handle_ocsp_task(void) {
 		}
 	}
 
-	ocsp_mktask(default_ctx, NULL, -1.0);
+	if (default_ctx != NULL)
+		ocsp_mktask(default_ctx, NULL, -1.0);
 
 	ev_timer_init(&timer_ppid_check, check_ppid, 1.0, 1.0);
 	ev_timer_start(loop, &timer_ppid_check);
