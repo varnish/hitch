@@ -45,7 +45,26 @@ backend = "[127.0.0.1]:6081"
 # type: string
 pem-file = ""
 
-# Alternative pem-file syntax:
+# OCSP settings
+#
+# Directory where Hitch will store and read OCSP responses for
+# stapling. Directory must be readable and writable for the configured
+# hitch user. Setting this option enables automatic retrieval and
+# updating of OCSP responses.
+#
+# ocsp-dir = "/var/lib/hitch-ocsp"
+
+# Timeout for fetching an OCSP response from a responder (in seconds)
+# ocsp-resp-tmo = 10;
+
+# Timeout for connecting to an OCSP responder (in seconds)
+# ocsp-connect-tmo = 4;
+
+# Verification of OCSP responses
+# ocsp-verify-staple = off
+
+# If you have a manually pre-loaded OCSP staple, and alternative
+# pem-file syntax can be used for stapling:
 #
 # pem-file = {
 # 	cert = "mycert.pem"
@@ -166,24 +185,6 @@ proxy-proxy = off
 #
 # type: boolean
 sni-nomatch-abort = off
-
-## OCSP settings
-#
-# Directory where Hitch will store and read OCSP responses for
-# stapling. Directory must be readable and writable for the configured
-# hitch user. Setting this option enables automatic retrieval and
-# updating of OCSP responses.
-#
-# ocsp-dir = "/var/lib/hitch-ocsp"
-
-# Timeout for fetching an OCSP response from a responder (in seconds)
-# ocsp-resp-tmo = 10;
-
-# Timeout for connecting to an OCSP responder (in seconds)
-# ocsp-connect-tmo = 4;
-
-# Verification of OCSP responses
-# ocsp-verify-staple = off
 
 # frontend = {
 #
