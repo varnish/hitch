@@ -4,6 +4,11 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.3.1 (2016-08-16)
+------------------------
+
+* Fixes a bug in the autotools configuration which led to man pages not being built.
+
 hitch-1.3.0 (2016-08-16)
 ------------------------
 
