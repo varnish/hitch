@@ -22,7 +22,7 @@ AC_ARG_WITH([rst2man],
 if test "x$RST2MAN" = "xno"; then
   AC_MSG_WARN([rst2man/rst2man.py were not found, Hitch will lack man pages.  To fix this, please install python-docutils first and re-run configure.])
 fi
-AM_CONDITIONAL([FOUND_RST2MAN], [test "x$RST2MAN" = xyes])
+AM_CONDITIONAL([FOUND_RST2MAN], [test "x$RST2MAN" != xno])
 
 AM_MAINTAINER_MODE([disable])
 
