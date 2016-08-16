@@ -4,6 +4,13 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.3.0 (2016-08-16)
+------------------------
+
+* Fix a bug where we crashed in the OCSP handling if there was no
+  default SSLCTX configured.
+* Minor documentation fix.
+
 hitch-1.3.0-beta3 (2016-07-26)
 ------------------------------
 
