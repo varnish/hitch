@@ -75,6 +75,9 @@ Command line arguments
                          (Default: off)
   --sni-nomatch-abort    Abort handshake when client submits an unrecognized SNI server name
                          (Default: off)
+  --ocsp-dir=DIR         Set OCSP staple cache directory
+                         This enables automated retrieval and stapling of OCSP responses
+                         (Default: "")
   -t  --test                 Test configuration and exit
   -p  --pidfile=FILE         PID file
   -V  --version              Print program version and exit
