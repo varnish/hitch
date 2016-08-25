@@ -53,6 +53,8 @@
 #define CFG_WRITE_PROXY_V2 "write-proxy-v2"
 #define CFG_PEM_FILE "pem-file"
 #define CFG_PROXY_PROXY "proxy-proxy"
+#define CFG_ALPN_PROTOS "alpn-protos"
+#define CFG_PARAM_ALPN_PROTOS 48173
 #define CFG_BACKEND_CONNECT_TIMEOUT "backend-connect-timeout"
 #define CFG_SSL_HANDSHAKE_TIMEOUT "ssl-handshake-timeout"
 #define CFG_RECV_BUFSIZE "recv-bufsize"
@@ -134,6 +136,9 @@ config_new(void)
 	r->WRITE_PROXY_LINE_V1= 0;
 	r->WRITE_PROXY_LINE_V2= 0;
 	r->PROXY_PROXY_LINE   = 0;
+	r->ALPN_PROTOS        = NULL;
+	r->ALPN_PROTOS_LV     = NULL;
+	r->ALPN_PROTOS_LV_LEN = 0;
 	r->CHROOT             = NULL;
 	r->UID                = -1;
 	r->GID                = -1;
@@ -232,6 +237,8 @@ config_destroy(hitch_config *cfg)
 	free(cfg->ENGINE);
 	free(cfg->PIDFILE);
 	free(cfg->OCSP_DIR);
+	free(cfg->ALPN_PROTOS);
+	free(cfg->ALPN_PROTOS_LV);
 
 #ifdef USE_SHARED_CACHE
 	free(cfg->SHCUPD_IP);
@@ -807,6 +814,10 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		r = config_param_val_bool(v, &cfg->WRITE_PROXY_LINE_V2);
 	} else if (strcmp(k, CFG_PROXY_PROXY) == 0) {
 		r = config_param_val_bool(v, &cfg->PROXY_PROXY_LINE);
+	} else if (strcmp(k, CFG_ALPN_PROTOS) == 0) {
+		if (strlen(v) > 0) {
+			config_assign_str(&cfg->ALPN_PROTOS, v);
+		}
 	} else if (strcmp(k, CFG_PEM_FILE) == 0) {
 		struct cfg_cert_file *cert;
 		cert = cfg_cert_file_new();
@@ -1115,6 +1126,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		{ CFG_WRITE_PROXY_V2, 0, &cfg->WRITE_PROXY_LINE_V2, 1 },
 		{ CFG_WRITE_PROXY, 0, &cfg->WRITE_PROXY_LINE_V2, 1 },
 		{ CFG_PROXY_PROXY, 0, &cfg->PROXY_PROXY_LINE, 1 },
+		{ CFG_ALPN_PROTOS, 1, NULL, CFG_PARAM_ALPN_PROTOS },
 		{ CFG_SNI_NOMATCH_ABORT, 0, &cfg->SNI_NOMATCH_ABORT, 1 },
 		{ CFG_OCSP_DIR, 1, NULL, 'o' },
 		{ "test", 0, NULL, 't' },
@@ -1238,6 +1250,9 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		case 'o':
 			ret = config_param_validate(CFG_OCSP_DIR, optarg, cfg, NULL, 0);
 			break;
+		case CFG_PARAM_ALPN_PROTOS:
+			ret = config_param_validate(CFG_ALPN_PROTOS, optarg, cfg, NULL, 0);
+			break;
 
 		default:
 			config_error_set("Invalid command line parameters. "
@@ -1292,6 +1307,69 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 	}
 #endif
 
+	/* ALPN/NPN protocol negotiation additional configuration and error
+	   handling */
+	if (cfg->ALPN_PROTOS != NULL) {
+		char *error;
+		if (!create_alpn_callback_data(cfg, &error)) {
+			if (error)
+				config_error_set("alpn-protos configuration"
+				    " \"%s\" is bad. %s",
+				    cfg->ALPN_PROTOS, error);
+			else
+				config_error_set("alpn-protos configuration"
+				    " \"%s\" is bad. See man page for more"
+				    " info.",
+				    cfg->ALPN_PROTOS);
+			*retval = 1;
+			return (1);
+		}
+		AN(cfg->ALPN_PROTOS_LV);
+		int multi_proto =
+		    cfg->ALPN_PROTOS_LV[0] != cfg->ALPN_PROTOS_LV_LEN - 1;
+		if (0 == strncmp((char *)cfg->ALPN_PROTOS_LV, "\x8http/1.1", 9)
+		    && !multi_proto)
+			fprintf(stderr, "standard protocol in use\n");
+		if (multi_proto && !cfg->WRITE_PROXY_LINE_V2) {
+			config_error_set("alpn-protos is specified with"
+			    " more than one protocol while proxy-v2 is "
+			    " not selected. This is a configuration"
+			    " error.");
+			*retval = 1;
+			return (1);
+			/* Note that this test was carried out indepenently of
+			   the availability of ALPN / NPN */
+		}
+#if defined(OPENSSL_WITH_NPN) || defined(OPENSSL_WITH_ALPN)
+		if (cfg->WRITE_PROXY_LINE_V2)
+			fprintf(stderr, ALPN_NPN_PREFIX_STR
+			    " Negotiated protocol will be communicated to the"
+			    " backend.\n");
+#ifndef OPENSSL_WITH_ALPN
+		fprintf(stderr, ALPN_NPN_PREFIX_STR " Warning: Hitch has been"
+		    " compiled against a version of OpenSSL without ALPN"
+		    " support.\n");
+#endif
+#else
+		/* No support for ALPN / NPN support in OpenSSL */
+		if (multi_proto ||
+		    0 != strncmp(cfg->ALPN_PROTOS_LV, "\x8http/1.1", 9)) {
+			config_error_set("This is compiled against SSL version"
+			    " %lx, which does not have no NPN or ALPN support,"
+			    " yet alpn-protos has been set to %s.",
+			    OPENSSL_VERSION_NUMBER, cfg->ALPN_PROTOS);
+			*retval = 1;
+			return (1);
+		}
+		else
+			fprintf(stderr, "This is compiled against SSL version"
+			    " %lx, which does not have no NPN or ALPN support,"
+			    " but since alpn-protos has been set to http/1.1,"
+			    " we carry on without ALPN/NPN.\n",
+			    OPENSSL_VERSION_NUMBER);
+#endif
+	}
+
 	// Any arguments left are presumed to be PEM files
 	argc -= optind;
 	argv += optind;
@@ -1333,4 +1411,39 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 	}
 
 	return (0);
+}
+
+int create_alpn_callback_data(hitch_config *cfg, char **error)
+{
+	size_t i = 0, j, l;
+
+	AN(cfg->ALPN_PROTOS);
+	l = strlen(cfg->ALPN_PROTOS);
+	if (l > 254) {
+		*error = "alpn-protos too long";
+		return 0; // failure
+	}
+	cfg->ALPN_PROTOS_LV = malloc(l + 1);
+	AN(cfg->ALPN_PROTOS_LV);
+	for(j = 0; j < l; j++) {
+		if (cfg->ALPN_PROTOS[j] == ',') {
+			if (i == j) {
+				*error = "alpn-protos has empty proto in list";
+				return 0; // failure
+			}
+			cfg->ALPN_PROTOS_LV[i] = (unsigned char)(j - i);
+			i = j + 1;
+		} else {
+			cfg->ALPN_PROTOS_LV[j + 1] =
+			    (unsigned char)cfg->ALPN_PROTOS[j];
+		}
+	}
+	if (i == j) {
+		// alpn-protos ends with a comma - we let it slide
+		cfg->ALPN_PROTOS_LV_LEN = l;
+	} else {
+		cfg->ALPN_PROTOS_LV[i] = (unsigned char)(j - i);
+		cfg->ALPN_PROTOS_LV_LEN = l + 1;
+	}
+	return 1; // ok!
 }

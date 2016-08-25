@@ -73,6 +73,10 @@ Command line arguments
   --proxy-proxy          Proxy HaProxy's PROXY (IPv4 or IPv6) protocol line
                          before actual data (PROXY v1 only)
                          (Default: off)
+  --alpn-protos=LIST     Sets the protocols for ALPN/NPN negotiation, given by a comma
+                         separated list. If this is not set explicitly, ALPN/NPN will
+                         not be used. Requires OpenSSL 1.0.1 for NPN and OpenSSL 1.0.2
+                         for ALPN.
   --sni-nomatch-abort    Abort handshake when client submits an unrecognized SNI server name
                          (Default: off)
   --ocsp-dir=DIR         Set OCSP staple cache directory

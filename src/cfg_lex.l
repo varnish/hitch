@@ -50,6 +50,7 @@
 "write-proxy-v2"		{ return (TOK_WRITE_PROXY_V2); }
 "pem-file"		{ return (TOK_PEM_FILE); }
 "proxy-proxy"		{ return (TOK_PROXY_PROXY); }
+"alpn-protos"		{ return (TOK_ALPN_PROTOS); }
 "backend-connect-timeout"	{ return (TOK_BACKEND_CONNECT_TIMEOUT); }
 "ssl-handshake-timeout"		{ return (TOK_SSL_HANDSHAKE_TIMEOUT); }
 "recv-bufsize"		{ return (TOK_RECV_BUFSIZE); }

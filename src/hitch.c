@@ -601,6 +601,75 @@ info_callback(const SSL *ssl, int where, int ret)
 	}
 }
 
+#ifdef OPENSSL_WITH_NPN
+
+static int npn_select_cb(SSL *ssl, const unsigned char **out,
+    unsigned *outlen, void *arg) {
+	(void)ssl;
+	(void)arg;
+	LOG("{npn} Got NPN callback, no idea what the client wants\n");
+	*out = (unsigned char *) CONFIG->ALPN_PROTOS_LV;
+	*outlen = CONFIG->ALPN_PROTOS_LV_LEN;
+
+	return SSL_TLSEXT_ERR_OK;
+}
+#endif
+
+#ifdef OPENSSL_WITH_ALPN
+static unsigned format_protocol_list_wire_format(unsigned char *buf,
+    unsigned buf_len, const unsigned char *in, unsigned in_len) {
+	unsigned pos = 0, i, j;
+	assert(buf_len >= in_len);
+	for (i = 0; i < in_len; i++) {
+		assert(pos < buf_len - 2);
+		if (i != 0)
+			buf[pos++] = ',';
+		for (j = in[i++]; j > 0; j--, pos++, i++) {
+			if (pos >= buf_len - 1 || i >= in_len)
+				return 0;
+			buf[pos] = in[i];
+		}
+	}
+	buf[pos] = '\0';
+	return pos;
+}
+
+static int alpn_select_cb(SSL *ssl,
+    const unsigned char **out,
+    unsigned char *outlen,
+    const unsigned char *in,
+    unsigned int inlen,
+    void *arg)
+{
+	unsigned char buf[inlen];
+	int selected;
+	(void)ssl;
+	(void)arg;
+
+	if (format_protocol_list_wire_format(buf, sizeof buf, in, inlen))
+		LOG("{alpn} Got ALPN callback, client wants: %s\n", buf);
+	else
+		LOG("{alpn} Got ALPN callback (%u).\n", inlen);
+	selected = SSL_select_next_proto((unsigned char **)out, outlen,
+	    CONFIG->ALPN_PROTOS_LV, CONFIG->ALPN_PROTOS_LV_LEN, in, inlen);
+	if (selected == OPENSSL_NPN_NEGOTIATED) {
+		if (*outlen < sizeof(buf)) {
+			memcpy(buf, *out, *outlen);
+			buf[*outlen] = '\0';
+			LOG("{alpn} Negociated (%u) %s\n",
+			    (unsigned)*outlen, buf);
+		} else
+			LOG("{alpn} Agreed on protocol\n");
+		return SSL_TLSEXT_ERR_OK;
+	} else {
+		assert(selected == OPENSSL_NPN_NO_OVERLAP);
+		LOG("{alpn} No overlap in protocols.\n");
+		return SSL_TLSEXT_ERR_NOACK;
+	}
+	return SSL_TLSEXT_ERR_NOACK;
+}
+#endif /* OPENSSL_WITH_ALPN */
+
 #ifdef USE_SHARED_CACHE
 
 /* Handle incoming message updates */
@@ -1347,6 +1416,18 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 
 	SSL_CTX_set_options(ctx, ssloptions);
 	SSL_CTX_set_info_callback(ctx, info_callback);
+#ifdef OPENSSL_WITH_ALPN
+	if (CONFIG->ALPN_PROTOS != NULL) {
+		LOG("{alpn} Registering ALPN callback\n");
+		SSL_CTX_set_alpn_select_cb(ctx, alpn_select_cb, NULL);
+	}
+#endif
+#ifdef OPENSSL_WITH_NPN
+	if (CONFIG->ALPN_PROTOS != NULL) {
+		LOG("{npn} Registering NPN callback\n");
+		SSL_CTX_set_next_protos_advertised_cb(ctx, npn_select_cb, NULL);
+	}
+#endif
 	AN(SSL_CTX_set_default_verify_paths(ctx));
 
 	if (ciphers != NULL) {
@@ -2146,6 +2227,27 @@ start_handshake(proxystate *ps, int err)
 static void
 write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 {
+	char *base;
+#if defined(OPENSSL_WITH_ALPN) || defined(OPENSSL_WITH_NPN)
+	const unsigned char *selected = NULL;
+	unsigned selected_len = 0;
+	char *alpn_base;
+#endif
+#ifdef OPENSSL_WITH_ALPN
+	SSL_get0_alpn_selected(ps->ssl, &selected, &selected_len);
+	if (selected_len > 0)
+		LOG("{alpn} Selected protocol: %.*s\n",
+		    selected_len, (char*)selected);
+#endif
+#ifdef OPENSSL_WITH_NPN
+	if (selected_len == 0) {
+		SSL_get0_next_proto_negotiated(ps->ssl, &selected, &selected_len);
+		if (selected_len > 0)
+			LOG("{npn} Selected protocol: %.*s\n",
+			    selected_len, (char*)selected);
+	}
+#endif
+
 	struct ha_proxy_v2_hdr *p;
 	union addr {
 		struct sockaddr		sa;
@@ -2154,8 +2256,8 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 	} *l, *r;
 
 	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
-	p = (struct ha_proxy_v2_hdr *)
-	    ringbuffer_write_ptr(&ps->ring_ssl2clear);
+	base = ringbuffer_write_ptr(&ps->ring_ssl2clear);
+	p = (struct ha_proxy_v2_hdr *)base;
 	size_t len = 16;
 	l = (union addr *) local;
 	r = (union addr *) &ps->remote_ip;
@@ -2163,7 +2265,12 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 	memcpy(&p->sig,"\r\n\r\n\0\r\nQUIT\n", 12);
 	p->ver_cmd = 0x21; 	/* v2|PROXY */
 	p->fam = l->sa.sa_family == AF_INET ? 0x11 : 0x21;
-	p->len = l->sa.sa_family == AF_INET ? htons(12) : htons(36);
+	size_t payload_len = l->sa.sa_family == AF_INET ? 12 : 36;
+#if defined(OPENSSL_WITH_ALPN) || defined(OPENSSL_WITH_NPN)
+	if (selected_len > 0)
+		payload_len += selected_len + 3;
+#endif
+	p->len = htons(payload_len);
 
 	if (l->sa.sa_family == AF_INET) {
 		len += 12;
@@ -2195,6 +2302,22 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 		memcpy(&p->addr.ipv6.dst_port, &l->sa6.sin6_port,
 		    sizeof p->addr.ipv6.dst_port);
 	}
+
+	/* This is where we add something related to NPN or ALPN*/
+#if defined(OPENSSL_WITH_ALPN) || defined(OPENSSL_WITH_NPN)
+	if (selected_len > 0) {
+		/* let the server know that a protocol was selected. */
+		alpn_base = base + len;
+		alpn_base[0] = 1 /* PP2_TYPE_ALPN */;
+		alpn_base[1] = (selected_len >> 8) & 0xff;
+		alpn_base[2] = selected_len & 0xff;
+		memcpy(alpn_base + 3, selected, selected_len);
+		len += selected_len + 3;
+	}
+#endif
+	LOG("{debug} Proxy header is %zd, payload is %zu\n",
+	    len, payload_len);
+	assert(len == payload_len + 16);
 	ringbuffer_write_append(&ps->ring_ssl2clear, len);
 }
 

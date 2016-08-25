@@ -6,8 +6,28 @@
  */
 
 #include <sys/types.h>
+#include <openssl/opensslv.h>
+
 #include "vqueue.h"
 #include "uthash.h"
+
+/* Is NPN available? See openssl/opensslv.h for explanation. */
+#if OPENSSL_VERSION_NUMBER >= 0x1000100fL
+#define OPENSSL_WITH_NPN
+#endif
+
+/* Is ALPN available? See openssl/opensslv.h for explanation. */
+#if OPENSSL_VERSION_NUMBER >= 0x1000200fL
+#define OPENSSL_WITH_ALPN
+#endif
+
+#ifdef OPENSSL_WITH_ALPN
+#define ALPN_NPN_PREFIX_STR "{alpn}"
+#else
+#ifdef OPENSSL_WITH_NPN
+#define ALPN_NPN_PREFIX_STR "{npn}"
+#endif
+#endif
 
 #ifdef USE_SHARED_CACHE
   #include "shctx.h"
@@ -69,6 +89,9 @@ struct __hitch_config {
     int WRITE_PROXY_LINE_V1;
     int WRITE_PROXY_LINE_V2;
     int PROXY_PROXY_LINE;
+    char *ALPN_PROTOS;
+    unsigned char *ALPN_PROTOS_LV;
+    unsigned ALPN_PROTOS_LV_LEN;
     char *CHROOT;
     int UID;
     int GID;
@@ -119,3 +142,5 @@ hitch_config * config_new (void);
 void config_destroy (hitch_config *cfg);
 int config_file_parse (char *file, hitch_config *cfg);
 int config_parse_cli(int argc, char **argv, hitch_config *cfg, int *rv);
+
+int create_alpn_callback_data(hitch_config *cfg, char **error);
