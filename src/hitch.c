@@ -619,24 +619,6 @@ static int npn_select_cb(SSL *ssl, const unsigned char **out,
 #endif
 
 #ifdef OPENSSL_WITH_ALPN
-static unsigned format_protocol_list_wire_format(unsigned char *buf,
-    unsigned buf_len, const unsigned char *in, unsigned in_len) {
-	unsigned pos = 0, i, j;
-	assert(buf_len >= in_len);
-	for (i = 0; i < in_len; i++) {
-		assert(pos < buf_len - 2);
-		if (i != 0)
-			buf[pos++] = ',';
-		for (j = in[i++]; j > 0; j--, pos++, i++) {
-			if (pos >= buf_len - 1 || i >= in_len)
-				return 0;
-			buf[pos] = in[i];
-		}
-	}
-	buf[pos] = '\0';
-	return pos;
-}
-
 static int alpn_select_cb(SSL *ssl,
     const unsigned char **out,
     unsigned char *outlen,
@@ -644,7 +626,6 @@ static int alpn_select_cb(SSL *ssl,
     unsigned int inlen,
     void *arg)
 {
-	unsigned char buf[inlen];
 	int selected;
 	proxystate *ps;
 	(void)arg;
@@ -652,20 +633,12 @@ static int alpn_select_cb(SSL *ssl,
 	CAST_OBJ_NOTNULL(ps, SSL_get_app_data(ssl), PROXYSTATE_MAGIC);
 	ps->npn_alpn_tried = 1;
 
-	if (format_protocol_list_wire_format(buf, sizeof buf, in, inlen))
-		LOG("{alpn} Got ALPN callback, client wants: %s\n", buf);
-	else
-		LOG("{alpn} Got ALPN callback (%u).\n", inlen);
+	LOG("{alpn} Got ALPN callback.\n");
 	selected = SSL_select_next_proto((unsigned char **)out, outlen,
 	    CONFIG->ALPN_PROTOS_LV, CONFIG->ALPN_PROTOS_LV_LEN, in, inlen);
 	if (selected == OPENSSL_NPN_NEGOTIATED) {
-		if (*outlen < sizeof(buf)) {
-			memcpy(buf, *out, *outlen);
-			buf[*outlen] = '\0';
-			LOG("{alpn} Negociated (%u) %s\n",
-			    (unsigned)*outlen, buf);
-		} else
-			LOG("{alpn} Agreed on protocol\n");
+		LOG("{alpn} Negotiated %.*s\n",
+		    (unsigned)*outlen, *out);
 		return SSL_TLSEXT_ERR_OK;
 	} else {
 		assert(selected == OPENSSL_NPN_NO_OVERLAP);
