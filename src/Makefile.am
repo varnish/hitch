@@ -1,5 +1,6 @@
 
 sbin_PROGRAMS = hitch
+noinst_PROGRAMS = parse_proxy_v2
 
 EXTRA_DIST = tests
 
@@ -28,3 +29,5 @@ hitch_SOURCES += shctx.c
 hitch_LDADD += ebtree/libebtree.a
 AM_CFLAGS += -Iebtree
 endif
+
+parse_proxy_v2_SOURCES = tests/utils/parse_proxy_v2.c
