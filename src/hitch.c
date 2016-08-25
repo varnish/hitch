@@ -349,6 +349,7 @@ typedef struct proxystate {
 						    * connected */
 	int			renegotiation:1; /* Renegotation is
 						  * occuring */
+	int			npn_alpn_tried:1;/* NPN or ALPN was tried */
 
 	SSL			*ssl;		/* OpenSSL SSL state */
 
@@ -602,11 +603,13 @@ info_callback(const SSL *ssl, int where, int ret)
 }
 
 #ifdef OPENSSL_WITH_NPN
-
 static int npn_select_cb(SSL *ssl, const unsigned char **out,
     unsigned *outlen, void *arg) {
-	(void)ssl;
+	proxystate *ps;
 	(void)arg;
+	CAST_OBJ_NOTNULL(ps, SSL_get_app_data(ssl), PROXYSTATE_MAGIC);
+	ps->npn_alpn_tried = 1;
+
 	LOG("{npn} Got NPN callback, no idea what the client wants\n");
 	*out = (unsigned char *) CONFIG->ALPN_PROTOS_LV;
 	*outlen = CONFIG->ALPN_PROTOS_LV_LEN;
@@ -643,8 +646,11 @@ static int alpn_select_cb(SSL *ssl,
 {
 	unsigned char buf[inlen];
 	int selected;
-	(void)ssl;
+	proxystate *ps;
 	(void)arg;
+
+	CAST_OBJ_NOTNULL(ps, SSL_get_app_data(ssl), PROXYSTATE_MAGIC);
+	ps->npn_alpn_tried = 1;
 
 	if (format_protocol_list_wire_format(buf, sizeof buf, in, inlen))
 		LOG("{alpn} Got ALPN callback, client wants: %s\n", buf);
@@ -2225,6 +2231,25 @@ start_handshake(proxystate *ps, int err)
 }
 
 static void
+get_proto_selected(proxystate *ps, const unsigned char **selected, unsigned *len) {
+	*selected = NULL;
+	*len = 0;
+#ifdef OPENSSL_WITH_ALPN
+	SSL_get0_alpn_selected(ps->ssl, selected, len);
+	if (*len > 0)
+		LOG("{alpn} Selected protocol: %.*s\n", *len, (char*)*selected);
+#endif
+#ifdef OPENSSL_WITH_NPN
+	if (*len == 0) {
+		SSL_get0_next_proto_negotiated(ps->ssl, selected, len);
+		if (*len > 0)
+			LOG("{npn} Selected protocol: %.*s\n",
+			    *len, (char*)*selected);
+	}
+#endif
+}
+
+static void
 write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 {
 	char *base;
@@ -2232,22 +2257,9 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 	const unsigned char *selected = NULL;
 	unsigned selected_len = 0;
 	char *alpn_base;
-#endif
-#ifdef OPENSSL_WITH_ALPN
-	SSL_get0_alpn_selected(ps->ssl, &selected, &selected_len);
-	if (selected_len > 0)
-		LOG("{alpn} Selected protocol: %.*s\n",
-		    selected_len, (char*)selected);
-#endif
-#ifdef OPENSSL_WITH_NPN
-	if (selected_len == 0) {
-		SSL_get0_next_proto_negotiated(ps->ssl, &selected, &selected_len);
-		if (selected_len > 0)
-			LOG("{npn} Selected protocol: %.*s\n",
-			    selected_len, (char*)selected);
-	}
-#endif
 
+	get_proto_selected(ps, &selected, &selected_len);
+#endif
 	struct ha_proxy_v2_hdr *p;
 	union addr {
 		struct sockaddr		sa;
@@ -2376,6 +2388,45 @@ write_ip_octet(proxystate *ps)
 		ringbuffer_write_append(&ps->ring_ssl2clear, 1U + 4U);
 	}
 }
+
+#if defined(OPENSSL_WITH_NPN) || defined(OPENSSL_WITH_ALPN)
+static int is_protocol_matching(const unsigned char *selected, unsigned len) {
+	int unsigned i = 0;
+	if (CONFIG->ALPN_PROTOS_LV != NULL) {
+		while (i < CONFIG->ALPN_PROTOS_LV_LEN) {
+			if(CONFIG->ALPN_PROTOS_LV[i] == len &&
+			    0 == memcmp(selected,
+				CONFIG->ALPN_PROTOS_LV + i + 1,
+				len))
+				return 1;
+			i+= CONFIG->ALPN_PROTOS_LV[i] + 1;
+		}
+	}
+	return 0;
+}
+
+static int is_alpn_shutdown_needed(proxystate *ps) {
+	const unsigned char *selected;
+	unsigned selected_len;
+
+	if (CONFIG->ALPN_PROTOS_LV == NULL)
+		return 0;
+
+	get_proto_selected(ps, &selected, &selected_len);
+	if (selected_len == 0) {
+		/* If alpn / npn was tried, shut down */
+		if(ps->npn_alpn_tried) {
+			LOGPROXY(ps, "{alpn/npn} Unsuccessful negotiation");
+			return 1;
+		}
+	} else if (!is_protocol_matching(selected, selected_len)) {
+		LOGPROXY(ps, "{alpn/npn} Unknown protocol selected\n");
+		return 1;
+	}
+	return 0;
+}
+#endif
+
 /* After OpenSSL is done with a handshake, re-wire standard read/write handlers
  * for data transmission */
 static void end_handshake(proxystate *ps) {
@@ -2384,6 +2435,12 @@ static void end_handshake(proxystate *ps) {
 	ev_io_stop(loop, &ps->ev_w_handshake);
 	ev_timer_stop(loop, &ps->ev_t_handshake);
 
+#if defined(OPENSSL_WITH_NPN) || defined(OPENSSL_WITH_ALPN)
+	if (is_alpn_shutdown_needed(ps)) {
+		shutdown_proxy(ps, SHUTDOWN_HARD);
+		return;
+	}
+#endif
 	LOGPROXY(ps,"ssl end handshake\n");
 	/* Disable renegotiation (CVE-2009-3555) */
 	if (ps->ssl->s3) {
@@ -2786,6 +2843,7 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 		CAST_OBJ_NOTNULL(so, default_ctx, SSLCTX_MAGIC);
 
 	SSL *ssl = SSL_new(so->ctx);
+
 	long mode = SSL_MODE_ENABLE_PARTIAL_WRITE;
 #ifdef SSL_MODE_RELEASE_BUFFERS
 	mode |= SSL_MODE_RELEASE_BUFFERS;
