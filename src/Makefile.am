@@ -10,7 +10,7 @@ AM_YFLAGS = -d -t
 
 TESTS_ENVIRONMENT = \
 	TESTDIR=$(abs_top_srcdir)/src/tests/; export TESTDIR; \
-	PATH=$(abs_top_builddir)/src:$(abs_top_builddir)/src/tests/utils:$$PATH; export PATH;
+	PATH=$(abs_top_builddir)/src:$(abs_top_builddir)/src/util:$$PATH; export PATH;
 TESTS = @SH_TESTS@
 TEST_EXTENSIONS = .sh
 

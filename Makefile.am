@@ -1,5 +1,5 @@
 
-SUBDIRS = src src/tests/utils
+SUBDIRS = src src/util
 
 if FOUND_RST2MAN
 
