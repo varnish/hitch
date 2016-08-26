@@ -1419,17 +1419,19 @@ int create_alpn_callback_data(hitch_config *cfg, char **error)
 
 	AN(cfg->ALPN_PROTOS);
 	l = strlen(cfg->ALPN_PROTOS);
-	if (l > 254) {
-		*error = "alpn-protos too long";
-		return 0; // failure
-	}
 	cfg->ALPN_PROTOS_LV = malloc(l + 1);
 	AN(cfg->ALPN_PROTOS_LV);
 	for(j = 0; j < l; j++) {
 		if (cfg->ALPN_PROTOS[j] == ',') {
 			if (i == j) {
 				*error = "alpn-protos has empty proto in list";
-				return 0; // failure
+				return (0); // failure
+			}
+			if (j - i > 255) {
+				free(cfg->ALPN_PROTOS_LV);
+				cfg->ALPN_PROTOS_LV = NULL;
+				*error = "alpn protocol too long";
+				return (0);
 			}
 			cfg->ALPN_PROTOS_LV[i] = (unsigned char)(j - i);
 			i = j + 1;
@@ -1442,8 +1444,14 @@ int create_alpn_callback_data(hitch_config *cfg, char **error)
 		// alpn-protos ends with a comma - we let it slide
 		cfg->ALPN_PROTOS_LV_LEN = l;
 	} else {
+		if (j - i > 255) {
+			free(cfg->ALPN_PROTOS_LV);
+			cfg->ALPN_PROTOS_LV = NULL;
+			*error = "alpn protocol too long";
+			return (0);
+		}
 		cfg->ALPN_PROTOS_LV[i] = (unsigned char)(j - i);
 		cfg->ALPN_PROTOS_LV_LEN = l + 1;
 	}
-	return 1; // ok!
+	return (1); // ok!
 }
