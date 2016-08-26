@@ -71,5 +71,6 @@ AC_SUBST(SH_TESTS)
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([src/Makefile])
+AC_CONFIG_FILES([src/tests/utils/Makefile])
 
 AC_OUTPUT

@@ -1,6 +1,6 @@
 
 sbin_PROGRAMS = hitch
-noinst_PROGRAMS = parse_proxy_v2
+
 
 EXTRA_DIST = tests
 
@@ -10,7 +10,7 @@ AM_YFLAGS = -d -t
 
 TESTS_ENVIRONMENT = \
 	TESTDIR=$(abs_top_srcdir)/src/tests/; export TESTDIR; \
-	PATH=$(abs_top_builddir)/src:$$PATH; export PATH;
+	PATH=$(abs_top_builddir)/src:$(abs_top_builddir)/src/tests/utils:$$PATH; export PATH;
 TESTS = @SH_TESTS@
 TEST_EXTENSIONS = .sh
 
@@ -29,5 +29,3 @@ hitch_SOURCES += shctx.c
 hitch_LDADD += ebtree/libebtree.a
 AM_CFLAGS += -Iebtree
 endif
-
-parse_proxy_v2_SOURCES = tests/utils/parse_proxy_v2.c
