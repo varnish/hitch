@@ -9,16 +9,12 @@ core.*
 **.sw[op]
 /src/hitch
 Makefile
-/stamp-h1
 /aclocal.m4
-/compile
-/missing
+/stamp-h1
 /config.log
 /config.status
 /config.h
 /configure
-/depcomp
-/install-sh
 /autom4te.cache
 /hitch.8
 # Flex output files.
@@ -28,4 +24,7 @@ Makefile
 /src/cfg_parser.output
 /ylwrap
 src/tests/utils/parse_proxy_v2
+src/tests/test*.trs
+src/tests/test*.log
 parse_proxy_v2
+/build-aux/

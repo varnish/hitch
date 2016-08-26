@@ -3,4 +3,5 @@ set -o errexit
 aclocal
 autoconf
 autoheader
+mkdir -p build-aux
 automake --add-missing --foreign
