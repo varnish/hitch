@@ -173,7 +173,7 @@ ssize_t read_from_socket(const char *port, unsigned char *buf, int len) {
 	(void)buf;
 	(void)len;
 	memset(&hints, 0, sizeof(struct addrinfo));
-	hints.ai_family = AF_UNSPEC;     /* Allow IPv4 or IPv6 */
+	hints.ai_family = AF_INET;     /* Allow IPv4 or IPv6 */
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
 	hints.ai_protocol = 0;
