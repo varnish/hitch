@@ -4,6 +4,16 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.4.0-beta1 (2016-08-26)
+------------------------------
+
+* NPN (and ALPN, when the OpenSSL version allows it) support for
+  negotiating a protocol in the SSL handshake. For ALPN, OpenSSL 1.0.2
+  is needed, while NPN requires OpenSSL 1.0.1. When a list of
+  protocols are specified through the new option "alpn-protos", hitch
+  will communicate the result of the negotiation through the proxy
+  protocol, version 2.
+
 hitch-1.3.1 (2016-08-16)
 ------------------------
 
