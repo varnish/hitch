@@ -30,6 +30,14 @@ die() {
 	exit 255
 }
 
+skip() {
+	echo "SKIPPED: $*"
+	if [ -r "$DUMPFILE" ]; then
+		cat $DUMPFILE;
+	fi
+	exit 77
+}
+
 mk_cfg() {
 	cat > "$CONFFILE"
 }
