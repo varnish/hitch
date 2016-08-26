@@ -66,9 +66,9 @@ int main(int argc, const char **argv) {
 	printf("Warning:\tThis OpenSSL version is too old for ALPN.\n");
 #endif
 	if (argc == 1)
-		n = read(STDIN_FILENO, proxy_header, MAX_HEADER_SIZE + 1);
+		n = read(STDIN_FILENO, proxy_header, MAX_HEADER_SIZE);
 	else if (argc == 2)
-		n = read_from_socket(argv[1], proxy_header, MAX_HEADER_SIZE + 1);
+		n = read_from_socket(argv[1], proxy_header, MAX_HEADER_SIZE);
 	else {
 		fprintf(stderr, "Usage: parse_proxy_v2 [port]\n");
 		return (1);
