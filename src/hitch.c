@@ -610,7 +610,7 @@ static int npn_select_cb(SSL *ssl, const unsigned char **out,
 	CAST_OBJ_NOTNULL(ps, SSL_get_app_data(ssl), PROXYSTATE_MAGIC);
 	ps->npn_alpn_tried = 1;
 
-	LOG("{npn} Got NPN callback, no idea what the client wants\n");
+	LOG("{npn} Got NPN callback\n");
 	*out = (unsigned char *) CONFIG->ALPN_PROTOS_LV;
 	*outlen = CONFIG->ALPN_PROTOS_LV_LEN;
 
