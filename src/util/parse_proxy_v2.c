@@ -216,11 +216,14 @@ ssize_t read_from_socket(const char *port, unsigned char *buf, int len) {
 	fprintf(stderr, "Listening on port %s\n", port);
 	int sock = accept(listen_socket, NULL, NULL);
 	if (sock < 0) {
+		close(listen_socket);
 		perror("Calling accept failed");
 		exit(1);
 	}
 	ssize_t n = recv(sock, buf, len, 0);
 	fprintf(stderr, "Read %zd bytes in recv\n", n);
+	close(sock);
+	close(listen_socket);
 	return n;
 }
 
