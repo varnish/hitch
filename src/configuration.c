@@ -1341,10 +1341,12 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 			   the availability of ALPN / NPN */
 		}
 #if defined(OPENSSL_WITH_NPN) || defined(OPENSSL_WITH_ALPN)
+		/*
 		if (cfg->WRITE_PROXY_LINE_V2)
 			fprintf(stderr, ALPN_NPN_PREFIX_STR
 			    " Negotiated protocol will be communicated to the"
 			    " backend.\n");
+		*/
 #ifndef OPENSSL_WITH_ALPN
 		fprintf(stderr, ALPN_NPN_PREFIX_STR " Warning: Hitch has been"
 		    " compiled against a version of OpenSSL without ALPN"

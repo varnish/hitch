@@ -633,21 +633,20 @@ static int alpn_select_cb(SSL *ssl,
 	CAST_OBJ_NOTNULL(ps, SSL_get_app_data(ssl), PROXYSTATE_MAGIC);
 	ps->npn_alpn_tried = 1;
 
-	LOG("{alpn} Got ALPN callback.\n");
 	selected = SSL_select_next_proto((unsigned char **)out, outlen,
 	    CONFIG->ALPN_PROTOS_LV, CONFIG->ALPN_PROTOS_LV_LEN, in, inlen);
-	if (selected == OPENSSL_NPN_NEGOTIATED) {
-		LOG("{alpn} Negotiated %.*s\n",
-		    (unsigned)*outlen, *out);
+	if (selected == OPENSSL_NPN_NEGOTIATED)
 		return SSL_TLSEXT_ERR_OK;
-	} else {
+	else {
 		assert(selected == OPENSSL_NPN_NO_OVERLAP);
-		LOG("{alpn} No overlap in protocols.\n");
+		LOGPROXY(ps, "ALPN: no overlap in protocols.\n");
+		/* Here it is possible to add logging of which protocols
+		   the client wanted */
 		return SSL_TLSEXT_ERR_NOACK;
 	}
 	return SSL_TLSEXT_ERR_NOACK;
 }
-#endif /* OPENSSL_WITH_ALPN */
+#endif
 
 #ifdef USE_SHARED_CACHE
 
@@ -1396,16 +1395,12 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	SSL_CTX_set_options(ctx, ssloptions);
 	SSL_CTX_set_info_callback(ctx, info_callback);
 #ifdef OPENSSL_WITH_ALPN
-	if (CONFIG->ALPN_PROTOS != NULL) {
-		LOG("{alpn} Registering ALPN callback\n");
+	if (CONFIG->ALPN_PROTOS != NULL)
 		SSL_CTX_set_alpn_select_cb(ctx, alpn_select_cb, NULL);
-	}
 #endif
 #ifdef OPENSSL_WITH_NPN
-	if (CONFIG->ALPN_PROTOS != NULL) {
-		LOG("{npn} Registering NPN callback\n");
+	if (CONFIG->ALPN_PROTOS != NULL)
 		SSL_CTX_set_next_protos_advertised_cb(ctx, npn_select_cb, NULL);
-	}
 #endif
 	AN(SSL_CTX_set_default_verify_paths(ctx));
 
@@ -2209,16 +2204,10 @@ get_proto_selected(proxystate *ps, const unsigned char **selected, unsigned *len
 	*len = 0;
 #ifdef OPENSSL_WITH_ALPN
 	SSL_get0_alpn_selected(ps->ssl, selected, len);
-	if (*len > 0)
-		LOG("{alpn} Selected protocol: %.*s\n", *len, (char*)*selected);
 #endif
 #ifdef OPENSSL_WITH_NPN
-	if (*len == 0) {
+	if (*len == 0)
 		SSL_get0_next_proto_negotiated(ps->ssl, selected, len);
-		if (*len > 0)
-			LOG("{npn} Selected protocol: %.*s\n",
-			    *len, (char*)*selected);
-	}
 #endif
 }
 
@@ -2300,8 +2289,6 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 		len += selected_len + 3;
 	}
 #endif
-	LOG("{debug} Proxy header is %zd, payload is %zu\n",
-	    len, payload_len);
 	assert(len == payload_len + 16);
 	ringbuffer_write_append(&ps->ring_ssl2clear, len);
 }
@@ -2389,13 +2376,16 @@ static int is_alpn_shutdown_needed(proxystate *ps) {
 	if (selected_len == 0) {
 		/* If alpn / npn was tried, shut down */
 		if(ps->npn_alpn_tried) {
-			LOGPROXY(ps, "{alpn/npn} Unsuccessful negotiation");
+			LOGPROXY(ps, "Unsuccessful NPN/ALPN negotiation\n");
 			return 1;
-		}
+		} else
+			LOGPROXY(ps, "No NPN/ALPN negotiation happened.\n");
 	} else if (!is_protocol_matching(selected, selected_len)) {
-		LOGPROXY(ps, "{alpn/npn} Unknown protocol selected\n");
+		LOGPROXY(ps, "NPN: Unknown protocol selected\n");
 		return 1;
-	}
+	} else
+		LOGPROXY(ps, "NPN/ALPN protocol: %.*s\n",
+		    selected_len, selected);
 	return 0;
 }
 #endif
