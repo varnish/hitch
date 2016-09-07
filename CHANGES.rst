@@ -7,12 +7,15 @@ version.
 hitch-1.4.0-beta1 (2016-08-26)
 ------------------------------
 
-* NPN (and ALPN, when the OpenSSL version allows it) support for
-  negotiating a protocol in the SSL handshake. For ALPN, OpenSSL 1.0.2
-  is needed, while NPN requires OpenSSL 1.0.1. When a list of
-  protocols are specified through the new option "alpn-protos", hitch
-  will communicate the result of the negotiation through the proxy
-  protocol, version 2.
+* NPN/ALPN support for negotiating a protocol in the SSL
+  handshake. This lets you use Hitch for terminating TLS in front of
+  an HTTP/2 capable backend. For ALPN, OpenSSL 1.0.2 is needed, while
+  NPN requires OpenSSL 1.0.1.
+
+* Expanded PROXY protocol support for communicating an ALPN/NPN
+  negotiated protocol to the backend. Hitch will now include the
+  ALPN/NPN protocol that was selected during the handshake as part of
+  the PROXYv2 header.
 
 hitch-1.3.1 (2016-08-16)
 ------------------------

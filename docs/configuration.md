@@ -145,6 +145,21 @@ configuration file:
         ocsp-resp-file = "mycert-ocsp.der"
     }
 
+## ALPN/NPN support
+
+Hitch supports both the ALPN and the NPN TLS extension. This allows
+negotiation of the application layer protocol that is to be used.
+
+This is useful if Hitch terminates TLS for HTTP/2 traffic.
+
+To turn this on, you must supply an `alpn-protos` setting in the
+configuration file:
+
+	alpn-protos = "h2,http/1.1"
+
+If the PROXY protocol is enabled (`write-proxy = on`), Hitch will
+transmit the selected protocol as part of its PROXY header.
+
 
 ## Uninterrupted configuration reload
 
