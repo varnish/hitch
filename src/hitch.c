@@ -928,11 +928,11 @@ create_shcupd_socket()
 
 #endif /*USE_SHARED_CACHE */
 
-RSA *
-load_rsa_privatekey(SSL_CTX *ctx, const char *file)
+EVP_PKEY *
+load_privatekey(SSL_CTX *ctx, const char *file)
 {
 	BIO *bio;
-	RSA *rsa;
+	EVP_PKEY *pkey;
 
 	bio = BIO_new_file(file, "r");
 	if (!bio) {
@@ -940,12 +940,12 @@ load_rsa_privatekey(SSL_CTX *ctx, const char *file)
 		return NULL;
 	}
 
-	rsa = PEM_read_bio_RSAPrivateKey(bio, NULL,
+	pkey = PEM_read_bio_PrivateKey(bio, NULL,
 	    ctx->default_passwd_callback,
 	    ctx->default_passwd_callback_userdata);
 	BIO_free(bio);
 
-	return rsa;
+	return (pkey);
 }
 
 #ifndef OPENSSL_NO_TLSEXT
@@ -1367,7 +1367,7 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 {
 	SSL_CTX *ctx;
 	sslctx *sc;
-	RSA *rsa;
+	EVP_PKEY *pkey;
 	ENC_TYPE etype = CONFIG->ETYPE;
 	char *ciphers = CONFIG->CIPHER_SUITE;
 	int pref_srv_ciphers = CONFIG->PREFER_SERVER_CIPHERS;
@@ -1433,17 +1433,17 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 		return (NULL);
 	}
 
-	rsa = load_rsa_privatekey(ctx, cf->filename);
-	if (!rsa) {
-		ERR("Error loading RSA private key (%s)\n", cf->filename);
+	pkey = load_privatekey(ctx, cf->filename);
+	if (!pkey) {
+		ERR("Error loading private key (%s)\n", cf->filename);
 		sctx_free(sc, NULL);
 		return (NULL);
 	}
 
-	if (SSL_CTX_use_RSAPrivateKey(ctx, rsa) <= 0) {
-		log_ssl_error(NULL, "SSL_CTX_use_RSAPrivateKey: %s",
+	if (SSL_CTX_use_PrivateKey(ctx, pkey) <= 0) {
+		log_ssl_error(NULL, "SSL_CTX_use_PrivateKey: %s",
 		    cf->filename);
-		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 		sctx_free(sc, NULL);
 		return (NULL);
 	}
@@ -1463,7 +1463,7 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	}
 
 	if (load_cert_ctx(sc) != 0) {
-		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 		sctx_free(sc, NULL);
 		return (NULL);
 	}
@@ -1482,7 +1482,7 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 		if (ocsp_init_file(cf->ocspfn, sc, 0) != 0) {
 			ERR("Error loading OCSP response %s for stapling.\n",
 			    cf->ocspfn);
-			RSA_free(rsa);
+			EVP_PKEY_free(pkey);
 			sctx_free(sc, NULL);
 			return (NULL);
 		} else {
@@ -1501,14 +1501,17 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	if (CONFIG->SHARED_CACHE) {
 		if (shared_context_init(ctx, CONFIG->SHARED_CACHE) < 0) {
 			ERR("Unable to alloc memory for shared cache.\n");
-			RSA_free(rsa);
+			EVP_PKEY_free(pkey);
 			sctx_free(sc, NULL);
 			return (NULL);
 		}
 		if (CONFIG->SHCUPD_PORT) {
-			if (compute_secret(rsa, shared_secret) < 0) {
+			RSA *rsa;
+			rsa = EVP_PKEY_get1_RSA(pkey);
+			if (rsa != NULL &&
+			    compute_secret(rsa, shared_secret) < 0) {
 				ERR("Unable to compute shared secret.\n");
-				RSA_free(rsa);
+				EVP_PKEY_free(pkey);
 				sctx_free(sc, NULL);
 				return (NULL);
 			}
@@ -1522,7 +1525,7 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 		}
 	}
 #endif
-	RSA_free(rsa);
+	EVP_PKEY_free(pkey);
 	return (sc);
 }
 
