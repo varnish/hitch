@@ -17,7 +17,11 @@ hitch-1.4.0-beta1 (2016-08-26)
   ALPN/NPN protocol that was selected during the handshake as part of
   the PROXYv2 header.
 
-hitch-1.3.1 (2016-08-16)
+* Fix a bug in the OCSP request code where it broke if the OCSP
+  responder required a Host header. (#113)
+
+
+  hitch-1.3.1 (2016-08-16)
 ------------------------
 
 * Fixes a bug in the autotools configuration which led to man pages not being built.
