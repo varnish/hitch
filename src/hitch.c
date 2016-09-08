@@ -3419,7 +3419,7 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 		}
 	}
 
-	rctx = OCSP_sendreq_new(cbio, path, req, 0);
+	rctx = OCSP_sendreq_new(cbio, path, NULL, 0);
 	if (rctx == NULL) {
 		ERR("{ocsp} OCSP_sendreq_new failed\n");
 		refresh_hint = 60;
