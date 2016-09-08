@@ -4,6 +4,15 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.4.0-beta2 (2016-09-xy)
+------------------------------
+
+* Fix a bug in the OCSP request code where it broke if the OCSP
+  responder required a Host header. (#113)
+
+* Add support for ECC certificates.
+
+
 hitch-1.4.0-beta1 (2016-08-26)
 ------------------------------
 
@@ -16,10 +25,6 @@ hitch-1.4.0-beta1 (2016-08-26)
   negotiated protocol to the backend. Hitch will now include the
   ALPN/NPN protocol that was selected during the handshake as part of
   the PROXYv2 header.
-
-* Fix a bug in the OCSP request code where it broke if the OCSP
-  responder required a Host header. (#113)
-
 
   hitch-1.3.1 (2016-08-16)
 ------------------------
