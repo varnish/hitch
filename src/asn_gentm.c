@@ -199,7 +199,7 @@ int asn1_generalizedtime_to_tm(struct tm *tm, const ASN1_GENERALIZEDTIME *d)
 		if (++o > l)
 			goto err;
 		i = o;
-		while ((a[o] >= '0') && (a[o] <= '9') && (o <= l))
+		while ((o <= l) && (a[o] >= '0') && (a[o] <= '9'))
 			o++;
 		/* Must have at least one digit after decimal point */
 		if (i == o)
