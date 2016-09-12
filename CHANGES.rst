@@ -4,13 +4,13 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
-hitch-1.4.0-beta2 (2016-09-xy)
-------------------------------
+hitch-1.4.0 (2016-09-12)
+------------------------
 
 * Fix a bug in the OCSP request code where it broke if the OCSP
   responder required a Host header. (#113)
 
-* Add support for ECC certificates.
+* Add support for ECC certificates (#116).
 
 
 hitch-1.4.0-beta1 (2016-08-26)
