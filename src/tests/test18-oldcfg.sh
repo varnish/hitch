@@ -881,6 +881,6 @@ sni-nomatch-abort = off
 EOF
 
 hitch $HITCH_ARGS --config=$CONFFILE
-test "$?" = "0" || die "Hitch did not start."
+test "$?" = "0" || die "Hitch did not start ($?)"
 
 runcurl $LISTENADDR $((LISTENPORT))
