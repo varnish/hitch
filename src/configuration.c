@@ -65,6 +65,7 @@
 #define CFG_PIDFILE "pidfile"
 #define CFG_SNI_NOMATCH_ABORT "sni-nomatch-abort"
 #define CFG_OCSP_DIR "ocsp-dir"
+#define CFG_TLS_PROTOS "tls-protos"
 
 #ifdef USE_SHARED_CACHE
 	#define CFG_SHARED_CACHE "shared-cache"
@@ -128,7 +129,7 @@ front_arg_new(void)
 	AN(fa);
 	fa->match_global_certs = -1;
 	fa->sni_nomatch_abort = -1;
-	fa->etype = ENC_TLS;
+	fa->selected_protos = 0;
 	fa->prefer_server_ciphers = -1;
 
 	return (fa);
@@ -163,8 +164,8 @@ config_new(void)
 
 	// set default values
 
-	r->ETYPE              = ENC_TLS;
 	r->PMODE              = SSL_SERVER;
+	r->SELECTED_TLS_PROTOS= 0;
 	r->WRITE_IP_OCTET     = 0;
 	r->WRITE_PROXY_LINE_V1= 0;
 	r->WRITE_PROXY_LINE_V2= 0;
@@ -695,9 +696,9 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 	assert(strlen(k) >= 2);
 
 	if (strcmp(k, "tls") == 0) {
-		cfg->ETYPE = ENC_TLS;
+		cfg->SELECTED_TLS_PROTOS = TLS_OPTION_PROTOS;
 	} else if (strcmp(k, "ssl") == 0) {
-		cfg->ETYPE = ENC_SSL;
+		cfg->SELECTED_TLS_PROTOS = SSL_OPTION_PROTOS;
 	} else if (strcmp(k, CFG_CIPHERS) == 0) {
 		if (strlen(v) > 0) {
 			config_assign_str(&cfg->CIPHER_SUITE, v);
@@ -1172,6 +1173,8 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		}
 	}
 
+	int tls_protos_config_file = cfg->SELECTED_TLS_PROTOS;
+
 	optind = 1;
 	while (1) {
 		int ret = 0;
@@ -1281,6 +1284,12 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		}
 	}
 
+	if ((tls || ssl) && tls_protos_config_file != 0) {
+		config_error_set("Deprecated options --tls and --ssl cannot be"
+		    " used to override tls-protos in a config file.");
+		*retval = 1;
+		return (1);
+	}
 	if (tls && ssl) {
 		config_error_set("Options --tls and --ssl are mutually"
 		    " exclusive.");
@@ -1288,10 +1297,12 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		return (1);
 	} else {
 		if (ssl)
-			cfg->ETYPE = ENC_SSL;
+			cfg->SELECTED_TLS_PROTOS = SSL_OPTION_PROTOS;
 		else if (tls)
-			cfg->ETYPE = ENC_TLS;
+			cfg->SELECTED_TLS_PROTOS = TLS_OPTION_PROTOS;
 	}
+	if (cfg->SELECTED_TLS_PROTOS == 0)
+		cfg->SELECTED_TLS_PROTOS = DEFAULT_TLS_PROTOS;
 
 	if (client)
 		cfg->PMODE = SSL_CLIENT;

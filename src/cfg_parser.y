@@ -15,6 +15,7 @@ int config_param_validate(char *k, char *v, hitch_config *cfg,
     char *file, int line);
 int front_arg_add(hitch_config *cfg, struct front_arg *fa);
 struct front_arg *front_arg_new(void);
+void front_arg_destroy(struct front_arg *fa);
 struct cfg_cert_file *
 cfg_cert_file_new(void);
 void cfg_cert_file_free(struct cfg_cert_file **cfptr);
@@ -47,6 +48,7 @@ static struct cfg_cert_file *cur_pem;
 %token TOK_PIDFILE TOK_SNI_NOMATCH_ABORT TOK_SSL TOK_TLS TOK_HOST TOK_PORT
 %token TOK_MATCH_GLOBAL TOK_PB_CERT TOK_PB_OCSP_FILE TOK_OCSP_VERIFY
 %token TOK_OCSP_DIR TOK_OCSP_RESP_TMO TOK_OCSP_CONN_TMO TOK_ALPN_PROTOS
+%token TOK_TLS_PROTOS TOK_SSLv3 TOK_TLSv1_0 TOK_TLSv1_1 TOK_TLSv1_2
 
 %parse-param { hitch_config *cfg }
 
@@ -67,6 +69,7 @@ CFG_RECORD
 	| CIPHERS_REC
 	| TLS_REC
 	| SSL_REC
+	| TLS_PROTOS_REC
 	| PREFER_SERVER_CIPHERS_REC
 	| SSL_ENGINE_REC
 	| WORKERS_REC
@@ -126,6 +129,7 @@ FB_REC
 	| FB_SNI_NOMATCH_ABORT
 	| FB_TLS
 	| FB_SSL
+	| FB_TLS_PROTOS
 	| FB_CIPHERS
 	| FB_PREF_SRV_CIPH
 	;
@@ -216,8 +220,56 @@ FB_SNI_NOMATCH_ABORT:TOK_SNI_NOMATCH_ABORT '=' BOOL
 {
 		cur_fa->sni_nomatch_abort = $3;
 };
-FB_TLS: TOK_TLS '=' BOOL { if ($3) cur_fa->etype = ENC_TLS; }
-FB_SSL: TOK_SSL '=' BOOL { if ($3) cur_fa->etype = ENC_SSL; }
+// this is not optimal, but it was not before, either.
+FB_TLS: TOK_TLS '=' BOOL {
+	if (cur_fa->selected_protos != 0) {
+		fprintf(stderr, "%s (%s, line %d):"
+		    " It is illegal to specify tls after ssl,"
+		    " tls or tls-protos.\n",
+		    __func__, __FILE__, __LINE__);
+		front_arg_destroy(cur_fa);
+		cur_fa = NULL;
+		YYABORT;
+	}
+	if ($3)
+		cur_fa->selected_protos = TLS_OPTION_PROTOS;
+	else
+		fprintf(stderr,
+		    "Warning: tsl = off is deprecated and has no effect.\n");
+}
+FB_SSL: TOK_SSL '=' BOOL {
+	if (cur_fa->selected_protos != 0) {
+		fprintf(stderr, "%s (%s, line %d):"
+		    " It is illegal to specify ssl after ssl,"
+		    " tls or tls-protos.\n",
+		    __func__, __FILE__, __LINE__);
+		front_arg_destroy(cur_fa);
+		cur_fa = NULL;
+		YYABORT;
+	}
+	if ($3)
+		cur_fa->selected_protos = SSL_OPTION_PROTOS;
+	else
+		fprintf(stderr,
+		    "Warning: ssl = off is deprecated and has no effect.\n");
+}
+FB_TLS_PROTOS: TOK_TLS_PROTOS {
+	if (cur_fa->selected_protos != 0) {
+		fprintf(stderr, "%s (%s, line %d):"
+		    " It is illegal to specify tls-protos after"
+		    " ssl, tls or tls-protos\nSelected before was %d\n",
+		    __func__, __FILE__, __LINE__, cur_fa->selected_protos);
+		front_arg_destroy(cur_fa);
+		cur_fa = NULL;
+		YYABORT;
+	}
+} '=' FB_TLS_PROTOS_LIST;
+FB_TLS_PROTOS_LIST: FB_TLS_PROTO | FB_TLS_PROTOS_LIST FB_TLS_PROTO;
+FB_TLS_PROTO
+: TOK_SSLv3 { cur_fa->selected_protos |= SSLv3_PROTO; }
+| TOK_TLSv1_0 { cur_fa->selected_protos |= TLSv1_0_PROTO; }
+| TOK_TLSv1_1 { cur_fa->selected_protos |= TLSv1_1_PROTO; }
+| TOK_TLSv1_2 { cur_fa->selected_protos |= TLSv1_2_PROTO; };
 FB_CIPHERS: TOK_CIPHERS '=' STRING { if ($3) cur_fa->ciphers = strdup($3); };
 FB_PREF_SRV_CIPH: TOK_PREFER_SERVER_CIPHERS '=' BOOL
 {
@@ -232,9 +284,51 @@ BACKLOG_REC: TOK_BACKLOG '=' UINT { cfg->BACKLOG = $3; };
 
 KEEPALIVE_REC: TOK_KEEPALIVE '=' UINT { cfg->TCP_KEEPALIVE_TIME = $3; };
 
-TLS_REC: TOK_TLS '=' BOOL { if ($3) { cfg->ETYPE = ENC_TLS; } };
+TLS_REC: TOK_TLS '=' BOOL {
+	if (cfg->SELECTED_TLS_PROTOS != 0) {
+		fprintf(stderr, "%s (%s, line %d):"
+		    " It is illegal to specify tls after ssl,"
+		    " tls or tls-protos\n",
+		    __func__, __FILE__, __LINE__);
+		YYABORT;
+	}
+	if ($3)
+		cfg->SELECTED_TLS_PROTOS = TLS_OPTION_PROTOS;
+	else
+		fprintf(stderr,
+		    "Warning: tsl = off is deprecated and has no effect.\n");
+};
 
-SSL_REC: TOK_SSL '=' BOOL { if ($3) { cfg->ETYPE = ENC_SSL; } };
+SSL_REC: TOK_SSL '=' BOOL {
+	if (cfg->SELECTED_TLS_PROTOS != 0) {
+		fprintf(stderr, "%s (%s, line %d):"
+		    " It is illegal to specify ssl after ssl,"
+		    " tls or tls-protos.\n",
+		    __func__, __FILE__, __LINE__);
+		YYABORT;
+	}
+	if ($3)
+		cfg->SELECTED_TLS_PROTOS = SSL_OPTION_PROTOS;
+	else
+		fprintf(stderr,
+		    "Warning: ssl = off is deprecated and has no effect.\n");
+};
+
+TLS_PROTOS_REC: TOK_TLS_PROTOS {
+	if (cfg->SELECTED_TLS_PROTOS != 0) {
+		fprintf(stderr, "%s (%s, line %d):"
+		    " It is illegal to specify tls-protos after"
+		    " ssl, tls or tls-protos\n",
+		    __func__, __FILE__, __LINE__);
+		YYABORT;
+	}
+} '=' TLS_PROTOS_LIST;
+TLS_PROTOS_LIST: TLS_PROTO | TLS_PROTOS_LIST TLS_PROTO;
+TLS_PROTO
+	: TOK_SSLv3 { cfg->SELECTED_TLS_PROTOS |= SSLv3_PROTO; }
+	| TOK_TLSv1_0 { cfg->SELECTED_TLS_PROTOS |= TLSv1_0_PROTO; }
+	| TOK_TLSv1_1 { cfg->SELECTED_TLS_PROTOS |= TLSv1_1_PROTO; }
+	| TOK_TLSv1_2 { cfg->SELECTED_TLS_PROTOS |= TLSv1_2_PROTO; };
 
 SSL_ENGINE_REC: TOK_SSL_ENGINE '=' STRING { if ($3) cfg->ENGINE = strdup($3); };
 

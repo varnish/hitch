@@ -32,6 +32,11 @@
 "quiet"		{ return (TOK_QUIET); }
 "ssl"		{ return (TOK_SSL); }
 "tls"		{ return (TOK_TLS); }
+"tls-protos"    { return (TOK_TLS_PROTOS); }
+"SSLv3"         { return (TOK_SSLv3); }
+"TLSv1.0"       { return (TOK_TLSv1_0); }
+"TLSv1.1"       { return (TOK_TLSv1_1); }
+"TLSv1.2"       { return (TOK_TLSv1_2); }
 "ciphers"		{ return (TOK_CIPHERS); }
 "ssl-engine"		{ return (TOK_SSL_ENGINE); }
 "prefer-server-ciphers"	{ return (TOK_PREFER_SERVER_CIPHERS); }
