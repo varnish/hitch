@@ -1543,7 +1543,7 @@ insert_sni_names(sslctx *sc, sni_name **sn_tab)
 			key = sn->servername + 1;
 		HASH_FIND_STR(*sn_tab, key, sn2);
 		if (sn2 != NULL) {
-			ERR("Warning: SNI name '%s' from '%s' overriden"
+			ERR("Warning: SNI name '%s' from '%s' overridden"
 			    " by '%s'\n",
 			    key, sn2->sctx->filename, sn->sctx->filename);
 		}
@@ -3482,7 +3482,7 @@ ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 
 		if (n == 0) {
 			/* timeout */
-			ERR("{ocsp} Error: Transmission timout for %s:%s. "
+			ERR("{ocsp} Error: Transmission timeout for %s:%s. "
 			    "Consider increasing parameter 'ocsp-resp-tmo'"
 			    " [current value: %.3fs]\n",
 			    host, port, CONFIG->OCSP_RESP_TMO);
