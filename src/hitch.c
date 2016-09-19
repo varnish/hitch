@@ -1775,15 +1775,6 @@ frontend_listen(const struct front_arg *fa, struct listen_sock_head *slist)
 			    fa->pspec);
 			goto creat_frontend_err;
 		}
-#ifdef SO_REUSEPORT
-		if (setsockopt(ls->sock, SOL_SOCKET, SO_REUSEPORT,
-			&t, sizeof(int))
-		    < 0) {
-			ERR("{setsockopt-reuseport}: %s: %s\n", strerror(errno),
-			    fa->pspec);
-			goto creat_frontend_err;
-		}
-#endif
 		if(setnonblocking(ls->sock) < 0) {
 			ERR("{listen sock: setnonblocking}: %s: %s\n",
 			    strerror(errno), fa->pspec);
