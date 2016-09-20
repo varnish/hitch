@@ -130,8 +130,8 @@ FB_REC
 	| FB_PREF_SRV_CIPH
 	;
 
-FB_HOST: TOK_HOST '=' STRING { cur_fa->ip = strdup($3); };
-FB_PORT: TOK_PORT '=' STRING { cur_fa->port = strdup($3); };
+FB_HOST: TOK_HOST '=' STRING { if ($3) cur_fa->ip = strdup($3); };
+FB_PORT: TOK_PORT '=' STRING { if ($3) cur_fa->port = strdup($3); };
 
 PEM_BLK: PB_RECS;
 
@@ -146,11 +146,12 @@ PB_REC
 	| OCSP_VERIFY
 	;
 
-PB_CERT: TOK_PB_CERT '=' STRING { cur_pem->filename = strdup($3); };
+PB_CERT: TOK_PB_CERT '=' STRING { if ($3) cur_pem->filename = strdup($3); };
 
 PB_OCSP_RESP_FILE: TOK_PB_OCSP_FILE '=' STRING
 {
-	cur_pem->ocspfn = strdup($3);
+	if ($3)
+		cur_pem->ocspfn = strdup($3);
 };
 
 OCSP_VERIFY: TOK_OCSP_VERIFY '=' BOOL
@@ -163,7 +164,8 @@ OCSP_VERIFY: TOK_OCSP_VERIFY '=' BOOL
 
 OCSP_DIR: TOK_OCSP_DIR '=' STRING
 {
-	cfg->OCSP_DIR = strdup($3);
+	if ($3)
+		cfg->OCSP_DIR = strdup($3);
 };
 
 OCSP_RESP_TMO: TOK_OCSP_RESP_TMO '=' UINT
@@ -178,16 +180,18 @@ OCSP_CONN_TMO: TOK_OCSP_CONN_TMO '=' UINT
 
 FB_CERT: TOK_PEM_FILE '=' STRING
 {
-	int r;
-	struct cfg_cert_file *cert;
-	cert = cfg_cert_file_new();
-	cert->filename = strdup($3);
-	r = cfg_cert_vfy(cert);
-	if (r == 0) {
-		cfg_cert_file_free(&cert);
-		YYABORT;
+	if ($3 != NULL) {
+		int r;
+		struct cfg_cert_file *cert;
+		cert = cfg_cert_file_new();
+		cert->filename = strdup($3);
+		r = cfg_cert_vfy(cert);
+		if (r == 0) {
+			cfg_cert_file_free(&cert);
+			YYABORT;
+		}
+		cfg_cert_add(cert, &cur_fa->certs);
 	}
-	cfg_cert_add(cert, &cur_fa->certs);
 }
 	| TOK_PEM_FILE '=' '{'
 {

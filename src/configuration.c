@@ -630,8 +630,6 @@ front_arg_add(hitch_config *cfg, struct front_arg *fa)
 	struct vsb pspec;
 
 	CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
-	AN(fa->port);
-
 	if (cfg->LISTEN_DEFAULT != NULL) {
 		/* drop default listen arg. */
 		struct front_arg *def = NULL;
@@ -646,10 +644,16 @@ front_arg_add(hitch_config *cfg, struct front_arg *fa)
 	}
 
 	VSB_new(&pspec, NULL, 0, VSB_AUTOEXTEND);
-	VSB_printf(&pspec, "[%s]:", fa->ip);
-	VSB_cat(&pspec, fa->port);
+	VSB_printf(&pspec, "[%s]:%s", fa->ip, fa->port);
 	VSB_finish(&pspec);
 	fa->pspec = VSB_data(&pspec);
+
+	if (fa->port == NULL) {
+		config_error_set("No port number specified "
+		    "for frontend '%s'", fa->pspec);
+		return (0);
+	}
+
 	HASH_ADD_KEYPTR(hh, cfg->LISTEN_ARGS, fa->pspec,
 	    strlen(fa->pspec), fa);
 
