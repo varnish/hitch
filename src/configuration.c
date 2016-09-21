@@ -119,6 +119,39 @@ config_error_get(void)
 	return error_buf;
 }
 
+struct front_arg *
+front_arg_new(void)
+{
+	struct front_arg *fa;
+
+	ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
+	AN(fa);
+	fa->match_global_certs = -1;
+	fa->sni_nomatch_abort = -1;
+	fa->etype = ENC_TLS;
+	fa->prefer_server_ciphers = -1;
+
+	return (fa);
+}
+
+void
+front_arg_destroy(struct front_arg *fa)
+{
+	struct cfg_cert_file *cf, *cftmp;
+
+	CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
+	free(fa->ip);
+	free(fa->port);
+	free(fa->pspec);
+	free(fa->ciphers);
+	HASH_ITER(hh, fa->certs, cf, cftmp) {
+		CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
+		HASH_DEL(fa->certs, cf);
+		cfg_cert_file_free(&cf);
+	}
+	FREE_OBJ(fa);
+}
+
 hitch_config *
 config_new(void)
 {
@@ -152,7 +185,7 @@ config_new(void)
 	r->CERT_DEFAULT	      = NULL;
 	r->CERT_FILES         = NULL;
 	r->LISTEN_ARGS        = NULL;
-	ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
+	fa = front_arg_new();
 	fa->port = strdup("8443");
 	fa->pspec = strdup("default");
 	HASH_ADD_KEYPTR(hh, r->LISTEN_ARGS, fa->pspec, strlen(fa->pspec), fa);
@@ -210,16 +243,7 @@ config_destroy(hitch_config *cfg)
 	HASH_ITER(hh, cfg->LISTEN_ARGS, fa, ftmp) {
 		CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
 		HASH_DEL(cfg->LISTEN_ARGS, fa);
-		free(fa->ip);
-		free(fa->port);
-		free(fa->pspec);
-		free(fa->ciphers);
-		HASH_ITER(hh, fa->certs, cf, cftmp) {
-			CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
-			HASH_DEL(fa->certs, cf);
-			cfg_cert_file_free(&cf);
-		}
-		FREE_OBJ(fa);
+		front_arg_destroy(fa);
 	}
 	free(cfg->BACK_IP);
 	free(cfg->BACK_PORT);
@@ -608,21 +632,6 @@ config_param_shcupd_peer(char *str, hitch_config *cfg)
 }
 
 #endif /* USE_SHARED_CACHE */
-
-struct front_arg *
-front_arg_new(void)
-{
-	struct front_arg *fa;
-
-	ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
-	AN(fa);
-	fa->match_global_certs = -1;
-	fa->sni_nomatch_abort = -1;
-	fa->etype = ENC_TLS;
-	fa->prefer_server_ciphers = -1;
-
-	return (fa);
-}
 
 int
 front_arg_add(hitch_config *cfg, struct front_arg *fa)
