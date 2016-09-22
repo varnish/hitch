@@ -20,8 +20,9 @@ frontend = {
 # will configure the option for this specific frontend only:
 #
 #    pem-file = ""
-#    tls = on
-#    ssl = off
+#    tls = on		(deprecated)
+#    ssl = on		(deprecated)
+#    tls-protos = TLSv1.1 TLSv1.2
 #    ciphers = ""
 #    prefer-server-ciphers = off
 #    sni-nomatch-abort = off
@@ -71,10 +72,27 @@ pem-file = ""
 #	ocsp-resp-file = "ocsp-resp.der"
 # }
 
-# SSL protocol.
+# SSL/TLS protocols.
+#
+# The default behavior is to disable SSLv3 and TLS version 1.0. This corresponds to
+#
+# tls-protos = TLSv1.1, TLSv1.2
+#
+# All TLS versions can be enabled by:
+#
+# tls-protos = TLSv1.0 TLSv1.1, TLSv1.2
+#
+# or the deprecated
 #
 # tls = on
-# ssl = off
+#
+# It is also possible, but strongly discouraged, to enable SSLv3:
+#
+# tls-protos = SSLv3 TLSv1.0 TLSv1.1, TLSv1.2
+#
+# or
+#
+# ssl = on
 
 # List of allowed SSL ciphers.
 #
