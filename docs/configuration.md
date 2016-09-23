@@ -145,6 +145,7 @@ configuration file:
         ocsp-resp-file = "mycert-ocsp.der"
     }
 
+
 ## ALPN/NPN support
 
 Hitch supports both the ALPN and the NPN TLS extension. This allows
@@ -160,6 +161,18 @@ configuration file:
 If the PROXY protocol is enabled (`write-proxy = on`), Hitch will
 transmit the selected protocol as part of its PROXY header.
 
+
+## SSL/TLS protocol setting
+
+Hitch supports TLS (1.0, 1.1 and 1.2) and SSL 3. By default, only TLS
+versions 1.1 and 1.2 are enabled, while TLS 1.0 and SSLv3 are
+disabled. The recommended way to to select protocols is to use
+`tls-protos` in the configuration file:
+
+    tls-protos = TLSv1.1 TLSv1.2
+
+The following tokens are available for the `tls-protos` option:
+`SSLv3`, `TLSv1.0`, `TLSv1.1` and `TLSv1.2`.
 
 ## Uninterrupted configuration reload
 

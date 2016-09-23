@@ -28,7 +28,7 @@ frontend = {
 #    sni-nomatch-abort = off
 #    match-global-certs = off
 #
-# See further explanation below for each specifc option.
+# See further explanation below for each specific option.
 
 # Upstream server address. REQUIRED.
 #
@@ -76,11 +76,11 @@ pem-file = ""
 #
 # The default behavior is to disable SSLv3 and TLS version 1.0. This corresponds to
 #
-# tls-protos = TLSv1.1, TLSv1.2
+# tls-protos = TLSv1.1 TLSv1.2
 #
 # All TLS versions can be enabled by:
 #
-# tls-protos = TLSv1.0 TLSv1.1, TLSv1.2
+# tls-protos = TLSv1.0 TLSv1.1 TLSv1.2
 #
 # or the deprecated
 #
@@ -88,7 +88,7 @@ pem-file = ""
 #
 # It is also possible, but strongly discouraged, to enable SSLv3:
 #
-# tls-protos = SSLv3 TLSv1.0 TLSv1.1, TLSv1.2
+# tls-protos = SSLv3 TLSv1.0 TLSv1.1 TLSv1.2
 #
 # or
 #
