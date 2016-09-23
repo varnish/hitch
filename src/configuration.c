@@ -65,6 +65,7 @@
 #define CFG_PIDFILE "pidfile"
 #define CFG_SNI_NOMATCH_ABORT "sni-nomatch-abort"
 #define CFG_OCSP_DIR "ocsp-dir"
+#define CFG_TLS_PROTOS "tls-protos"
 
 #ifdef USE_SHARED_CACHE
 	#define CFG_SHARED_CACHE "shared-cache"
@@ -119,6 +120,39 @@ config_error_get(void)
 	return error_buf;
 }
 
+struct front_arg *
+front_arg_new(void)
+{
+	struct front_arg *fa;
+
+	ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
+	AN(fa);
+	fa->match_global_certs = -1;
+	fa->sni_nomatch_abort = -1;
+	fa->selected_protos = 0;
+	fa->prefer_server_ciphers = -1;
+
+	return (fa);
+}
+
+void
+front_arg_destroy(struct front_arg *fa)
+{
+	struct cfg_cert_file *cf, *cftmp;
+
+	CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
+	free(fa->ip);
+	free(fa->port);
+	free(fa->pspec);
+	free(fa->ciphers);
+	HASH_ITER(hh, fa->certs, cf, cftmp) {
+		CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
+		HASH_DEL(fa->certs, cf);
+		cfg_cert_file_free(&cf);
+	}
+	FREE_OBJ(fa);
+}
+
 hitch_config *
 config_new(void)
 {
@@ -130,8 +164,8 @@ config_new(void)
 
 	// set default values
 
-	r->ETYPE              = ENC_TLS;
 	r->PMODE              = SSL_SERVER;
+	r->SELECTED_TLS_PROTOS= 0;
 	r->WRITE_IP_OCTET     = 0;
 	r->WRITE_PROXY_LINE_V1= 0;
 	r->WRITE_PROXY_LINE_V2= 0;
@@ -152,7 +186,7 @@ config_new(void)
 	r->CERT_DEFAULT	      = NULL;
 	r->CERT_FILES         = NULL;
 	r->LISTEN_ARGS        = NULL;
-	ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
+	fa = front_arg_new();
 	fa->port = strdup("8443");
 	fa->pspec = strdup("default");
 	HASH_ADD_KEYPTR(hh, r->LISTEN_ARGS, fa->pspec, strlen(fa->pspec), fa);
@@ -210,16 +244,7 @@ config_destroy(hitch_config *cfg)
 	HASH_ITER(hh, cfg->LISTEN_ARGS, fa, ftmp) {
 		CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
 		HASH_DEL(cfg->LISTEN_ARGS, fa);
-		free(fa->ip);
-		free(fa->port);
-		free(fa->pspec);
-		free(fa->ciphers);
-		HASH_ITER(hh, fa->certs, cf, cftmp) {
-			CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
-			HASH_DEL(fa->certs, cf);
-			cfg_cert_file_free(&cf);
-		}
-		FREE_OBJ(fa);
+		front_arg_destroy(fa);
 	}
 	free(cfg->BACK_IP);
 	free(cfg->BACK_PORT);
@@ -609,21 +634,6 @@ config_param_shcupd_peer(char *str, hitch_config *cfg)
 
 #endif /* USE_SHARED_CACHE */
 
-struct front_arg *
-front_arg_new(void)
-{
-	struct front_arg *fa;
-
-	ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
-	AN(fa);
-	fa->match_global_certs = -1;
-	fa->sni_nomatch_abort = -1;
-	fa->etype = ENC_TLS;
-	fa->prefer_server_ciphers = -1;
-
-	return (fa);
-}
-
 int
 front_arg_add(hitch_config *cfg, struct front_arg *fa)
 {
@@ -686,9 +696,9 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 	assert(strlen(k) >= 2);
 
 	if (strcmp(k, "tls") == 0) {
-		cfg->ETYPE = ENC_TLS;
+		cfg->SELECTED_TLS_PROTOS = TLS_OPTION_PROTOS;
 	} else if (strcmp(k, "ssl") == 0) {
-		cfg->ETYPE = ENC_SSL;
+		cfg->SELECTED_TLS_PROTOS = SSL_OPTION_PROTOS;
 	} else if (strcmp(k, CFG_CIPHERS) == 0) {
 		if (strlen(v) > 0) {
 			config_assign_str(&cfg->CIPHER_SUITE, v);
@@ -1163,6 +1173,8 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		}
 	}
 
+	int tls_protos_config_file = cfg->SELECTED_TLS_PROTOS;
+
 	optind = 1;
 	while (1) {
 		int ret = 0;
@@ -1272,6 +1284,12 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		}
 	}
 
+	if ((tls || ssl) && tls_protos_config_file != 0) {
+		config_error_set("Deprecated options --tls and --ssl cannot be"
+		    " used to override tls-protos in a config file.");
+		*retval = 1;
+		return (1);
+	}
 	if (tls && ssl) {
 		config_error_set("Options --tls and --ssl are mutually"
 		    " exclusive.");
@@ -1279,10 +1297,12 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		return (1);
 	} else {
 		if (ssl)
-			cfg->ETYPE = ENC_SSL;
+			cfg->SELECTED_TLS_PROTOS = SSL_OPTION_PROTOS;
 		else if (tls)
-			cfg->ETYPE = ENC_TLS;
+			cfg->SELECTED_TLS_PROTOS = TLS_OPTION_PROTOS;
 	}
+	if (cfg->SELECTED_TLS_PROTOS == 0)
+		cfg->SELECTED_TLS_PROTOS = DEFAULT_TLS_PROTOS;
 
 	if (client)
 		cfg->PMODE = SSL_CLIENT;

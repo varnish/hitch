@@ -1368,13 +1368,14 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	SSL_CTX *ctx;
 	sslctx *sc;
 	EVP_PKEY *pkey;
-	ENC_TYPE etype = CONFIG->ETYPE;
+	int selected_protos = CONFIG->SELECTED_TLS_PROTOS;
 	char *ciphers = CONFIG->CIPHER_SUITE;
 	int pref_srv_ciphers = CONFIG->PREFER_SERVER_CIPHERS;
 
 	if (fa != NULL) {
 		CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
-		etype = fa->etype;
+		if (fa->selected_protos != 0)
+			selected_protos = fa->selected_protos;
 		if (fa->ciphers != NULL)
 			ciphers = fa->ciphers;
 		if (fa->prefer_server_ciphers != -1)
@@ -1387,8 +1388,14 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 #ifdef SSL_OP_NO_COMPRESSION
 	ssloptions |= SSL_OP_NO_COMPRESSION;
 #endif
-	if (etype == ENC_TLS)
+	if (!(selected_protos & SSLv3_PROTO))
 		ssloptions |= SSL_OP_NO_SSLv3;
+	if (!(selected_protos & TLSv1_0_PROTO))
+		ssloptions |= SSL_OP_NO_TLSv1;
+	if (!(selected_protos & TLSv1_1_PROTO))
+		ssloptions |= SSL_OP_NO_TLSv1_1;
+	if (!(selected_protos & TLSv1_2_PROTO))
+		ssloptions |= SSL_OP_NO_TLSv1_2;
 	ctx = SSL_CTX_new((CONFIG->PMODE == SSL_CLIENT) ?
 	    SSLv23_client_method() : SSLv23_server_method());
 

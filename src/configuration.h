@@ -44,9 +44,15 @@ typedef struct shcupd_peer_opt {
 #endif
 
 typedef enum {
-    ENC_TLS,
-    ENC_SSL
-} ENC_TYPE;
+	SSLv3_PROTO	= 0x01,
+	TLSv1_0_PROTO	= 0x02,
+	TLSv1_1_PROTO	= 0x04,
+	TLSv1_2_PROTO	= 0x08
+} TLS_PROTOCOL;
+
+#define DEFAULT_TLS_PROTOS (TLSv1_1_PROTO | TLSv1_2_PROTO)
+#define TLS_OPTION_PROTOS (TLSv1_0_PROTO | DEFAULT_TLS_PROTOS)
+#define SSL_OPTION_PROTOS (SSLv3_PROTO | TLS_OPTION_PROTOS)
 
 typedef enum {
     SSL_SERVER,
@@ -76,15 +82,17 @@ struct front_arg {
 	int			sni_nomatch_abort;
 	int			prefer_server_ciphers;
 	char			*ciphers;
-	ENC_TYPE		etype;
+	// ENC_TYPE		etype;
+	int			selected_protos;
 	int			mark;
 	UT_hash_handle		hh;
 };
 
 /* configuration structure */
 struct __hitch_config {
-    ENC_TYPE ETYPE;
+    // ENC_TYPE ETYPE;
     PROXY_MODE PMODE;
+    int SELECTED_TLS_PROTOS;
     int WRITE_IP_OCTET;
     int WRITE_PROXY_LINE_V1;
     int WRITE_PROXY_LINE_V2;

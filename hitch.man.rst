@@ -38,8 +38,8 @@ Command line arguments
 ======================
 
   --config=FILE                 Load configuration from specified file.
-  --tls                         TLSv1 (default. No SSLv3)
-  --ssl                         SSLv3 (enables SSLv3)
+  --tls                         All TLS versions, no SSLv3 (deprecated). See details below.
+  --ssl                         enable SSLv3 (deprecated). See details below.
   -c  --ciphers=SUITE           Sets allowed ciphers (Default: "")
   -e  --ssl-engine=NAME         Sets OpenSSL engine (Default: "")
   -O  --prefer-server-ciphers   Prefer server list order
@@ -86,6 +86,25 @@ Command line arguments
   -p  --pidfile=FILE         PID file
   -V  --version              Print program version and exit
   -h  --help                 This help message
+
+
+Selecting SSL/TLS protocols
+===========================
+
+Hitch supports TLS (1.0, 1.1 and 1.2) and SSL 3. By default, only TLS
+versions 1.1 and 1.2 are enabled, while TLS 1.0 and SSLv3 are
+disabled. The recomended way to to select protocols is to use
+tls-protos in the config file, either in global scope or in a frontend
+block.
+
+Both overrides --ssl and --tls are deprected, and users are encouraged
+to either use the defaults or switch to tls-protocols in the
+config file. Using --ssl will enable SSLv3 and all TLS protocols
+while --tls will disable SSLv3 and enable all TLS protocols, but these
+only affect the global scope, not settings inside frontend blocks.
+
+It is an error to use --ssl or --tls when sepcifying tls-protos in
+global scope in the the config file.
 
 
 History
