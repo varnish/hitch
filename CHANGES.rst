@@ -4,6 +4,15 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+
+hitch-1.4.1 (2016-09-23)
+------------------------
+
+* Add a new ``tls-protos`` configuration option for specifying the
+  permitted TLS/SSL protocols. This new option supersedes settings
+  ``ssl`` and ``tls`` which are now deprecated and will be kept for
+  backwards compatibility.
+
 hitch-1.4.0 (2016-09-12)
 ------------------------
 
