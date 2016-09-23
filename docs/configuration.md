@@ -174,6 +174,7 @@ disabled. The recommended way to to select protocols is to use
 The following tokens are available for the `tls-protos` option:
 `SSLv3`, `TLSv1.0`, `TLSv1.1` and `TLSv1.2`.
 
+
 ## Uninterrupted configuration reload
 
 Issuing a SIGHUP signal to the main Hitch process will initiate a
