@@ -67,6 +67,29 @@ AC_FUNC_FORK
 AC_FUNC_MMAP
 AC_CHECK_FUNCS([accept4])
 
+AC_CACHE_CHECK([whether SO_REUSEPORT works],
+  [ac_cv_so_reuseport_works],
+  [AC_RUN_IFELSE(
+    [AC_LANG_PROGRAM([[
+#include <sys/types.h>
+#include <sys/socket.h>
+    ]], [[
+int main() {
+	int s = socket(AF_INET, SOCK_STREAM, 0);
+	int i = 5;
+	if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &i, sizeof i) < 0)
+	  return (1);
+	return (0);
+}
+]])],
+  [ac_cv_so_reuseport_works=yes],
+  [ac_cv_so_reuseport_works=no])
+  ]
+)
+if test "$ac_cv_so_reuseport_works" = yes; then
+  AC_DEFINE([SO_REUSEPORT_WORKS], [1], [Define if SO_REUSEPORT works])
+fi
+
 SH_TESTS="$(cd $srcdir/src && echo tests/test*.sh)"
 AC_SUBST(SH_TESTS)
 

@@ -774,7 +774,7 @@ create_shcupd_socket()
 
 	int t = 1;
 	(void)setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(int));
-#ifdef SO_REUSEPORT
+#ifdef SO_REUSEPORT_WORKS
 	(void)setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &t, sizeof(int));
 #endif
 
@@ -1782,7 +1782,7 @@ frontend_listen(const struct front_arg *fa, struct listen_sock_head *slist)
 			    fa->pspec);
 			goto creat_frontend_err;
 		}
-#ifdef SO_REUSEPORT
+#ifdef SO_REUSEPORT_WORKS
 		if (setsockopt(ls->sock, SOL_SOCKET, SO_REUSEPORT,
 			&t, sizeof(int))
 		    < 0) {
