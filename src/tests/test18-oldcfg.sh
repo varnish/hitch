@@ -128,7 +128,7 @@ proxy-proxy = off
 EOF
 
 hitch $HITCH_ARGS --config=$CONFFILE > $DUMPFILE
-test "$?" = "0" || die "Hitch did not start."
+test "$?" = "0" || die "Hitch did not start. (config #1)"
 
 runcurl $LISTENADDR $((LISTENPORT))
 kill $(cat $PIDFILE)
@@ -271,7 +271,7 @@ sni-nomatch-abort = off
 EOF
 
 hitch $HITCH_ARGS --config=$CONFFILE > $DUMPFILE
-test "$?" = "0" || die "Hitch did not start."
+test "$?" = "0" || die "Hitch did not start. (config #2)"
 
 runcurl $LISTENADDR $((LISTENPORT))
 kill $(cat $PIDFILE)
@@ -457,7 +457,7 @@ sni-nomatch-abort = off
 EOF
 
 hitch $HITCH_ARGS --config=$CONFFILE > $DUMPFILE
-test "$?" = "0" || die "Hitch did not start."
+test "$?" = "0" || die "Hitch did not start. (config #3)"
 
 runcurl $LISTENADDR $((LISTENPORT))
 kill $(cat $PIDFILE)
@@ -668,7 +668,7 @@ sni-nomatch-abort = off
 EOF
 
 hitch $HITCH_ARGS --config=$CONFFILE > $DUMPFILE
-test "$?" = "0" || die "Hitch did not start."
+test "$?" = "0" || die "Hitch did not start. (config #4)"
 
 runcurl $LISTENADDR $((LISTENPORT))
 kill $(cat $PIDFILE)
@@ -881,6 +881,6 @@ sni-nomatch-abort = off
 EOF
 
 hitch $HITCH_ARGS --config=$CONFFILE > $DUMPFILE
-test "$?" = "0" || die "Hitch did not start ($?)"
+test "$?" = "0" || die "Hitch did not start (config #5 return code: $?)"
 
 runcurl $LISTENADDR $((LISTENPORT))
