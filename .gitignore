@@ -26,5 +26,6 @@ Makefile
 src/tests/utils/parse_proxy_v2
 src/tests/test*.trs
 src/tests/test*.log
+src/test-suite.log
 parse_proxy_v2
 /build-aux/
