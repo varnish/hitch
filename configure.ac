@@ -74,13 +74,11 @@ AC_CACHE_CHECK([whether SO_REUSEPORT works],
 #include <sys/types.h>
 #include <sys/socket.h>
     ]], [[
-int main() {
 	int s = socket(AF_INET, SOCK_STREAM, 0);
 	int i = 5;
-	if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &i, sizeof i) < 0)
+	if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &i, sizeof i) < 0)
 	  return (1);
 	return (0);
-}
 ]])],
   [ac_cv_so_reuseport_works=yes],
   [ac_cv_so_reuseport_works=no])
