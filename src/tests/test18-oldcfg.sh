@@ -127,7 +127,7 @@ proxy-proxy = off
 
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE
+hitch $HITCH_ARGS --config=$CONFFILE > $DUMPFILE
 test "$?" = "0" || die "Hitch did not start."
 
 runcurl $LISTENADDR $((LISTENPORT))
@@ -270,7 +270,7 @@ sni-nomatch-abort = off
 
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE
+hitch $HITCH_ARGS --config=$CONFFILE > $DUMPFILE
 test "$?" = "0" || die "Hitch did not start."
 
 runcurl $LISTENADDR $((LISTENPORT))
@@ -456,7 +456,7 @@ sni-nomatch-abort = off
 # }
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE
+hitch $HITCH_ARGS --config=$CONFFILE > $DUMPFILE
 test "$?" = "0" || die "Hitch did not start."
 
 runcurl $LISTENADDR $((LISTENPORT))
@@ -667,7 +667,7 @@ sni-nomatch-abort = off
 # }
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE
+hitch $HITCH_ARGS --config=$CONFFILE > $DUMPFILE
 test "$?" = "0" || die "Hitch did not start."
 
 runcurl $LISTENADDR $((LISTENPORT))
@@ -880,7 +880,7 @@ sni-nomatch-abort = off
 
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE
+hitch $HITCH_ARGS --config=$CONFFILE > $DUMPFILE
 test "$?" = "0" || die "Hitch did not start ($?)"
 
 runcurl $LISTENADDR $((LISTENPORT))
