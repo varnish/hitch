@@ -1989,13 +1989,13 @@ shutdown_proxy(proxystate *ps, SHUTDOWN_REQUESTOR req)
 		ev_io_stop(loop, &ps->ev_r_clear);
 		ev_io_stop(loop, &ps->ev_proxy);
 
-		close(ps->fd_up);
-		close(ps->fd_down);
+		(void)SSL_shutdown(ps->ssl);
 
 		ERR_clear_error();
-
-		SSL_set_shutdown(ps->ssl, SSL_SENT_SHUTDOWN);
 		SSL_free(ps->ssl);
+
+		close(ps->fd_up);
+		close(ps->fd_down);
 
 		ringbuffer_cleanup(&ps->ring_clear2ssl);
 		ringbuffer_cleanup(&ps->ring_ssl2clear);
