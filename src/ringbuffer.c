@@ -40,13 +40,16 @@ ringbuffer_init(ringbuffer *rb, int num_slots, int data_len)
 {
 	rb->num_slots = num_slots ?: DEF_RING_SLOTS;
 	rb->data_len = data_len ?: DEF_RING_DATA_LEN;
-	rb->slots = (bufent*)malloc(rb->num_slots * sizeof(rb->slots[0]));
+	rb->slots = malloc(rb->num_slots * sizeof(rb->slots[0]));
+	AN(rb->slots);
+
 	rb->head = &rb->slots[0];
 	rb->tail = &rb->slots[0];
 	int x;
 	for (x=0; x < rb->num_slots; x++) {
 		rb->slots[x].next = &(rb->slots[(x + 1) % rb->num_slots]);
-		rb->slots[x].data = (char *)malloc(rb->data_len);
+		rb->slots[x].data = malloc(rb->data_len);
+		AN(rb->slots[x].data);
 	}
 	rb->used = 0;
 	rb->bytes_written = 0;
