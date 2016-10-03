@@ -22,8 +22,6 @@ sleep 1
 echo -e "\n" | openssl s_client -alpn 'h2' -prexit -connect $LISTENADDR:$LISTENPORT > /dev/null
 test "$?" = "0" || die "s_client failed"
 
-sleep 1
-
 grep -q -c "too old for ALPN" $DUMPFILE
 if [ "$" == "0" ]; then
     echo "Skipping test: SSL too old for ALPN"

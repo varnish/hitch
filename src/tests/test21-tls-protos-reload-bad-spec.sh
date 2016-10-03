@@ -29,6 +29,5 @@ sleep 1
 curl --max-time 5 --silent --insecure https://$LISTENADDR:$((LISTENPORT+1))/
 test "$?" != "0" || die "New listen endpoint should not be available."
 
-sleep 1
 curl --max-time 5 --silent --insecure https://$LISTENADDR:$((LISTENPORT))/
 test "$?" = "0" || die "Old listen endpoint should be available."

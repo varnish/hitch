@@ -20,8 +20,6 @@ sleep 1
 echo -e "\n" | openssl s_client -nextprotoneg 'h2-14' -prexit -connect $LISTENADDR:$LISTENPORT > /dev/null
 test "$?" = "0" || die "s_client failed"
 
-sleep 1
-
 grep -q -c "too old for NPN" $DUMPFILE
 if [ "$" == "0" ]; then
     echo "Skipping test: SSL too old for NPN"
