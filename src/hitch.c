@@ -2816,6 +2816,21 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 		CAST_OBJ_NOTNULL(so, default_ctx, SSLCTX_MAGIC);
 
 	SSL *ssl = SSL_new(so->ctx);
+	if (ssl == NULL) {
+		(void)close(back);
+		(void)close(client);
+		ERR("{SSL_new}: %s\n", strerror(errno));
+		return;
+	}
+
+	ALLOC_OBJ(ps, PROXYSTATE_MAGIC);
+	if (ps == NULL) {
+		SSL_free(ssl);
+		(void)close(back);
+		(void)close(client);
+		ERR("{malloc-err}: %s\n", strerror(errno));
+		return;
+	}
 
 	long mode = SSL_MODE_ENABLE_PARTIAL_WRITE;
 #ifdef SSL_MODE_RELEASE_BUFFERS
@@ -2824,8 +2839,6 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 	SSL_set_mode(ssl, mode);
 	SSL_set_accept_state(ssl);
 	SSL_set_fd(ssl, client);
-
-	ALLOC_OBJ(ps, PROXYSTATE_MAGIC);
 
 	ps->fd_up = client;
 	ps->fd_down = back;
