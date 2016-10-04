@@ -754,7 +754,7 @@ create_shcupd_socket()
 	const int gai_err = getaddrinfo(CONFIG->SHCUPD_IP,
 	    CONFIG->SHCUPD_PORT, &hints, &ai);
 	if (gai_err != 0) {
-		ERR("{getaddrinfo}: [%s]\n", gai_strerror(gai_err));
+		ERR("{getaddrinfo}: %s\n", gai_strerror(gai_err));
 		exit(1);
 	}
 
@@ -1757,7 +1757,7 @@ frontend_listen(const struct front_arg *fa, struct listen_sock_head *slist)
 	r = getaddrinfo(fa->ip, fa->port,
 	    &hints, &ai);
 	if (r != 0) {
-		ERR("{getaddrinfo}: %s: [%s]\n", fa->pspec,
+		ERR("{getaddrinfo-listen}: %s: %s\n", fa->pspec,
 		    gai_strerror(r));
 		return (-1);
 	}
@@ -3687,7 +3687,7 @@ init_globals(void)
 	const int gai_err = getaddrinfo(CONFIG->BACK_IP, CONFIG->BACK_PORT,
 	    &hints, &backaddr);
 	if (gai_err != 0) {
-		ERR("{getaddrinfo}: [%s]", gai_strerror(gai_err));
+		ERR("{getaddrinfo-backend}: %s\n", gai_strerror(gai_err));
 		exit(1);
 	}
 
@@ -3706,7 +3706,7 @@ init_globals(void)
 			    spo->port ? spo->port : CONFIG->SHCUPD_PORT,
 			    &hints, pai);
 			if (gai_err != 0) {
-				ERR("{getaddrinfo}: [%s]",
+				ERR("{getaddrinfo}: %s\n",
 				    gai_strerror(gai_err));
 				exit(1);
 			}
