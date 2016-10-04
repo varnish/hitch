@@ -4,6 +4,21 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.4.2 (unreleased)
+------------------------
+
+* Hitch will now send a TLS Close notification during connection teardown.
+  This fixes an incomplete read with a GnuTLS client when the backend
+  (thttpd) used EOF to signal end of data, leaving some octets discarded
+  by gnutls client-side. (issue 127_ )
+
+* Autotools will now detect SO_REUSEPORT availability. (issue 122_)
+
+* Improved error handling on memory allocation failure.
+
+.. _122: https://github.com/varnish/hitch/issues/122
+.. _127: https://github.com/varnish/hitch/issues/127
+
 
 hitch-1.4.1 (2016-09-23)
 ------------------------
