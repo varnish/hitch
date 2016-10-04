@@ -22,7 +22,7 @@ frontend = "[*]:$LISTENPORT"
 #
 # type: string
 # syntax: [HOST]:PORT.
-backend = "[hitch-tls.org]:80"
+backend = "[127.0.0.1]:80"
 
 # SSL x509 certificate file. REQUIRED.
 # List multiple certs to use SNI. Certs are used in the order they
@@ -127,11 +127,8 @@ proxy-proxy = off
 
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE > $DUMPFILE
+hitch --test --config=$CONFFILE > $DUMPFILE
 test "$?" = "0" || die "Hitch did not start. (config #1)"
-
-runcurl $LISTENADDR $((LISTENPORT))
-kill $(cat $PIDFILE)
 
 # hitch 1.0.0
 mk_cfg <<EOF
@@ -151,7 +148,7 @@ frontend = "[*]:$LISTENPORT"
 #
 # type: string
 # syntax: [HOST]:PORT.
-backend = "[hitch-tls.org]:80"
+backend = "[127.0.0.1]:80"
 
 # SSL x509 certificate file. REQUIRED.
 # List multiple certs to use SNI. Certs are used in the order they
@@ -270,11 +267,8 @@ sni-nomatch-abort = off
 
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE > $DUMPFILE
+hitch --test --config=$CONFFILE > $DUMPFILE
 test "$?" = "0" || die "Hitch did not start. (config #2)"
-
-runcurl $LISTENADDR $((LISTENPORT))
-kill $(cat $PIDFILE)
 
 # 1.1.0 didn't see any config file changes
 # hitch 1.2.0
@@ -314,7 +308,7 @@ frontend = {
 #
 # type: string
 # syntax: [HOST]:PORT.
-backend = "[hitch-tls.org]:80"
+backend = "[127.0.0.1]:80"
 
 # SSL x509 certificate file. REQUIRED.
 # List multiple certs to use SNI. Certs are used in the order they
@@ -456,11 +450,8 @@ sni-nomatch-abort = off
 # }
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE > $DUMPFILE
+hitch --test --config=$CONFFILE > $DUMPFILE
 test "$?" = "0" || die "Hitch did not start. (config #3)"
-
-runcurl $LISTENADDR $((LISTENPORT))
-kill $(cat $PIDFILE)
 
 # hitch 1.3.0
 mk_cfg <<EOF
@@ -499,7 +490,7 @@ frontend = {
 #
 # type: string
 # syntax: [HOST]:PORT.
-backend = "[hitch-tls.org]:80"
+backend = "[127.0.0.1]:80"
 
 # SSL x509 certificate file. REQUIRED.
 # List multiple certs to use SNI. Certs are used in the order they
@@ -667,11 +658,8 @@ sni-nomatch-abort = off
 # }
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE > $DUMPFILE
+hitch --test --config=$CONFFILE > $DUMPFILE
 test "$?" = "0" || die "Hitch did not start. (config #4)"
-
-runcurl $LISTENADDR $((LISTENPORT))
-kill $(cat $PIDFILE)
 
 
 # hitch 1.4.0
@@ -711,7 +699,7 @@ frontend = {
 #
 # type: string
 # syntax: [HOST]:PORT.
-backend = "[hitch-tls.org]:80"
+backend = "[127.0.0.1]:80"
 
 # SSL x509 certificate file. REQUIRED.
 # List multiple certs to use SNI. Certs are used in the order they
@@ -880,7 +868,5 @@ sni-nomatch-abort = off
 
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE > $DUMPFILE
+hitch --test --config=$CONFFILE > $DUMPFILE
 test "$?" = "0" || die "Hitch did not start (config #5 return code: $?)"
-
-runcurl $LISTENADDR $((LISTENPORT))
