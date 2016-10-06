@@ -10,7 +10,7 @@ hitch-1.4.2 (unreleased)
 * Hitch will now send a TLS Close notification during connection teardown.
   This fixes an incomplete read with a GnuTLS client when the backend
   (thttpd) used EOF to signal end of data, leaving some octets discarded
-  by gnutls client-side. (issue 127_ )
+  by gnutls client-side. (issue 127_)
 
 * Autotools will now detect SO_REUSEPORT availability. (issue 122_)
 
