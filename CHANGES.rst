@@ -10,9 +10,9 @@ hitch-1.4.2 (unreleased)
 * Hitch will now send a TLS Close notification during connection teardown.
   This fixes an incomplete read with a GnuTLS client when the backend
   (thttpd) used EOF to signal end of data, leaving some octets discarded
-  by gnutls client-side. (issue 127_)
+  by gnutls client-side. (#127_)
 
-* Autotools will now detect SO_REUSEPORT availability. (issue 122_)
+* Autotools will now detect SO_REUSEPORT availability. (#122_)
 
 * Improved error handling on memory allocation failure.
 
@@ -28,13 +28,17 @@ hitch-1.4.1 (2016-09-23)
   ``ssl`` and ``tls`` which are now deprecated and will be kept for
   backwards compatibility.
 
+
 hitch-1.4.0 (2016-09-12)
 ------------------------
 
 * Fix a bug in the OCSP request code where it broke if the OCSP
-  responder required a Host header. (#113)
+  responder required a Host header. (#113_)
 
-* Add support for ECC certificates (#116).
+* Add support for ECC certificates. (#116_)
+
+.. _113: https://github.com/varnish/hitch/issues/113
+.. _116: https://github.com/varnish/hitch/issues/116
 
 
 hitch-1.4.0-beta1 (2016-08-26)
@@ -50,17 +54,21 @@ hitch-1.4.0-beta1 (2016-08-26)
   ALPN/NPN protocol that was selected during the handshake as part of
   the PROXYv2 header.
 
+
 hitch-1.3.1 (2016-08-16)
 ------------------------
 
 * Fixes a bug in the autotools configuration which led to man pages not being built.
+
 
 hitch-1.3.0 (2016-08-16)
 ------------------------
 
 * Fix a bug where we crashed in the OCSP handling if there was no
   default SSLCTX configured.
+
 * Minor documentation fix.
+
 
 hitch-1.3.0-beta3 (2016-07-26)
 ------------------------------
@@ -71,9 +79,11 @@ hitch-1.3.0-beta3 (2016-07-26)
 * Cleanup of various log messages.
 * Verification of OCSP staples. Enabled by setting
   ``ocsp-verify-staple = on``.
-* Make rst2man an optional requirement (#93). Thanks to Barry Allard.
-* Avoid stapling expired OCSP responses
-* A few fixes to the shared cache updating code. Thanks to Piyush Dewnani
+* Make rst2man an optional requirement (#93_). Thanks to Barry Allard.
+* Avoid stapling expired OCSP responses.
+* A few fixes to the shared cache updating code. Thanks to Piyush Dewnani.
+
+.. _93: https://github.com/varnish/hitch/issues/93
 
 hitch-1.3.0-beta2 (2016-05-31)
 ------------------------------
@@ -124,11 +134,15 @@ hitch-1.1.1 (2016-01-26)
 
 * Remove compiler warning on FreeBSD.
 * Fix fatal build error for manpage on FreeBSD.
-* #55: Fix a bug which caused the Hitch worker threads to sometimes
+* #55_: Fix a bug which caused the Hitch worker threads to sometimes
   hit an assert after a configuration reload.
-* #57: Slightly reorganize assertion handling.
-* #52: Fix a bug where we would crash on --help.
+* #57_: Slightly reorganize assertion handling.
+* #52_: Fix a bug where we would crash on --help.
 * Various minor documentation changes.
+
+.. _52: https://github.com/varnish/hitch/issues/52
+.. _55: https://github.com/varnish/hitch/issues/55
+.. _57: https://github.com/varnish/hitch/issues/57
 
 
 hitch-1.1.0 (2015-11-20)
