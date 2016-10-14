@@ -1084,6 +1084,7 @@ sctx_free(sslctx *sc, sni_name **sn_tab)
 
 	if (sn_tab != NULL)
 		CHECK_OBJ_NOTNULL(*sn_tab, SNI_NAME_MAGIC);
+
 	CHECK_OBJ_NOTNULL(sc, SSLCTX_MAGIC);
 	VTAILQ_FOREACH_SAFE(sn, &sc->sni_list, list, sntmp) {
 		CHECK_OBJ_NOTNULL(sn, SNI_NAME_MAGIC);
