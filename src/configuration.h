@@ -5,6 +5,9 @@
  *
  */
 
+#ifndef CONFIGURATION_H_INCLUDED
+#define CONFIGURATION_H_INCLUDED
+
 #include <sys/types.h>
 #include <openssl/opensslv.h>
 
@@ -152,3 +155,5 @@ int config_file_parse (char *file, hitch_config *cfg);
 int config_parse_cli(int argc, char **argv, hitch_config *cfg, int *rv);
 
 int create_alpn_callback_data(hitch_config *cfg, char **error);
+
+#endif  /* CONFIGURATION_H_INCLUDED */

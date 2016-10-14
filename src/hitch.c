@@ -36,6 +36,8 @@
   */
 
 #include "config.h"
+#include "hitch.h"
+#include "ocsp.h"
 
 #include <libgen.h>
 #include <sys/types.h>
@@ -115,7 +117,8 @@
 #endif
 
 /* Globals */
-static struct ev_loop *loop;
+struct ev_loop *loop;
+hitch_config *CONFIG;
 
 /* Worker proc's read side of mgt->worker pipe(2) */
 static ev_io mgt_rd;
@@ -203,7 +206,6 @@ static unsigned char shared_secret[SHA_DIGEST_LENGTH];
 #define NULL_DEV "/dev/null"
 
 int create_workers;
-hitch_config *CONFIG;
 static struct vpf_fh *pfh = NULL;
 
 static char tcp_proxy_line[128] = "";
@@ -224,56 +226,7 @@ static const char *SHUTDOWN_STR[] = {
 
 #ifndef OPENSSL_NO_TLSEXT
 
-struct sni_name_s;
-VTAILQ_HEAD(sni_name_head, sni_name_s);
-
-typedef struct sslstaple_s {
-	unsigned	magic;
-#define SSLSTAPLE_MAGIC	0x20fe53fd
-	unsigned char	*staple;
-	double		mtim;
-	double		nextupd;
-	int		len;
-} sslstaple;
-
-/* SSL contexts. */
-typedef struct sslctx_s {
-	unsigned		magic;
-#define SSLCTX_MAGIC		0xcd1ce5ff
-	char			*filename;
-	SSL_CTX			*ctx;
-	double			mtim;
-	sslstaple		*staple;
-	int			staple_vfy;
-	char			*staple_fn;
-	X509			*x509;
-	ev_stat			*ev_staple;
-	struct sni_name_head	sni_list;
-	UT_hash_handle		hh;
-} sslctx;
-
-
-typedef struct ocspquery_s {
-	unsigned	magic;
-#define OCSPQUERY_MAGIC	0xb91c4eb1
-	ev_timer	ev_t_refresh;
-	sslctx		*sctx;
-
-	/*  */
-} ocspquery;
-
-/* SNI lookup objects */
-typedef struct sni_name_s {
-	unsigned		magic;
-#define SNI_NAME_MAGIC		0xb0626581
-	char			*servername;
-	sslctx			*sctx;
-	int			is_wildcard;
-	VTAILQ_ENTRY(sni_name_s)	list;
-	UT_hash_handle		hh;
-} sni_name;
-
-static sni_name *sni_names;
+sni_name *sni_names;
 static sslctx *ssl_ctxs;
 static sslctx *default_ctx;
 
@@ -310,57 +263,9 @@ struct ha_proxy_v2_hdr {
 	union ha_proxy_v2_addr	addr;
 };
 
-/*
- * Proxied State
- *
- * All state associated with one proxied connection
- */
-typedef struct proxystate {
-	unsigned		magic;
-#define PROXYSTATE_MAGIC	0xcf877ed9
-	ringbuffer		ring_ssl2clear;	/* Pushing bytes from
-						 * secure to clear
-						 * stream */
-	ringbuffer		ring_clear2ssl;	/* Pushing bytes from
-						 * clear to secure
-						 * stream */
-	ev_io 			ev_r_ssl;	/* Secure stream write event */
-	ev_io			ev_w_ssl;	/* Secure stream read event */
-	ev_io			ev_r_handshake;	/* Secure stream handshake
-						 * write event */
-	ev_io			ev_w_handshake;	/* Secure stream handshake
-						 * read event */
-	ev_timer		ev_t_handshake;	/* handshake timer */
-	ev_io			ev_w_connect;	/* Backend connect event */
-	ev_timer		ev_t_connect;	/* backend connect timer */
 
-	ev_io			ev_r_clear;	/* Clear stream write event */
-	ev_io			ev_w_clear;	/* Clear stream read event */
-	ev_io			ev_proxy;	/* proxy read event */
-
-	int			fd_up;		/* Upstream (client) socket */
-	int			fd_down;	/* Downstream (backend)
-						 * socket */
-
-	int			want_shutdown:1; /* Connection is
-						  * half-shutdown */
-	int			handshaked:1;	/* Initial handshake happened */
-	int			clear_connected:1; /* Clear stream is
-						    * connected */
-	int			renegotiation:1; /* Renegotation is
-						  * occuring */
-	int			npn_alpn_tried:1;/* NPN or ALPN was tried */
-
-	SSL			*ssl;		/* OpenSSL SSL state */
-
-	struct sockaddr_storage	remote_ip;	/* Remote ip returned
-						 * from `accept` */
-	int			connect_port;	/* local port for connection */
-} proxystate;
-
-
-static double
-time_now(void)
+double
+Time_now(void)
 {
 	struct timespec tv;
 
@@ -368,13 +273,7 @@ time_now(void)
 	return (tv.tv_sec + 1e-9 * tv.tv_nsec);
 }
 
-/* declare printf like functions: */
-static void WLOG(int level, const char *fmt, ...)
-	__attribute__((format(printf, 2, 3)));
-static void logproxy(int level, const proxystate* ps, const char *fmt, ...)
-	__attribute__((format(printf, 3, 4)));
-
-static void
+void
 VWLOG(int level, const char *fmt, va_list ap)
 {
 	struct timeval tv;
@@ -417,7 +316,7 @@ VWLOG(int level, const char *fmt, va_list ap)
 	va_end(ap1);
 }
 
-static void
+void
 WLOG(int level, const char *fmt, ...)
 {
 	va_list ap;
@@ -445,11 +344,8 @@ WLOG(int level, const char *fmt, ...)
 		}						\
 	} while (0)
 
-static void
-log_ssl_error(proxystate *ps, const char *what, ...);
 
-
-static void
+void
 logproxy(int level, const proxystate* ps, const char *fmt, ...)
 {
 	char buf[1024];
@@ -949,33 +845,6 @@ load_privatekey(SSL_CTX *ctx, const char *file)
 }
 
 #ifndef OPENSSL_NO_TLSEXT
-int
-ocsp_staple_cb(SSL *ssl, void *priv)
-{
-	sslstaple *staple;
-	unsigned char *buf;
-	CAST_OBJ_NOTNULL(staple, priv, SSLSTAPLE_MAGIC);
-
-	if (staple->nextupd != -1 &&
-	    staple->nextupd < time_now()) {
-		return (SSL_TLSEXT_ERR_NOACK);
-	}
-
-	/* SSL_set_tlsext_status_ocsp_resp will issue a free() on the
-	 * provided input, so we need to pass a copy. */
-	buf = malloc(staple->len);
-	AN(buf);
-	memcpy(buf, staple->staple, staple->len);
-
-	if (SSL_set_tlsext_status_ocsp_resp(ssl,
-		buf, staple->len) == 1)
-		return (SSL_TLSEXT_ERR_OK);
-	else
-		free(buf);
-
-	return (SSL_TLSEXT_ERR_NOACK);
-}
-
 static int
 sni_match(const sni_name *sn, const char *srvname)
 {
@@ -1100,266 +969,26 @@ sctx_free(sslctx *sc, sni_name **sn_tab)
 	FREE_OBJ(sc);
 }
 
-static X509 *
-find_issuer(X509 *subj, STACK_OF(X509) *chain)
+X509 *
+Find_issuer(X509 *subj, STACK_OF(X509) *chain)
 {
-	int i;
-	X509 *x;
+       int i;
+       X509 *x;
 
-	AN(subj);
+       AN(subj);
 
-	for (i = 0; i < sk_X509_num(chain); i++) {
-		x = sk_X509_value(chain, i);
-		if (X509_check_issued(x, subj) == X509_V_OK)
-			return (x);
-	}
+       for (i = 0; i < sk_X509_num(chain); i++) {
+               x = sk_X509_value(chain, i);
+               if (X509_check_issued(x, subj) == X509_V_OK)
+                       return (x);
+       }
 
-	/* todo: look in cert store?  */
+       /* todo: look in cert store?  */
 
-	return (NULL);
-}
-
-static int
-ocsp_verify(sslctx *sc, OCSP_RESPONSE *resp, double *nextupd)
-{
-	OCSP_BASICRESP *br = NULL;
-	X509_STORE *store;
-	STACK_OF(X509) *chain = NULL;
-	OCSP_CERTID *cid = NULL;
-	int status = -1, reason;
-	ASN1_GENERALIZEDTIME *asn_nextupd = NULL;
-	X509 *issuer;
-	int i;
-	int do_verify = sc->staple_vfy;
-	int verify_flags = OCSP_TRUSTOTHER;
-
-	if (sc->staple_vfy < 0)
-		do_verify = CONFIG->OCSP_VFY;
-
-	if (!do_verify)
-		verify_flags |= OCSP_NOVERIFY;
-
-	store = SSL_CTX_get_cert_store(sc->ctx);
-	AN(store);
-
-#ifdef SSL_CTRL_GET_CHAIN_CERTS
-	AN(SSL_CTX_get0_chain_certs(sc->ctx, &chain));
-#else
-	chain = sc->ctx->extra_certs;
-#endif
-	br = OCSP_response_get1_basic(resp);
-	if (br == NULL) {
-		ERR("{core} OCSP_response_get1_basic failed (cert: %s)\n",
-		    sc->filename);
-		goto err;
-	}
-	i = OCSP_basic_verify(br, chain, store, verify_flags);
-	if (i <= 0) {
-		log_ssl_error(NULL, "{core} Staple verification failed "
-		    "for cert %s\n", sc->filename);
-		goto err;
-	}
-
-	issuer = find_issuer(sc->x509, chain);
-	if (issuer == NULL) {
-		ERR("{core} Unable to find issuer for cert %s\n.",
-		    sc->filename);
-		goto err;
-	}
-
-	cid = OCSP_cert_to_id(NULL, sc->x509, issuer);
-	if (cid == NULL) {
-		ERR("{core} OCSP_cert_to_id failed\n");
-		goto err;
-	}
-
-	if (OCSP_resp_find_status(br, cid, &status, &reason,
-		NULL, NULL, &asn_nextupd) != 1) {
-		ERR("{core} OCSP_resp_find_status failed: Unable to "
-		    "find OCSP response with a matching certificate id\n");
-		goto err;
-	}
-
-	if (status != V_OCSP_CERTSTATUS_GOOD) {
-		ERR("{core} Certificate %s has status %s\n", sc->filename,
-		    OCSP_cert_status_str(status));
-		if (status == V_OCSP_CERTSTATUS_REVOKED)
-			ERR("{core} Certificate %s revocation reason: %s\n",
-			    sc->filename, OCSP_crl_reason_str(reason));
-		goto err;
-	}
-
-	if (asn_nextupd != NULL)
-		*nextupd = asn1_gentime_parse(asn_nextupd);
-	else {
-		*nextupd = -1.0;
-	}
-
-	OCSP_CERTID_free(cid);
-	OCSP_BASICRESP_free(br);
-	return (0);
-
-err:
-	if (cid != NULL)
-		OCSP_CERTID_free(cid);
-	if (br != NULL)
-		OCSP_BASICRESP_free(br);
-	return (1);
-}
-
-static int
-ocsp_init_resp(sslctx *sc, OCSP_RESPONSE *resp)
-{
-	sslstaple *staple = NULL;
-	int len, i;
-	unsigned char *tmp, *buf;
-
-	i = OCSP_response_status(resp);
-	if (i != OCSP_RESPONSE_STATUS_SUCCESSFUL) {
-		ERR("{core} Error: OCSP response for cert %s has status %s\n",
-		    sc->filename, OCSP_response_status_str(i));
-		goto err;
-	}
-
-	len = i2d_OCSP_RESPONSE(resp, NULL);
-	if (len < 0) {
-		log_ssl_error(NULL, "{core} i2d_OCSP_RESPONSE");
-		goto err;
-	}
-	buf = malloc(len);
-	AN(buf);
-	tmp = buf;
-	i = i2d_OCSP_RESPONSE(resp, &tmp);
-	assert(i > 0);
-
-	ALLOC_OBJ(staple, SSLSTAPLE_MAGIC);
-	AN(staple);
-	staple->staple = buf;
-	staple->len = len;
-
-	if (ocsp_verify(sc, resp, &staple->nextupd) != 0) {
-		goto err;
-	}
-
-	if (!SSL_CTX_set_tlsext_status_cb(sc->ctx, ocsp_staple_cb)) {
-		ERR("Error configuring status callback.\n");
-		goto err;
-	} else if (!SSL_CTX_set_tlsext_status_arg(sc->ctx, staple)) {
-		ERR("Error setting status callback argument.\n");
-		goto err;
-	}
-
-	if (sc->staple != NULL)
-		sslstaple_free(&sc->staple);
-	sc->staple = staple;
-	return (0);
-
-err:
-	if (staple != NULL)
-		sslstaple_free(&staple);
-	return (1);
-
-}
-
-static char *
-ocsp_fn(const char *certfn);
-
-static int
-ocsp_init_file(const char *ocspfn, sslctx *sc, int is_cached);
-
-static void
-ocsp_stat_cb(struct ev_loop *loop, ev_stat *w, int revents)
-{
-	sslctx *sc;
-	sslstaple *oldstaple;
-
-	(void) revents;
-	(void) loop;
-	CAST_OBJ_NOTNULL(sc, w->data, SSLCTX_MAGIC);
-
-	if (w->attr.st_nlink) {
-		oldstaple = sc->staple;
-		sc->staple = NULL;
-		AN(sc->staple_fn);
-
-		if (ocsp_init_file(sc->staple_fn, sc, 1) != 0) {
-			sc->staple = oldstaple;
-			return;
-		}
-
-		sslstaple_free(&oldstaple);
-		LOG("{core} Loaded cached OCSP staple for cert '%s'\n",
-		    sc->filename);
-	}
-}
-
-void
-ocsp_ev_stat(sslctx *sc)
-{
-	char *fn;
-	STACK_OF(OPENSSL_STRING) *sk_uri = NULL;
-	AN(sc->x509);
-	sk_uri = X509_get1_ocsp(sc->x509);
-
-	if (sk_uri == NULL
-	   || sk_OPENSSL_STRING_num(sk_uri) == 0) {
-		goto err;
-	}
-
-	fn = ocsp_fn(sc->filename);
-	if (fn == NULL)
-		goto err;
-
-	free(sc->staple_fn);
-	sc->staple_fn = fn;
-	sc->ev_staple = malloc(sizeof *sc->ev_staple);
-	AN(sc->ev_staple);
-	sc->ev_staple->data = sc;
-	ev_stat_init(sc->ev_staple, ocsp_stat_cb, fn, 0);
-
-err:
-	if (sk_uri != NULL)
-		X509_email_free(sk_uri);
+       return (NULL);
 }
 
 
-static int
-ocsp_init_file(const char *ocspfn, sslctx *sc, int is_cached)
-{
-	BIO *bio;
-	OCSP_RESPONSE *resp;
-
-	if (ocspfn == NULL) {
-		return (1);
-	}
-
-	bio = BIO_new_file(ocspfn, "r");
-	if (bio == NULL) {
-		if (is_cached)
-			return (1);
-		ERR("Error loading status file '%s'\n", ocspfn);
-		return (1);
-	}
-
-	resp = d2i_OCSP_RESPONSE_bio(bio, NULL);
-	BIO_free(bio);
-	if (resp == NULL) {
-		ERR("Error parsing OCSP staple in '%s'\n", ocspfn);
-		return (1);
-	}
-
-	if (ocsp_init_resp(sc, resp) != 0)
-		goto err;
-
-	CHECK_OBJ_NOTNULL(sc->staple, SSLSTAPLE_MAGIC);
-	OCSP_RESPONSE_free(resp);
-	return (0);
-
-err:
-	if (resp != NULL)
-		OCSP_RESPONSE_free(resp);
-	return (1);
-}
 
 /* Initialize an SSL context */
 static sslctx *
@@ -1477,9 +1106,9 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	}
 
 	if (CONFIG->OCSP_DIR) {
-		char *fn = ocsp_fn(sc->filename);
+		char *fn = HOCSP_fn(sc->filename);
 		/* attempt loading of cached ocsp staple */
-		if (fn != NULL && ocsp_init_file(fn, sc, 1) == 0) {
+		if (fn != NULL && HOCSP_init_file(fn, sc, 1) == 0) {
 			LOG("{core} Loaded cached OCSP staple for cert '%s'\n",
 			    sc->filename);
 			sc->staple_fn = fn;
@@ -1487,7 +1116,7 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	}
 
 	if (sc->staple == NULL && cf->ocspfn != NULL) {
-		if (ocsp_init_file(cf->ocspfn, sc, 0) != 0) {
+		if (HOCSP_init_file(cf->ocspfn, sc, 0) != 0) {
 			ERR("Error loading OCSP response %s for stapling.\n",
 			    cf->ocspfn);
 			EVP_PKEY_free(pkey);
@@ -1501,7 +1130,7 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	}
 
 	if (CONFIG->OCSP_DIR != NULL)
-		ocsp_ev_stat(sc);
+		HOCSP_ev_stat(sc);
 
 #endif /* OPENSSL_NO_TLSEXT */
 
@@ -2507,7 +2136,7 @@ client_proxy_proxy(struct ev_loop *loop, ev_io *w, int revents)
 	}
 }
 
-static void
+void
 log_ssl_error(proxystate *ps, const char *what, ...)
 {
 	va_list ap;
@@ -3176,422 +2805,6 @@ handle_connections(int mgt_fd)
 	_exit(1);
 }
 
-static OCSP_REQUEST *
-ocsp_mkreq(ocspquery *oq)
-{
-	OCSP_REQUEST *req;
-	OCSP_CERTID *cid;
-	STACK_OF(X509) *chain = NULL;
-	X509 *issuer;
-
-	CHECK_OBJ_NOTNULL(oq, OCSPQUERY_MAGIC);
-	CHECK_OBJ_NOTNULL(oq->sctx, SSLCTX_MAGIC);
-
-#ifdef SSL_CTRL_GET_CHAIN_CERTS
-	AN(SSL_CTX_get0_chain_certs(oq->sctx->ctx, &chain));
-#else
-	chain = oq->sctx->ctx->extra_certs;
-#endif
-	issuer = find_issuer(oq->sctx->x509, chain);
-	if (issuer == NULL) {
-		ERR("{ocsp} Unable to find issuer for cert %s\n.",
-		    oq->sctx->filename);
-		return (NULL);
-	}
-
-	cid = OCSP_cert_to_id(NULL, oq->sctx->x509, issuer);
-	if (cid == NULL) {
-		ERR("{ocsp} OCSP_cert_to_id failed for cert %s\n",
-		    oq->sctx->filename);
-		return (NULL);
-	}
-
-	req = OCSP_REQUEST_new();
-	if (req == NULL) {
-		ERR("{ocsp} OCSP_REQUEST_new failed\n");
-		OCSP_CERTID_free(cid);
-		return (NULL);
-	}
-
-	if (OCSP_request_add0_id(req, cid) == NULL) {
-		ERR("{ocsp} OCSP_request_add0_id failed\n");
-		OCSP_CERTID_free(cid);
-		OCSP_REQUEST_free(req);
-		return (NULL);
-	}
-
-	return (req);
-}
-
-static char *
-ocsp_fn(const char *certfn)
-{
-	EVP_MD_CTX *mdctx = NULL;
-	unsigned char md_val[EVP_MAX_MD_SIZE];
-	unsigned int i, md_len;
-	struct vsb *vsb;
-	const char *ocsp_dir = CONFIG->OCSP_DIR;
-	char *res;
-
-	if (ocsp_dir == NULL) {
-		ERR("{ocsp} Error: OCSP directory not specified.\n");
-		return (NULL);
-	}
-
-	mdctx = EVP_MD_CTX_create();
-	if (mdctx == NULL) {
-		ERR("{ocsp} EVP_MD_CTX_create failed\n");
-		goto err;
-	}
-	if (EVP_DigestInit_ex(mdctx, EVP_md5(), NULL) != 1) {
-		ERR("{ocsp} EVP_DigestInit_ex in ocsp_fn() failed\n");
-		goto err;
-	}
-	if (EVP_DigestUpdate(mdctx, certfn, strlen(certfn)) != 1) {
-		ERR("{ocsp} EVP_DigestUpdate in ocsp_fn() failed\n");
-		goto err;
-	}
-	if (EVP_DigestFinal_ex(mdctx, md_val, &md_len) != 1) {
-		ERR("{ocsp} EVP_DigestFinal_ex in ocsp_fn() failed\n");
-		goto err;
-	}
-
-	EVP_MD_CTX_destroy(mdctx);
-
-	vsb = VSB_new_auto();
-	AN(vsb);
-	VSB_cat(vsb, ocsp_dir);
-	VSB_putc(vsb, '/');
-	for (i = 0; i < md_len; i++)
-		VSB_printf(vsb, "%02x", md_val[i]);
-	VSB_finish(vsb);
-	res = strdup(VSB_data(vsb));
-	AN(res);
-	VSB_delete(vsb);
-	return (res);
-
-err:
-	if (mdctx != NULL)
-		EVP_MD_CTX_destroy(mdctx);
-	return (NULL);
-}
-
-static int
-ocsp_proc_persist(sslctx *sc)
-{
-	char *dstfile = NULL;
-	int fd = -1;
-	struct vsb *tmpfn;
-
-	CHECK_OBJ_NOTNULL(sc, SSLCTX_MAGIC);
-	CHECK_OBJ_NOTNULL(sc->staple, SSLSTAPLE_MAGIC);
-	dstfile = ocsp_fn(sc->filename);
-	if (dstfile == NULL)
-		return (1);
-	tmpfn = VSB_new_auto();
-	AN(tmpfn);
-	VSB_printf(tmpfn, "%s.XXXXXX", dstfile);
-	VSB_finish(tmpfn);
-	fd = mkstemp(VSB_data(tmpfn));
-	if (fd < 0) {
-		if (errno == EACCES)
-			ERR("{ocsp} Error: ocsp-dir '%s' is not "
-			    "writable for the configured user\n",
-			    CONFIG->OCSP_DIR);
-		else
-			ERR("{ocsp} ocsp_proc_persist: mkstemp: %s: %s\n",
-			    VSB_data(tmpfn), strerror(errno));
-		goto err;
-	}
-
-	if (write(fd, sc->staple->staple, sc->staple->len) != sc->staple->len) {
-		ERR("{ocsp} ocsp_proc_persist: write: %s\n", strerror(errno));
-		(void) close(fd);
-		goto err;
-	}
-
-	if(close(fd) != 0) {
-		ERR("{ocsp} ocsp_proc_persist: close: %s\n", strerror(errno));
-		goto err;
-	}
-
-	if (rename(VSB_data(tmpfn), dstfile) != 0) {
-		ERR("{ocsp} ocsp_proc_persist: rename: %s: %s\n",
-		    strerror(errno), dstfile);
-		goto err;
-	}
-
-	/* worker procs notified via ev_stat (inotify/stat) */
-
-	VSB_delete(tmpfn);
-	free(dstfile);
-	return (0);
-
-err:
-	unlink(VSB_data(tmpfn));
-	VSB_delete(tmpfn);
-	free(dstfile);
-	return (1);
-}
-
-
-static void
-ocsp_mktask(sslctx *sc, ocspquery *oq, double refresh_hint);
-
-static void
-ocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
-{
-	ocspquery *oq;
-	OCSP_REQUEST *req = NULL;
-	OCSP_REQ_CTX *rctx = NULL;
-	STACK_OF(OPENSSL_STRING) *sk_uri;
-	char *host = NULL, *port = NULL, *path = NULL;
-	int https = 0;
-	BIO *cbio = NULL, *sbio;
-	SSL_CTX *ctx = NULL;
-	OCSP_RESPONSE *resp = NULL;
-	double resp_tmo;
-	fd_set fds;
-	struct timeval tv;
-	int n, fd;
-	double refresh_hint = -1.0;
-
-	(void) loop;
-	(void) revents;
-
-	CAST_OBJ_NOTNULL(oq, w->data, OCSPQUERY_MAGIC);
-
-	sk_uri = X509_get1_ocsp(oq->sctx->x509);
-	AN(sk_uri);
-
-	AN(OCSP_parse_url(sk_OPENSSL_STRING_value(sk_uri, 0),
-		&host, &port, &path, &https));
-	X509_email_free(sk_uri);
-
-	req = ocsp_mkreq(oq);
-	if (req == NULL) {
-		/* If we weren't able to create a request, there is no
-		 * use in scheduling a retry. */
-		FREE_OBJ(oq);
-		goto err;
-	}
-
-	/* printf("host: %s port: %s path: %s ssl: %d\n", */
-	/*     host, port, path, https); */
-
-	cbio = BIO_new_connect(host);
-	if (cbio == NULL) {
-		refresh_hint = 60;
-		goto retry;
-	}
-
-	if (port == NULL) {
-		if (https)
-			port = "443";
-		else
-			port = "80";
-	}
-	AN(BIO_set_conn_port(cbio, port));
-
-	if (https) {
-		ctx = SSL_CTX_new(SSLv23_client_method());
-		AN(ctx);
-		SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2);
-		SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv3);
-		SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
-		sbio = BIO_new_ssl(ctx, 1);
-		if (sbio == NULL) {
-			ERR("{ocsp} BIO_new_ssl failed: %s\n", strerror(errno));
-			refresh_hint = 60;
-			goto retry;
-		}
-		cbio = BIO_push(sbio, cbio);
-		AN(cbio);
-	}
-
-	/* set non-blocking */
-	BIO_set_nbio(cbio, 1);
-	n = BIO_do_connect(cbio);
-	if (n <= 0 && !BIO_should_retry(cbio)) {
-		ERR("{ocsp} Error connecting to %s:%s\n", host, port);
-		refresh_hint = 300;
-		goto retry;
-	}
-
-	assert(BIO_get_fd(cbio, &fd) >= 0);
-
-	if (n <= 0) {
-		FD_ZERO(&fds);
-		FD_SET(fd, &fds);
-		tv.tv_sec = CONFIG->OCSP_CONN_TMO;
-		tv.tv_usec = (CONFIG->OCSP_CONN_TMO - tv.tv_sec) * 1e6;
-		n = select(fd + 1, NULL, (void *) &fds, NULL, &tv);
-		if (n == 0) {
-			/* connect timeout */
-			ERR("{ocsp} Error: Connection to %s:%s timed out. "
-			    "Hit parameter 'ocsp-connect-tmo"
-			    " [current value: %.3fs]\n",
-			    host, port, CONFIG->OCSP_CONN_TMO);
-			refresh_hint = 300;
-			goto retry;
-		} else if (n < 0) {
-			ERR("{ocsp} Error: Connecting to %s:%s failed: "
-			    "select: %s\n",
-			    host, port, strerror(errno));
-			refresh_hint = 300;
-			goto retry;
-		}
-	}
-
-	rctx = OCSP_sendreq_new(cbio, path, NULL, 0);
-	if (rctx == NULL) {
-		ERR("{ocsp} OCSP_sendreq_new failed\n");
-		refresh_hint = 60;
-		goto retry;
-	}
-	if (OCSP_REQ_CTX_add1_header(rctx, "Host", host) == 0) {
-		ERR("{ocsp} OCSP_REQ_CTX_add1_header failed\n");
-		refresh_hint = 60;
-		goto retry;
-	}
-	if (OCSP_REQ_CTX_set1_req(rctx, req) == 0) {
-		ERR("{ocsp} OCSP_REQ_CTX_set1_req failed\n");
-		refresh_hint = 60;
-		goto retry;
-	}
-
-	resp_tmo = time_now() + CONFIG->OCSP_RESP_TMO;
-	while (1) {
-		double tnow;
-		n = OCSP_sendreq_nbio(&resp, rctx);
-		if (n == 0) {
-			/* this is an error, and we can't continue */
-			ERR("{ocsp} OCSP_sendreq_nbio failed for %s:%s.\n",
-			    host, port);
-			refresh_hint = 300;
-			goto retry;
-		} else if (n == 1) {
-			/* complete */
-			break;
-		}
-
-		FD_ZERO(&fds);
-		FD_SET(fd, &fds);
-
-		tnow = time_now();
-		tv.tv_sec = resp_tmo - tnow;
-		tv.tv_usec = ((resp_tmo - tnow) - tv.tv_sec) * 1e6;
-
-		if (BIO_should_read(cbio))
-			n = select(fd + 1, (void *) &fds, NULL, NULL, &tv);
-		else if (BIO_should_write(cbio))
-			n = select(fd + 1, NULL, (void *) &fds, NULL, &tv);
-		else {
-			/* BIO_should_io_special? */
-			refresh_hint = 300;
-			goto retry;
-		}
-
-		if (n == -1) {
-			if (errno == EINTR)
-				continue;
-			ERR("{ocsp} Error: Transmission failed:"
-			    " select: %s\n", strerror(errno));
-			refresh_hint = 300;
-			goto retry;
-		}
-
-		if (n == 0) {
-			/* timeout */
-			ERR("{ocsp} Error: Transmission timeout for %s:%s. "
-			    "Consider increasing parameter 'ocsp-resp-tmo'"
-			    " [current value: %.3fs]\n",
-			    host, port, CONFIG->OCSP_RESP_TMO);
-			refresh_hint = 300;
-			goto retry;
-		}
-	}
-
-	if (resp == NULL) {
-		/* fetch failed.  Retry later. */
-		refresh_hint = 600.0;
-	} else {
-		if (ocsp_init_resp(oq->sctx, resp) == 0) {
-			LOG("{ocsp} Retrieved new staple for cert %s\n",
-			    oq->sctx->filename);
-			ocsp_proc_persist(oq->sctx);
-		} else {
-			refresh_hint = 300;
-			goto retry;
-		}
-	}
-
-retry:
-	ocsp_mktask(oq->sctx, oq, refresh_hint);
-err:
-	if (rctx)
-		OCSP_REQ_CTX_free(rctx);
-	if (req)
-		OCSP_REQUEST_free(req);
-	if (resp)
-		OCSP_RESPONSE_free(resp);
-	if (cbio)
-		BIO_free_all(cbio);
-	if (ctx)
-		SSL_CTX_free(ctx);
-}
-
-static void
-ocsp_mktask(sslctx *sc, ocspquery *oq, double refresh_hint)
-{
-	double refresh = -1.0;
-	double tnow;
-	STACK_OF(OPENSSL_STRING) *sk_uri;
-
-	tnow = time_now();
-
-	if (sc->staple != NULL) {
-		CHECK_OBJ_NOTNULL(sc->staple, SSLSTAPLE_MAGIC);
-		if (sc->staple->nextupd > 0) {
-			refresh = sc->staple->nextupd - tnow - 600;
-			if (refresh < 0)
-				refresh = 0.0;
-		} else
-			refresh = 1800;
-	} else {
-		AN(sc->x509);
-		sk_uri = X509_get1_ocsp(sc->x509);
-		if (sk_uri == NULL || sk_OPENSSL_STRING_num(sk_uri) == 0) {
-			LOG("{ocsp} Note: No OCSP responder URI found "
-			    "for cert %s\n", sc->filename);
-			if (sk_uri != NULL)
-				X509_email_free(sk_uri);
-			return;
-		}
-		/* schedule for immediate retrieval */
-		X509_email_free(sk_uri);
-		refresh = 0.0;
-	}
-
-	if (refresh < refresh_hint)
-		refresh = refresh_hint;
-
-	if (oq == NULL) {
-		ALLOC_OBJ(oq, OCSPQUERY_MAGIC);
-		AN(oq);
-	}
-	CHECK_OBJ_NOTNULL(oq, OCSPQUERY_MAGIC);
-	oq->sctx = sc;
-
-	assert(refresh >= 0.0);
-	ev_timer_init(&oq->ev_t_refresh,
-	    ocsp_query_responder, refresh, 0.);
-	oq->ev_t_refresh.data = oq;
-	ev_timer_start(loop, &oq->ev_t_refresh);
-
-	LOG("{ocsp} Refresh of OCSP staple for %s scheduled in "
-	    "%.0lf seconds\n", sc->filename, refresh);
-}
 
 /*
    OCSP requestor process.
@@ -3619,17 +2832,17 @@ handle_ocsp_task(void) {
 	/* Create ocspquery work items for any eligible ocsp queries */
 
 	HASH_ITER(hh, ssl_ctxs, sc, sctmp) {
-		ocsp_mktask(sc, NULL, -1.0);
+		HOCSP_mktask(sc, NULL, -1.0);
 	}
 
 	VTAILQ_FOREACH(fr, &frontends, list) {
 		HASH_ITER(hh, fr->ssl_ctxs, sc, sctmp) {
-			ocsp_mktask(sc, NULL, -1.0);
+			HOCSP_mktask(sc, NULL, -1.0);
 		}
 	}
 
 	if (default_ctx != NULL)
-		ocsp_mktask(default_ctx, NULL, -1.0);
+		HOCSP_mktask(default_ctx, NULL, -1.0);
 
 	ev_timer_init(&timer_ppid_check, check_ppid, 1.0, 1.0);
 	ev_timer_start(loop, &timer_ppid_check);
@@ -4128,6 +3341,7 @@ frontend_commit(struct cfg_tpc_obj *o)
 static void cert_rollback(struct cfg_tpc_obj *o);
 static void cert_commit(struct cfg_tpc_obj *o);
 
+// Is this incorrectly named?
 static int
 ocsp_cfg_changed(const struct cfg_cert_file *cf, const sslctx *sc)
 {
