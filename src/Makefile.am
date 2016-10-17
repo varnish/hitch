@@ -13,11 +13,12 @@ TESTS_ENVIRONMENT = \
 TESTS = @SH_TESTS@
 TEST_EXTENSIONS = .sh
 
-nobase_noinst_HEADERS = ringbuffer.h configuration.h shctx.h \
+nobase_noinst_HEADERS = hitch.h ringbuffer.h configuration.h shctx.h \
+	logging.h sysl_tbl.h hssl_locks.h asn_gentm.h ssl_err.h \
+	ocsp.h \
 	foreign/miniobj.h foreign/vqueue.h foreign/vpf.h \
 	foreign/flopen.h foreign/uthash.h \
-	foreign/vas.h foreign/vsb.h \
-	sysl_tbl.h hssl_locks.h asn_gentm.h ssl_err.h
+	foreign/vas.h foreign/vsb.h
 
 BUILT_SOURCES = cfg_parser.h
 hitch_SOURCES = configuration.c ringbuffer.c hitch.c cfg_parser.y \
