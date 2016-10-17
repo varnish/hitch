@@ -58,8 +58,8 @@
 #include "hssl_locks.h"
 #include "ocsp.h"
 #include "shctx.h"
-#include "vpf.h"
-#include "uthash.h"
+#include "foreign/vpf.h"
+#include "foreign/uthash.h"
 
 /* hitch.c */
 extern hitch_config *CONFIG;

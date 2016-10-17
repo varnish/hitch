@@ -51,10 +51,10 @@
 #include "asn_gentm.h"
 #include "config.h"
 #include "configuration.h"
-#include "miniobj.h"
 #include "ringbuffer.h"
-#include "vas.h"
-#include "vsb.h"
+#include "foreign/miniobj.h"
+#include "foreign/vas.h"
+#include "foreign/vsb.h"
 
 
 typedef struct sslstaple_s sslstaple;

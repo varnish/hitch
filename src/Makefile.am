@@ -1,7 +1,6 @@
 
 sbin_PROGRAMS = hitch
 
-
 EXTRA_DIST = tests
 
 AM_CPPFLAGS = $(EV_CFLAGS)
@@ -14,12 +13,19 @@ TESTS_ENVIRONMENT = \
 TESTS = @SH_TESTS@
 TEST_EXTENSIONS = .sh
 
-nobase_noinst_HEADERS = ringbuffer.h configuration.h shctx.h miniobj.h \
-	vqueue.h vpf.h flopen.h uthash.h sysl_tbl.h vas.h vsb.h \
-	hssl_locks.h asn_gentm.h ssl_err.h
+nobase_noinst_HEADERS = ringbuffer.h configuration.h shctx.h \
+	foreign/miniobj.h foreign/vqueue.h foreign/vpf.h \
+	foreign/flopen.h foreign/uthash.h \
+	foreign/vas.h foreign/vsb.h \
+	sysl_tbl.h hssl_locks.h asn_gentm.h ssl_err.h
+
 BUILT_SOURCES = cfg_parser.h
-hitch_SOURCES = configuration.c ringbuffer.c hitch.c vpf.c flopen.c vas.c \
-	cfg_parser.y cfg_lex.l vsb.c hssl_locks.c asn_gentm.c ocsp.c logging.c
+hitch_SOURCES = configuration.c ringbuffer.c hitch.c cfg_parser.y \
+	cfg_lex.l hssl_locks.c asn_gentm.c ocsp.c logging.c
+
+hitch_SOURCES += foreign/vpf.c foreign/flopen.c foreign/vas.c \
+	foreign/vsb.c
+
 hitch_LDADD = $(SSL_LIBS) $(CRYPTO_LIBS) $(EV_LIBS) -lrt
 CLEANFILES = cfg_parser.h cfg_parser.c cfg_lex.c
 

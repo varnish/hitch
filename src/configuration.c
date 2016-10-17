@@ -20,10 +20,11 @@
 #include <libgen.h>
 
 #include "config.h"
-#include "miniobj.h"
 #include "configuration.h"
-#include "vas.h"
-#include "vsb.h"
+#include "foreign/miniobj.h"
+#include "foreign/vas.h"
+#include "foreign/vsb.h"
+
 #include "cfg_parser.h"
 
 #define ADDR_LEN 150

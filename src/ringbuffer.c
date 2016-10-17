@@ -29,9 +29,10 @@
   *
   **/
 
-#include "ringbuffer.h"
-#include "vas.h"
 #include <stdlib.h>
+
+#include "foreign/vas.h"
+#include "ringbuffer.h"
 
 /* Initialize a ringbuffer structure to empty */
 

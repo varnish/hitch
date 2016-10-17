@@ -7,7 +7,7 @@ AC_CONFIG_SRCDIR([src/configuration.c])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_AUX_DIR([build-aux])
 
-AM_INIT_AUTOMAKE([foreign color-tests parallel-tests])
+AM_INIT_AUTOMAKE([foreign color-tests parallel-tests subdir-objects])
 
 # Checks for programs.
 AC_PROG_CC

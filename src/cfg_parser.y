@@ -2,9 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "configuration.h"
-#include "vas.h"
-#include "miniobj.h"
-#include "uthash.h"
+#include "foreign/vas.h"
+#include "foreign/miniobj.h"
+#include "foreign/uthash.h"
 
 extern int yylex (void);
 extern int yyparse(hitch_config *);

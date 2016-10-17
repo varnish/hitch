@@ -11,8 +11,8 @@
 #include <sys/types.h>
 #include <openssl/opensslv.h>
 
-#include "vqueue.h"
-#include "uthash.h"
+#include "foreign/vqueue.h"
+#include "foreign/uthash.h"
 
 /* Is NPN available? See openssl/opensslv.h for explanation. */
 #if OPENSSL_VERSION_NUMBER >= 0x1000100fL

@@ -33,7 +33,7 @@
 #include <openssl/err.h>
 #include <openssl/crypto.h>
 
-#include "vas.h"
+#include "foreign/vas.h"
 #include "hssl_locks.h"
 
 static int num_locks = 0;

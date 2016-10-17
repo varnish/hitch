@@ -68,8 +68,8 @@
 #include "logging.h"
 #include "ocsp.h"
 #include "shctx.h"
-#include "vpf.h"
-#include "uthash.h"
+#include "foreign/vpf.h"
+#include "foreign/uthash.h"
 
 #ifndef MSG_NOSIGNAL
 # define MSG_NOSIGNAL 0
