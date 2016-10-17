@@ -35,62 +35,40 @@
   *
   */
 
-#include "config.h"
-#include "hitch.h"
-#include "ocsp.h"
+#include <netdb.h>
+#include <netinet/tcp.h>  /* TCP_NODELAY */
+#include <net/if.h>
 
 #include <libgen.h>
-#include <sys/types.h>
-#include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <netdb.h>
-#include <sys/wait.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <net/if.h>
-#include <arpa/inet.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <getopt.h>
-#include <pwd.h>
-#include <grp.h>
-#include <limits.h>
-#include <syslog.h>
-#include <stdarg.h>
+#include <sys/wait.h>  /* WAIT_PID */
 
 #include <ctype.h>
+#include <errno.h>
+#include <getopt.h>
+#include <grp.h>
+#include <limits.h>
+#include <pwd.h>
 #include <sched.h>
 #include <signal.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
-
-#include <openssl/ssl.h>
-#include <openssl/x509.h>
-#include <openssl/x509v3.h>
-#include <openssl/err.h>
-#include <openssl/engine.h>
-#include <openssl/asn1.h>
-#include <openssl/ocsp.h>
-#include <openssl/evp.h>
-#include <ev.h>
+#include <unistd.h>
 
 #ifdef __linux__
 #include <sys/prctl.h>
 #endif
 
-#include "uthash.h"
-#include "ringbuffer.h"
-#include "miniobj.h"
+#include "config.h"
+#include "configuration.h"
+#include "hitch.h"
+#include "hssl_locks.h"
+#include "ocsp.h"
 #include "shctx.h"
 #include "vpf.h"
-#include "vas.h"
-#include "configuration.h"
-#include "hssl_locks.h"
-#include "asn_gentm.h"
-#include "vsb.h"
+#include "uthash.h"
 
 #ifndef MSG_NOSIGNAL
 # define MSG_NOSIGNAL 0

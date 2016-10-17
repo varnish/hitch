@@ -32,45 +32,28 @@
 #ifndef HITCH_H_INCLUDED
 #define HITCH_H_INCLUDED
 
-#include "config.h"
-
-#include <sys/types.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <sys/wait.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <net/if.h>
 #include <arpa/inet.h>
 
+#include <ev.h>
 #include <stdio.h>
-#include <limits.h>
 #include <syslog.h>
-
+#include <sys/types.h>
+#include <sys/ioctl.h>
+#include <openssl/asn1.h>
+#include <openssl/engine.h>
+#include <openssl/evp.h>
+#include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <openssl/ocsp.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
-#include <openssl/err.h>
-#include <openssl/engine.h>
-#include <openssl/asn1.h>
-#include <openssl/ocsp.h>
-#include <openssl/evp.h>
-#include <ev.h>
 
-#ifdef __linux__
-#include <sys/prctl.h>
-#endif
-
-#include "uthash.h"
-#include "ringbuffer.h"
-#include "miniobj.h"
-#include "shctx.h"
-#include "vpf.h"
-#include "vas.h"
-#include "configuration.h"
-#include "hssl_locks.h"
 #include "asn_gentm.h"
+#include "config.h"
+#include "configuration.h"
+#include "miniobj.h"
+#include "ringbuffer.h"
+#include "vas.h"
 #include "vsb.h"
 
 
