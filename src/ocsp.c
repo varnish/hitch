@@ -29,6 +29,7 @@
   *
   */
 
+#include "logging.h"
 #include "hitch.h"
 #include "ocsp.h"
 #include "configuration.h"
@@ -39,8 +40,8 @@
 extern hitch_config *CONFIG;
 extern struct ev_loop *loop;
 
-static void
-sslstaple_free(sslstaple **staple)
+void
+HOCSP_free(sslstaple **staple)
 {
 	if (*staple == NULL)
 		return;
@@ -211,13 +212,13 @@ HOCSP_init_resp(sslctx *sc, OCSP_RESPONSE *resp)
 	}
 
 	if (sc->staple != NULL)
-		sslstaple_free(&sc->staple);
+		HOCSP_free(&sc->staple);
 	sc->staple = staple;
 	return (0);
 
 err:
 	if (staple != NULL)
-		sslstaple_free(&staple);
+		HOCSP_free(&staple);
 	return (1);
 }
 
@@ -242,7 +243,7 @@ hocsp_stat_cb(struct ev_loop *loop, ev_stat *w, int revents)
 			return;
 		}
 
-		sslstaple_free(&oldstaple);
+		HOCSP_free(&oldstaple);
 		LOG("{core} Loaded cached OCSP staple for cert '%s'\n",
 		    sc->filename);
 	}

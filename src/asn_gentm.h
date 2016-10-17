@@ -29,5 +29,7 @@
  *
  */
 
+#include <openssl/asn1.h>
+
 double
 asn1_gentime_parse(const ASN1_GENERALIZEDTIME *d);

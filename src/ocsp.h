@@ -15,8 +15,9 @@ typedef struct ocspquery_s {
 	/*  */
 } ocspquery;
 
-int HOCSP_verify(sslctx *sc, OCSP_RESPONSE *resp, double *nextupd);
+void HOCSP_free(sslstaple **staple);
 int HOCSP_init_resp(sslctx *sc, OCSP_RESPONSE *resp);
+int HOCSP_verify(sslctx *sc, OCSP_RESPONSE *resp, double *nextupd);
 
 char * HOCSP_fn(const char *certfn);
 int HOCSP_init_file(const char *ocspfn, sslctx *sc, int is_cached);

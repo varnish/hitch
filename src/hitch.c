@@ -65,6 +65,7 @@
 #include "configuration.h"
 #include "hitch.h"
 #include "hssl_locks.h"
+#include "logging.h"
 #include "ocsp.h"
 #include "shctx.h"
 #include "vpf.h"
@@ -93,6 +94,12 @@
 #define OPENSSL_NO_TLSEXT
 #endif
 #endif
+
+/* logging.c */
+extern FILE *logfile;
+extern struct stat logf_st;
+extern time_t logf_check_t;
+
 
 /* Globals */
 struct ev_loop *loop;
@@ -169,11 +176,6 @@ VTAILQ_HEAD(frontend_head, frontend);
 
 static struct frontend_head frontends;
 
-#define LOG_REOPEN_INTERVAL 60
-static FILE* logf;
-static struct stat logf_st;
-static time_t logf_check_t;
-
 #ifdef USE_SHARED_CACHE
 static ev_io shcupd_listener;
 static int shcupd_socket;
@@ -181,7 +183,6 @@ struct addrinfo *shcupd_peers[MAX_SHCUPD_PEERS+1];
 static unsigned char shared_secret[SHA_DIGEST_LENGTH];
 #endif /*USE_SHARED_CACHE*/
 
-#define NULL_DEV "/dev/null"
 
 int create_workers;
 static struct vpf_fh *pfh = NULL;
@@ -242,133 +243,6 @@ struct ha_proxy_v2_hdr {
 };
 
 
-double
-Time_now(void)
-{
-	struct timespec tv;
-
-	AZ(clock_gettime(CLOCK_REALTIME, &tv));
-	return (tv.tv_sec + 1e-9 * tv.tv_nsec);
-}
-
-void
-VWLOG(int level, const char *fmt, va_list ap)
-{
-	struct timeval tv;
-	struct tm tm;
-	char buf[1024];
-	int n;
-	va_list ap1;
-
-	va_copy(ap1, ap);
-	if (CONFIG->SYSLOG) {
-		vsyslog(level, fmt, ap);
-	}
-
-	if (!logf) {
-		va_end(ap1);
-		return;
-	}
-	AZ(gettimeofday(&tv, NULL));
-	if (logf != stdout && logf != stderr
-	    && tv.tv_sec >= logf_check_t + LOG_REOPEN_INTERVAL) {
-		struct stat st;
-		if (stat(CONFIG->LOG_FILENAME, &st) < 0
-		    || st.st_dev != logf_st.st_dev
-		    || st.st_ino != logf_st.st_ino) {
-			fclose(logf);
-
-			logf = fopen(CONFIG->LOG_FILENAME, "a");
-			if (logf == NULL
-			    || fstat(fileno(logf), &logf_st) < 0)
-				memset(&logf_st, 0, sizeof(logf_st));
-		}
-		logf_check_t = tv.tv_sec;
-	}
-
-	AN(localtime_r(&tv.tv_sec, &tm));
-	n = strftime(buf, sizeof(buf), "%Y%m%dT%H%M%S", &tm);
-	snprintf(buf + n, sizeof(buf) - n, ".%06d [%5d] %s",
-	    (int) tv.tv_usec, getpid(), fmt);
-	vfprintf(logf, buf, ap1);
-	va_end(ap1);
-}
-
-void
-WLOG(int level, const char *fmt, ...)
-{
-	va_list ap;
-
-	va_start(ap, fmt);
-	VWLOG(level, fmt, ap);
-	va_end(ap);
-}
-
-#define LOG(...)							\
-	do {								\
-		if (!CONFIG->QUIET)					\
-			WLOG(LOG_INFO, __VA_ARGS__ );			\
-	} while (0)
-#define ERR(...)	WLOG(LOG_ERR, __VA_ARGS__ )
-
-#define LOGL(...) WLOG(LOG_INFO, __VA_ARGS__)
-
-#define SOCKERR(msg)						\
-	do {							\
-		if (errno == ECONNRESET) {			\
-			LOG(msg ": %s\n", strerror(errno));	\
-		} else {					\
-			ERR(msg ": %s\n", strerror(errno));	\
-		}						\
-	} while (0)
-
-
-void
-logproxy(int level, const proxystate* ps, const char *fmt, ...)
-{
-	char buf[1024];
-	char hbuf[INET6_ADDRSTRLEN+1];
-	char sbuf[8];
-	int n;
-	va_list ap;
-	socklen_t salen;
-
-	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
-
-	salen = (ps->remote_ip.ss_family == AF_INET) ?
-	    sizeof(struct sockaddr) : sizeof(struct sockaddr_in6);
-	n = getnameinfo((struct sockaddr *) &ps->remote_ip, salen, hbuf,
-		sizeof hbuf, sbuf, sizeof sbuf,
-		NI_NUMERICHOST | NI_NUMERICSERV);
-	if (n != 0) {
-		strcpy(hbuf, "n/a");
-		strcpy(sbuf, "n/a");
-	}
-
-	va_start(ap, fmt);
-	if (ps->remote_ip.ss_family == AF_INET)
-		snprintf(buf, sizeof(buf), "%s:%s :%d %d:%d %s",
-		    hbuf, sbuf, ps->connect_port, ps->fd_up, ps->fd_down, fmt);
-	else
-		snprintf(buf, sizeof(buf), "[%s]:%s :%d %d:%d %s",
-		    hbuf, sbuf, ps->connect_port, ps->fd_up, ps->fd_down, fmt);
-	VWLOG(level, buf, ap);
-	va_end(ap);
-}
-
-#define LOGPROXY(...)							\
-	do {								\
-		if (!CONFIG->QUIET && (logf || CONFIG->SYSLOG))		\
-			logproxy(LOG_INFO, __VA_ARGS__ );		\
-	} while(0)
-
-#define ERRPROXY(...)							\
-	do {								\
-		if (logf || CONFIG->SYSLOG)				\
-			logproxy(LOG_ERR, __VA_ARGS__ );		\
-	} while (0)
-
-
 /* set a file descriptor (socket) to non-blocking mode */
 static int
 setnonblocking(int fd)
@@ -404,12 +278,6 @@ settcpkeepalive(int fd)
 #endif
 }
 
-static void
-fail(const char *s)
-{
-	ERR("%s: %s\n", s, strerror(errno));
-	exit(1);
-}
 
 #ifndef OPENSSL_NO_DH
 static int
@@ -910,16 +778,6 @@ sni_switch_ctx(SSL *ssl, int *al, void *data)
 #endif /* OPENSSL_NO_TLSEXT */
 
 static void
-sslstaple_free(sslstaple **staple)
-{
-	if (*staple == NULL)
-		return;
-	free((*staple)->staple);
-	FREE_OBJ(*staple);
-	*staple = NULL;
-}
-
-static void
 sctx_free(sslctx *sc, sni_name **sn_tab)
 {
 	sni_name *sn, *sntmp;
@@ -927,7 +785,7 @@ sctx_free(sslctx *sc, sni_name **sn_tab)
 	if (sc == NULL)
 		return;
 
-	sslstaple_free(&sc->staple);
+	HOCSP_free(&sc->staple);
 
 	if (sn_tab != NULL)
 		CHECK_OBJ_NOTNULL(*sn_tab, SNI_NAME_MAGIC);
@@ -2114,29 +1972,6 @@ client_proxy_proxy(struct ev_loop *loop, ev_io *w, int revents)
 	}
 }
 
-void
-log_ssl_error(proxystate *ps, const char *what, ...)
-{
-	va_list ap;
-	int e;
-	char buf[256];
-	char whatbuf[1024];
-
-	CHECK_OBJ_ORNULL(ps, PROXYSTATE_MAGIC);
-
-	va_start(ap, what);
-	vsnprintf(whatbuf, sizeof(whatbuf), what, ap);
-	va_end(ap);
-
-	while ((e = ERR_get_error())) {
-		ERR_error_string_n(e, buf, sizeof(buf));
-		if (ps)
-			ERRPROXY(ps, "%s: %s\n", whatbuf, buf);
-		else
-			ERR("%s: %s\n", whatbuf, buf);
-	}
-}
-
 /* The libev I/O handler during the OpenSSL handshake phase.  Basically, just
  * let OpenSSL do what it likes with the socket and obey its requests for reads
  * or writes */
@@ -3131,11 +2966,13 @@ init_signals()
 
 }
 
+#define NULL_DEV "/dev/null"
 static void
 daemonize()
 {
-	if (logf == stdout || logf == stderr) {
-		logf = NULL;
+	/* logging.c */
+	if (logfile == stdout || logfile == stderr) {
+		logfile = NULL;
 	}
 
 	/* go to root directory */
@@ -3657,24 +3494,25 @@ main(int argc, char **argv)
 	if (CONFIG->LOG_FILENAME) {
 		FILE* f;
 		if ((f = fopen(CONFIG->LOG_FILENAME, "a")) == NULL) {
-			logf = stderr;
+			/* logging.c */
+			logfile = stderr;
 			ERR("FATAL: Unable to open log file: %s: %s\n",
 			    CONFIG->LOG_FILENAME, strerror(errno));
 			exit(2);
 		}
-		logf = f;
+		logfile = f;
 		if (CONFIG->UID >=0 || CONFIG->GID >= 0) {
-			AZ(fchown(fileno(logf), CONFIG->UID, CONFIG->GID));
+			AZ(fchown(fileno(logfile), CONFIG->UID, CONFIG->GID));
 		}
-		AZ(fstat(fileno(logf), &logf_st));
+		AZ(fstat(fileno(logfile), &logf_st));
 		logf_check_t = time(NULL);
 	} else {
-		logf = CONFIG->QUIET ? stderr : stdout;
+		logfile = CONFIG->QUIET ? stderr : stdout;
 	}
-	AZ(setvbuf(logf, NULL, _IONBF, BUFSIZ));
+	AZ(setvbuf(logfile, NULL, _IONBF, BUFSIZ));
 
-	if (CONFIG->DAEMONIZE && (logf == stdout || logf == stderr))
-		logf = NULL;
+	if (CONFIG->DAEMONIZE && (logfile == stdout || logfile == stderr))
+		logfile = NULL;
 
 	LOGL("{core} %s starting\n", PACKAGE_STRING);
 	create_workers = 1;
