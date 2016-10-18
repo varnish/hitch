@@ -37,7 +37,7 @@ DH parameter if you wish to use Diffie-Hellman cipher suites.
 Command line arguments
 ======================
 
-  --config=FILE                 Load configuration from specified file.
+  --config=FILE                 Load configuration from specified file. See `hitch.conf(5)` for details.
   --tls                         All TLS versions, no SSLv3 (deprecated). See config file setting ``tls-protos``.
   --ssl                         enable SSLv3 (deprecated). See config file setting ``tls-protos``.
   -c  --ciphers=SUITE           Sets allowed ciphers (Default: "")
