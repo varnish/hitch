@@ -279,12 +279,16 @@ Example
 
 The following file shows the syntax of most of the options above::
 
-    frontend = "[*]:443"
     frontend = {
         host = "*"
-        port = "8443"
-        # Enable TLSv1.0 for this frontend (not recommended):
-        tls-protos = TLSv1.0 TLSv1.1 TLSv1.2
+        port = "443"
+        # Some old OS/broswer combinations only support TLSv1.0
+        # Enable TLSv1.0 (not recommended, for legacy support):
+        # tls-protos = TLSv1.0 TLSv1.1 TLSv1.2
+        # The default:
+        tls-protos = TLSv1.1 TLSv1.2
+        # Strict:
+        # tls-protos = TLSv1.2
     }
     backend = "[127.0.0.1]:6081"
     ciphers = "EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH"
