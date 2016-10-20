@@ -12,7 +12,11 @@ dist_man_MANS = hitch.8 hitch.conf.5
 
 endif
 
+hitch.conf.example: hitch.conf.man.rst
+	./mkxmplconf hitch.conf.man.rst > $@
+
 doc_DATA = hitch.conf.example CHANGES.rst README.md
 
-
 EXTRA_DIST = LICENSE README.md hitch.man.rst hitch.conf.man.rst hitch.conf.example CHANGES.rst docs
+
+CLEANFILES = hitch.conf.example

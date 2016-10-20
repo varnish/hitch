@@ -31,3 +31,4 @@ parse_proxy_v2
 /build-aux/
 hitch.conf.5
 .dirstamp
+hitch.conf.example

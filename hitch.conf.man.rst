@@ -275,9 +275,9 @@ Default is off.
 Example
 =======
 
-The following file shows the syntax of most of the options above:
+.. example-start
 
-::
+The following file shows the syntax of most of the options above::
 
     frontend = "[*]:443"
     frontend = {
@@ -308,6 +308,7 @@ The following file shows the syntax of most of the options above:
 
     sni-nomatch-abort = off
 
+.. example-end
 
 Author
 ======
