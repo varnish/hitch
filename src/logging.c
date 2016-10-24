@@ -35,6 +35,7 @@
 
 #include <libgen.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
 #include <sys/wait.h>  /* WAIT_PID */
 
 #include <ctype.h>

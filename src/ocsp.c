@@ -29,12 +29,13 @@
   *
   */
 
+#include <sys/socket.h>
+#include <unistd.h>
+
 #include "logging.h"
 #include "hitch.h"
 #include "ocsp.h"
 #include "configuration.h"
-
-#include <unistd.h>
 
 /* hitch.c */
 extern hitch_config *CONFIG;

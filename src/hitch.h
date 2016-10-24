@@ -81,14 +81,14 @@ typedef struct sslctx_s sslctx;
 
 #ifndef OPENSSL_NO_TLSEXT
 
-typedef struct sslstaple_s {
+struct sslstaple_s {
 	unsigned	magic;
 #define SSLSTAPLE_MAGIC	0x20fe53fd
 	unsigned char	*staple;
 	double		mtim;
 	double		nextupd;
 	int		len;
-} sslstaple;
+};
 
 /* SNI lookup objects */
 typedef struct sni_name_s {
