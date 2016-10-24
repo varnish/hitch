@@ -36,6 +36,7 @@
   */
 
 #include <netdb.h>
+#include <netinet/in.h>
 #include <netinet/tcp.h>  /* TCP_NODELAY */
 #include <net/if.h>
 
