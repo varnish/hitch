@@ -1379,18 +1379,17 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		/* No support for ALPN / NPN support in OpenSSL */
 		if (multi_proto ||
 		    0 != strncmp(cfg->ALPN_PROTOS_LV, "\x8http/1.1", 9)) {
-			config_error_set("This is compiled against SSL version"
-			    " %lx, which does not have no NPN or ALPN support,"
+			config_error_set("This is compiled against OpenSSL version"
+			    " %lx, which does not have NPN or ALPN support,"
 			    " yet alpn-protos has been set to %s.",
 			    OPENSSL_VERSION_NUMBER, cfg->ALPN_PROTOS);
 			*retval = 1;
 			return (1);
 		}
 		else
-			fprintf(stderr, "This is compiled against SSL version"
-			    " %lx, which does not have no NPN or ALPN support,"
-			    " but since alpn-protos has been set to http/1.1,"
-			    " we carry on without ALPN/NPN.\n",
+			fprintf(stderr, "This is compiled against OpenSSL version"
+			    " %lx, which does not have NPN or ALPN support."
+			    " alpn-protos setting \"http/1.1\" will be ignored.\n",
 			    OPENSSL_VERSION_NUMBER);
 #endif
 	}
