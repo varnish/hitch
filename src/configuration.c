@@ -1353,9 +1353,6 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		AN(cfg->ALPN_PROTOS_LV);
 		int multi_proto =
 		    cfg->ALPN_PROTOS_LV[0] != cfg->ALPN_PROTOS_LV_LEN - 1;
-		if (0 == strncmp((char *)cfg->ALPN_PROTOS_LV, "\x8http/1.1", 9)
-		    && !multi_proto)
-			fprintf(stderr, "standard protocol in use\n");
 		if (multi_proto && !cfg->WRITE_PROXY_LINE_V2) {
 			config_error_set("alpn-protos is specified with"
 			    " more than one protocol while proxy-v2 is "
