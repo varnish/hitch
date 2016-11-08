@@ -4,8 +4,10 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
-hitch-1.4.2 (unreleased)
+hitch-1.4.2 (2016-11-08)
 ------------------------
+
+* hitch.conf(5) manual has been added.
 
 * Hitch will now send a TLS Close notification during connection teardown.
   This fixes an incomplete read with a GnuTLS client when the backend
