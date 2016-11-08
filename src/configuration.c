@@ -181,7 +181,7 @@ config_new(void)
 	r->BACK_IP            = strdup("127.0.0.1");
 	r->BACK_PORT          = strdup("8000");
 	r->NCORES             = 1;
-	r->CIPHER_SUITE       = NULL;
+	r->CIPHER_SUITE       = strdup("EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH");
 	r->ENGINE             = NULL;
 	r->BACKLOG            = 100;
 	r->SNI_NOMATCH_ABORT  = 0;
