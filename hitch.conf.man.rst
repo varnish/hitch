@@ -277,40 +277,25 @@ Example
 
 .. example-start
 
-The following file shows the syntax of most of the options above::
+The following file shows the syntax needed to get started with::
 
     frontend = {
         host = "*"
         port = "443"
-        # Some old OS/broswer combinations only support TLSv1.0
-        # Enable TLSv1.0 (not recommended, for legacy support):
-        # tls-protos = TLSv1.0 TLSv1.1 TLSv1.2
-        # The default:
-        tls-protos = TLSv1.1 TLSv1.2
-        # Strict:
-        # tls-protos = TLSv1.2
     }
-    backend = "[127.0.0.1]:6081"
-    ciphers = "EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH"
-    prefer-server-ciphers = off
-    ssl-engine = ""
-    workers = 4        # number of CPU cores
-    backlog = 100
-    keepalive = 3600
-    user = "hitch"
-    group = "hitch"
-    quiet = off
-    syslog = off
-    syslog-facility = "daemon"
-    daemon = off
+    backend = "[127.0.0.1]:6086"    # 6086 is the default Varnish PROXY port.
+    workers = 4                     # number of CPU cores
 
-    alpn-protos = "http/1.1"
+    daemon = on
+    user = "nobody"
+    group = "nogroup"
 
-    # run varnish as backend with PROXY protocol, ie.
-    # varnishd -a :6081,PROXY ...
-    write-proxy-v2 = on # Write PROXY header
+    # Enable to let clients negotiate HTTP/2 with ALPN. (default off)
+    # alpn-protos = "http/2, http/1.1"
 
-    sni-nomatch-abort = off
+    # run Varnish as backend over PROXY; varnishd -a :80 -a :6086,PROXY ...
+    write-proxy-v2 = on             # Write PROXY header
+
 
 .. example-end
 
