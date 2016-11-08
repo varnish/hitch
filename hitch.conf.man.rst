@@ -293,7 +293,7 @@ The following file shows the syntax needed to get started with::
     # Enable to let clients negotiate HTTP/2 with ALPN. (default off)
     # alpn-protos = "http/2, http/1.1"
 
-    # run Varnish as backend over PROXY; varnishd -a :80 -a :6086,PROXY ...
+    # run Varnish as backend over PROXY; varnishd -a :80 -a localhost:6086,PROXY ..
     write-proxy-v2 = on             # Write PROXY header
 
 
