@@ -435,10 +435,9 @@ HOCSP_fn(const char *certfn)
 	unsigned char md_val[EVP_MAX_MD_SIZE];
 	unsigned int i, md_len;
 	struct vsb *vsb;
-	const char *ocsp_dir = CONFIG->OCSP_DIR;
 	char *res;
 
-	if (ocsp_dir == NULL) {
+	if (CONFIG->OCSP_DIR == NULL) {
 		ERR("{ocsp} Error: OCSP directory not specified.\n");
 		return (NULL);
 	}
@@ -465,7 +464,7 @@ HOCSP_fn(const char *certfn)
 
 	vsb = VSB_new_auto();
 	AN(vsb);
-	VSB_cat(vsb, ocsp_dir);
+	VSB_cat(vsb, CONFIG->OCSP_DIR);
 	VSB_putc(vsb, '/');
 	for (i = 0; i < md_len; i++)
 		VSB_printf(vsb, "%02x", md_val[i]);
