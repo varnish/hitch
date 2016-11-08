@@ -339,6 +339,9 @@ hocsp_proc_persist(sslctx *sc)
 	dstfile = HOCSP_fn(sc->filename);
 	if (dstfile == NULL)
 		return (1);
+
+	(void)umask(027);
+
 	tmpfn = VSB_new_auto();
 	AN(tmpfn);
 	VSB_printf(tmpfn, "%s.XXXXXX", dstfile);
