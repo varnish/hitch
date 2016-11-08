@@ -718,7 +718,10 @@ hocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 		if (HOCSP_init_resp(oq->sctx, resp) == 0) {
 			LOG("{ocsp} Retrieved new staple for cert %s\n",
 			    oq->sctx->filename);
-			hocsp_proc_persist(oq->sctx);
+			if (hocsp_proc_persist(oq->sctx) != 0) {
+				refresh_hint = 300;
+				goto retry;
+			}
 		} else {
 			refresh_hint = 300;
 			goto retry;
