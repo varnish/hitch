@@ -7,6 +7,11 @@ version.
 hitch-1.4.2 (2016-11-08)
 ------------------------
 
+* Example configuration file hitch.conf.example has been shortened and
+  defaults moved into Hitch itself. Default cipher string is now what we
+  believe to be secure. Users are recommended to use the built-in default
+  from now on, unless they have special requirements.
+
 * hitch.conf(5) manual has been added.
 
 * Hitch will now send a TLS Close notification during connection teardown.
