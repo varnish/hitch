@@ -193,6 +193,7 @@ config_new(void)
 	fa->pspec = strdup("default");
 	HASH_ADD_KEYPTR(hh, r->LISTEN_ARGS, fa->pspec, strlen(fa->pspec), fa);
 	r->LISTEN_DEFAULT = fa;
+	r->OCSP_DIR           = strdup("/var/lib/hitch/");
 	r->OCSP_VFY = 0;
 	r->OCSP_RESP_TMO = 10.0;
 	r->OCSP_CONN_TMO = 4.0;
