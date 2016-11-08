@@ -108,3 +108,7 @@ test "$?" = "0" || die "--help after --config does not work as expected."
 # Works as expected.
 hitch --test --config=${CONFDIR}/default.cfg
 test "$?" = "1" || die "--help with --config does not work as expected."
+
+# Test that our example configuration is in fact usable.
+hitch --test --config=${TESTDIR}/../../hitch.conf.example ${CERTSDIR}/default.example.com
+test "$?" = "0" || die "hitch.conf.example is not valid"
