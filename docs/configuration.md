@@ -64,14 +64,6 @@ Hitch will complain and disable DH unless these parameters are available.
 Hitch has support for automated retrieval of OCSP responses from an
 OCSP responder.
 
-To set this up, specify the following setting in your configuration
-file:
-
-	ocsp-dir = "/var/lib/hitch-ocsp"
-
-This can also be configured via the command line option
-``--ocsp-dir=mydir``.
-
 If the loaded certificate contains an OCSP responder address and it
 also has the required issuer certificate as part of its chain, Hitch
 will automatically retrieve and refresh OCSP staples.
