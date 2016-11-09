@@ -327,6 +327,8 @@ hocsp_mkreq(ocspquery *oq)
 }
 
 
+/* Save a downloaded staple to the file system.
+ * Process: OCSP child  */
 static int
 hocsp_proc_persist(sslctx *sc)
 {
@@ -482,6 +484,9 @@ err:
 
 static void hocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents);
 
+
+/* Start a per-sslctx evloop timer that downloads the OCSP staple.
+ * Process: OCSP child  */
 void
 HOCSP_mktask(sslctx *sc, ocspquery *oq, double refresh_hint)
 {
@@ -517,10 +522,9 @@ HOCSP_mktask(sslctx *sc, ocspquery *oq, double refresh_hint)
 	if (refresh < refresh_hint)
 		refresh = refresh_hint;
 
-	if (oq == NULL) {
+	if (oq == NULL)
 		ALLOC_OBJ(oq, OCSPQUERY_MAGIC);
-		AN(oq);
-	}
+
 	CHECK_OBJ_NOTNULL(oq, OCSPQUERY_MAGIC);
 	oq->sctx = sc;
 
