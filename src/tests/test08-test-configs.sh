@@ -110,5 +110,11 @@ hitch --test --config=${CONFDIR}/default.cfg
 test "$?" = "1" || die "--help with --config does not work as expected."
 
 # Test that our example configuration is in fact usable.
-hitch --test --config=${TESTDIR}/../../hitch.conf.example ${CERTSDIR}/default.example.com
-test "$?" = "0" || die "hitch.conf.example is not valid"
+TMPFILE=(mktemp -u)
+sed -e "s|nogroup|$GRP|" ${TESTDIR}/../../hitch.conf.example > $TMPFILE
+hitch --test --config=$TMPFILE ${CERTSDIR}/default.example.com
+RCODE=$?
+rm $TMPFILE
+if [ "$RCODE" != "0" ]; then
+	die "hitch.conf.example is not valid"
+fi
