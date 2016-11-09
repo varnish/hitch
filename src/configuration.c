@@ -1423,20 +1423,20 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 
 		if (stat(cfg->OCSP_DIR, &sb) != 0) {
 			fprintf(stderr,
-			    "{ocsp} Warning: Unable to stat directory '%s': %s'.\n",
+			    "{ocsp} Warning: Unable to stat directory '%s': %s'."
+			    " OCSP stapling will be disabled.\n",
 			    cfg->OCSP_DIR, strerror(errno));
 			free(cfg->OCSP_DIR);
 			cfg->OCSP_DIR = NULL;
 		} else {
 			if (!S_ISDIR(sb.st_mode)) {
 				fprintf(stderr, "{ocsp} Bad ocsp-dir "
-				    "'%s': Not a directory.\n", cfg->OCSP_DIR);
+				    "'%s': Not a directory."
+				    " OCSP stapling will be disabled.\n", cfg->OCSP_DIR);
 				free(cfg->OCSP_DIR);
 				cfg->OCSP_DIR = NULL;
 			}
 		}
-		if (cfg->OCSP_DIR == NULL)
-			fprintf(stderr, "{ocsp} OCSP stapling will be disabled\n");
 	}
 
 	return (0);
