@@ -16,8 +16,8 @@ hitch.conf.example: hitch.conf.man.rst
 	echo "# Run 'man hitch.conf' for a description of all options." > $@.tmp
 	sed -e '1,/^.. example-start/d' \
 		-e '/.. example-end/,$$d' \
-		-e '/^[^ ]/d' $^ >> $@.tmp
-	sed -i -e ':a' -e 'N' -e '$$!ba' -e 's/\n\n\n/\n\n/g' -e 's/\n    /\n/g' $@.tmp
+		-e '/^[^ ]/d' \
+		-e 's/^    //' hitch.conf.man.rst >> $@.tmp
 	mv $@.tmp $@
 
 doc_DATA = hitch.conf.example CHANGES.rst README.md
