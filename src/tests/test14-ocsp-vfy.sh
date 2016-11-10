@@ -48,3 +48,24 @@ EOF
 
 hitch --test $HITCH_ARGS --config=$CONFFILE
 test "$?" = "0" || die "Hitch did not start."
+
+# Test that timeouts are valid configuration file entries. Actually
+# testing the timeouts will be complicated and is deemed unnecessary for now.
+mk_cfg <<EOF
+backend = "[hitch-tls.org]:80"
+
+frontend = {
+  host = "$LISTENADDR"
+  port = "$PORT1"
+}
+
+pem-file = {
+	 cert = "$CERTSDIR/valid.example.com"
+}
+
+ocsp-connect-tmo = 10
+ocsp-resp-tmo = 10
+EOF
+
+hitch --test $HITCH_ARGS --config=$CONFFILE
+test "$?" = "0" || die "Hitch did not start."

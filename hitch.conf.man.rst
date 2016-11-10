@@ -147,6 +147,37 @@ pem-file syntax can be used for stapling, given by an example here:
        ocsp-resp-file = "ocsp-resp.der"
    }
 
+
+
+ocsp-connect-tmo = <number>
+---------------------------
+
+OCSP fetch connect timeout.
+
+This does normally not need to be changed.
+
+Default is 4.0 seconds.
+
+
+ocsp-resp-tmo = <number>
+------------------------
+
+OCSP fetch response timeout.
+
+This does normally not need to be changed.
+
+Default is 10 seconds.
+
+
+ocsp-verify-staple = on|off
+---------------------------
+
+If set, OCSP responses will be verified against the certificate
+after retrieval.
+
+Default is off.
+
+
 pem-file = <string>
 -------------------
 
