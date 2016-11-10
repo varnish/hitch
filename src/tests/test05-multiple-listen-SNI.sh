@@ -1,4 +1,4 @@
-#/bin/sh
+#!/bin/sh
 #
 # Test multiple certificates (SNI) on a listening socket.
 #

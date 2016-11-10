@@ -1,4 +1,4 @@
-#/bin/sh
+#!/bin/sh
 # Test basic argument handling.
 . ${TESTDIR}common.sh
 set +o errexit

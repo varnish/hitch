@@ -1,4 +1,4 @@
-#/bin/sh
+#!/bin/sh
 # Test specifying combinations of ssl, tls and tls-protos in different ways.
 # All of these invocations of hitch shall fail, or something is wrong
 . ${TESTDIR}common.sh

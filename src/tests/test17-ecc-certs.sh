@@ -1,4 +1,4 @@
-#/bin/sh
+#!/bin/sh
 # Test loading an ECC certificate
 . ${TESTDIR}common.sh
 set +o errexit

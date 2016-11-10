@@ -1,4 +1,4 @@
-#/bin/sh
+#!/bin/sh
 
 # gh issue #82, per-frontend wildcard certificates
 

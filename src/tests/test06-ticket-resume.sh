@@ -1,4 +1,4 @@
-#/bin/sh
+#!/bin/sh
 #
 # Test resuming a session via a session ticket
 

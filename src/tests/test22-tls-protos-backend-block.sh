@@ -1,4 +1,4 @@
-#/bin/sh
+#!/bin/sh
 # Test tls-protos inside a frontend block
 . ${TESTDIR}common.sh
 set +o errexit

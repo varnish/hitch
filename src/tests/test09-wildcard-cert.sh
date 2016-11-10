@@ -1,4 +1,4 @@
-#/bin/sh
+#!/bin/sh
 
 . ${TESTDIR}common.sh
 set +o errexit

@@ -1,4 +1,4 @@
-#/bin/sh
+#!/bin/sh
 # Test configuration parser.
 . ${TESTDIR}common.sh
 set +o errexit

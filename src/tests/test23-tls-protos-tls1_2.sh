@@ -1,4 +1,4 @@
-#/bin/sh
+#!/bin/sh
 # Test tls-protos in global scope
 . ${TESTDIR}common.sh
 set +o errexit
