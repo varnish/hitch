@@ -25,8 +25,8 @@ ssl = on
 EOF
 
 kill -HUP $(cat $PIDFILE)
-sleep 1
-curl --max-time 5 --silent --insecure https://$LISTENADDR:`$LISTENPORT + 1`/
+sleep 0.5
+curl --max-time 5 --silent --insecure https://$LISTENADDR:`expr $LISTENPORT + 1`/
 test "$?" != "0" || die "New listen endpoint should not be available."
 
 curl --max-time 5 --silent --insecure https://$LISTENADDR:$LISTENPORT/
