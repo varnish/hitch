@@ -170,6 +170,8 @@ OCSP_DIR: TOK_OCSP_DIR '=' STRING
 {
 	if ($3)
 		cfg->OCSP_DIR = strdup($3);
+	else
+		cfg->OCSP_DIR = NULL;
 };
 
 OCSP_RESP_TMO: TOK_OCSP_RESP_TMO '=' UINT

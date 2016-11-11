@@ -79,6 +79,12 @@ The variables ``ocsp-connect-tmo`` and ``ocsp-resp-tmo`` controls
 respectively the connect timeout and fetch transmission timeout when
 Hitch is talking to an OCSP responder.
 
+Automated OCSP stapling can be disabled by specifying an empty string
+for the `ocsp-dir` parameter:
+
+	ocsp-dir = ""
+
+
 ## Verification of OCSP staples
 
 Hitch will optionally verify the OCSP staple, this can be done by
