@@ -4,6 +4,17 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.4.3 (unreleased)
+------------------------
+
+* OCSP stapling is now enabled by default.
+  Users should create ocsp-dir (default: /var/lib/hitch/) and make it
+  writable for the hitch user.
+
+* Build error due to man page generation on FreeBSD (most likely non-Linux)
+  has been fixed.
+
+
 hitch-1.4.2 (2016-11-08)
 ------------------------
 
