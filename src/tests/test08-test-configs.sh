@@ -1,6 +1,6 @@
 #!/bin/sh
 # Test configuration parser.
-. ${TESTDIR}common.sh
+. ${TESTDIR}/common.sh
 set +o errexit
 
 # This is a somewhat half-assed attempt at getting a usable group since the

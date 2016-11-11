@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. ${TESTDIR}common.sh
+. ${TESTDIR}/common.sh
 set +o errexit
 
 

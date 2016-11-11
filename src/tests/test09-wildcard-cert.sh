@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. ${TESTDIR}common.sh
+. ${TESTDIR}/common.sh
 set +o errexit
 
 hitch $HITCH_ARGS --backend=[hitch-tls.org]:80 "--frontend=[${LISTENADDR}]:$LISTENPORT" ${CERTSDIR}/wildcard.example.com ${CERTSDIR}/default.example.com

@@ -2,7 +2,7 @@
 #
 # Test resuming a session via a session ticket
 
-. ${TESTDIR}common.sh
+. ${TESTDIR}/common.sh
 set +o errexit
 
 sessfile=$(mktemp)

@@ -2,7 +2,7 @@
 #
 # Test --sni-nomatch-abort
 #
-. ${TESTDIR}common.sh
+. ${TESTDIR}/common.sh
 set +o errexit
 
 #PORT2=$(($RANDOM + 1024))

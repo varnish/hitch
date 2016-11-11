@@ -1,6 +1,6 @@
 #!/bin/sh
 # Test basic argument handling.
-. ${TESTDIR}common.sh
+. ${TESTDIR}/common.sh
 set +o errexit
 
 hitch --help

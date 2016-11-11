@@ -2,7 +2,7 @@
 
 # gh issue #82, per-frontend wildcard certificates
 
-. ${TESTDIR}common.sh
+. ${TESTDIR}/common.sh
 set +o errexit
 
 PORT1=$(($RANDOM + 1024))
