@@ -74,3 +74,4 @@ echo | openssl s_client -servername invalid.example.com -prexit -connect $LISTEN
 test "$?" = "0" || die "s_client failed"
 grep -q -c "subject=/CN=default.example.com" $DUMPFILE
 test "$?" = "0" || die "s_client got wrong certificate in listen port #2 (expected default.example.com)"
+

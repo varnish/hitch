@@ -2,7 +2,6 @@
 #
 # Test multiple listening sockets.
 #
-# This implements T3 in the original test plan.
 . ${TESTDIR}/common.sh
 
 PORT2=$(($RANDOM + 1024))

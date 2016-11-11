@@ -21,7 +21,7 @@ echo -e "\n" | openssl s_client -nextprotoneg 'h2-14' -prexit -connect $LISTENAD
 test "$?" = "0" || die "s_client failed"
 
 grep -q -c "too old for NPN" $DUMPFILE
-if [ "$" == "0" ]; then
+if [ "$" = "0" ]; then
     echo "Skipping test: SSL too old for NPN"
 else
     grep -q -c "ERROR" $DUMPFILE

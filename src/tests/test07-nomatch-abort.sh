@@ -5,8 +5,6 @@
 . ${TESTDIR}/common.sh
 set +o errexit
 
-#PORT2=$(($RANDOM + 1024))
-
 mk_cfg <<EOF
 sni-nomatch-abort = on
 

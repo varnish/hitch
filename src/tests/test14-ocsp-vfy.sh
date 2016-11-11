@@ -5,14 +5,12 @@ set +o errexit
 unset SSL_CERT_DIR
 unset SSL_CERT_FILE
 
-PORT1=$(($RANDOM + 1024))
-
 mk_cfg <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
   host = "$LISTENADDR"
-  port = "$PORT1"
+  port = "$LISTENPORT"
 }
 
 pem-file = {
@@ -36,7 +34,7 @@ backend = "[hitch-tls.org]:80"
 
 frontend = {
   host = "$LISTENADDR"
-  port = "$PORT1"
+  port = "$LISTENPORT"
 }
 
 pem-file = {
@@ -56,7 +54,7 @@ backend = "[hitch-tls.org]:80"
 
 frontend = {
   host = "$LISTENADDR"
-  port = "$PORT1"
+  port = "$LISTENPORT"
 }
 
 pem-file = {

@@ -3,7 +3,6 @@
 . ${TESTDIR}/common.sh
 set +o errexit
 
-
 mk_cfg <<EOF
 pem-file = "${CERTSDIR}/default.example.com"
 frontend = "[$LISTENADDR]:$LISTENPORT"

@@ -1,6 +1,7 @@
 #!/bin/sh
+#
 # Test basic argument handling.
-# This implements T2 in the original test plan.
+#
 . ${TESTDIR}/common.sh
 set +o errexit
 

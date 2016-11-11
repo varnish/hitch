@@ -5,8 +5,6 @@
 . ${TESTDIR}/common.sh
 set +o errexit
 
-#PORT2=$(($RANDOM + 1024))
-
 hitch $HITCH_ARGS --backend=[hitch-tls.org]:80 "--frontend=[${LISTENADDR}]:$LISTENPORT" \
 	${CERTSDIR}/site1.example.com ${CERTSDIR}/site2.example.com ${CERTSDIR}/default.example.com
 test "$?" = "0" || die "Hitch did not start."
