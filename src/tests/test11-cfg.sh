@@ -16,13 +16,13 @@ runcurl $LISTENADDR $LISTENPORT
 
 mk_cfg <<EOF
 pem-file = "${CERTSDIR}/default.example.com"
-frontend = "[$LISTENADDR]:$((LISTENPORT+1))"
+frontend = "[$LISTENADDR]:`expr $LISTENPORT + 1100`"
 backend = "[hitch-tls.org]:80"
 EOF
 
 kill -HUP $(cat $PIDFILE)
 sleep 1
-runcurl $LISTENADDR $((LISTENPORT+1))
+runcurl $LISTENADDR `expr $LISTENPORT + 1100`
 
-curl --max-time 5 --silent --insecure https://$LISTENADDR:$((LISTENPORT))/
+curl --max-time 5 --silent --insecure https://$LISTENADDR:$LISTENPORT/
 test "$?" != "0" || die "Removed listen endpoint should not be available."

@@ -6,7 +6,7 @@ set +o errexit
 # This is a somewhat half-assed attempt at getting a usable group since the
 # redhats and debians can't seem to agree on which group user "nobody"
 # should be in.
-GRP=$(id -Gn nobody | cut -d' ' -f1)
+GRP=`id -Gn nobody | cut -d' ' -f1`
 test "$GRP" != "" || die "No usable group found for user nobody."
 
 hitch --test --config=${CONFDIR}/default.cfg ${CERTSDIR}/default.example.com
@@ -110,7 +110,7 @@ hitch --test --config=${CONFDIR}/default.cfg
 test "$?" = "1" || die "--help with --config does not work as expected."
 
 # Test that our example configuration is in fact usable.
-TMPFILE=(mktemp -u)
+TMPFILE=$(mktemp -u)
 sed -e "s|nogroup|$GRP|" ${TESTDIR}/../../hitch.conf.example > $TMPFILE
 hitch --test --config=$TMPFILE ${CERTSDIR}/default.example.com
 RCODE=$?

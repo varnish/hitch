@@ -3,18 +3,22 @@
 . ${TESTDIR}/common.sh
 set +o errexit
 
-PORT1=$(($RANDOM + 1024))
+BACKENDPORT=`expr $LISTENPORT + 1600`
 
 openssl version > $DUMPFILE
 grep -q -c "OpenSSL 1.0.1" $DUMPFILE
 test "$?" != "0" || skip "OpenSSL does not support ALPN"
 
-hitch $HITCH_ARGS --backend=[127.0.0.1]:$PORT1 "--frontend=[${LISTENADDR}]:$LISTENPORT" ${CERTSDIR}/site1.example.com --write-proxy-v2 --alpn-protos="tor,h2,h2-14,http/1.1"
+hitch $HITCH_ARGS --backend=[127.0.0.1]:$BACKENDPORT "--frontend=[${LISTENADDR}]:$LISTENPORT" \
+	--write-proxy-v2 --alpn-protos="tor,h2,h2-14,http/1.1" \
+	 ${CERTSDIR}/site1.example.com
+
 test "$?" = "0" || die "Hitch did not start."
 
-parse_proxy_v2 $PORT1 > $DUMPFILE &
+type parse_proxy_v2 || die "Unable to find parse_proxy_v2"
+parse_proxy_v2 $BACKENDPORT > $DUMPFILE &
 
-sleep 1
+sleep 0.1
 
 # If you have nghttp installed, you can try it instead of openssl s_client:
 # nghttp -v "https://localhost:$LISTENPORT"

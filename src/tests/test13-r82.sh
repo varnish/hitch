@@ -5,9 +5,9 @@
 . ${TESTDIR}/common.sh
 set +o errexit
 
-PORT1=$(($RANDOM + 1024))
-PORT2=$(($RANDOM + 1024))
-PORT3=$(($RANDOM + 1024))
+PORT1=`expr $LISTENPORT + 1301`
+PORT2=`expr $LISTENPORT + 1302`
+PORT3=`expr $LISTENPORT + 1303`
 
 mk_cfg <<EOF
 backend = "[hitch-tls.org]:80"

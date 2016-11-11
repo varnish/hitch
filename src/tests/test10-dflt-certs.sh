@@ -4,10 +4,10 @@
 . ${TESTDIR}/common.sh
 set +o errexit
 
-PORT1=$(($RANDOM + 1024))
-PORT2=$(($RANDOM + 1024))
-PORT3=$(($RANDOM + 1024))
-PORT4=$(($RANDOM + 1024))
+PORT1=`expr $$ % 60000 + 1024`
+PORT2=`expr $$ % 60000 + 2048`
+PORT3=`expr $$ % 60000 + 3072`
+PORT4=`expr $$ % 60000 + 4096`
 
 mk_cfg <<EOF
 pem-file = "${CERTSDIR}/site1.example.com"
