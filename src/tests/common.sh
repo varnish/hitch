@@ -6,7 +6,7 @@ export LC_ALL=C
 set -o errexit
 
 LISTENADDR="localhost"
-LISTENPORT=`expr $$ % 64000 + 1024`
+LISTENPORT=`expr $$ % 62000 + 1024`
 PIDFILE="$(mktemp -u)"
 CONFFILE="$(mktemp -u)"
 DUMPFILE="$(mktemp -u)"

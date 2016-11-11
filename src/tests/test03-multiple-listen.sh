@@ -4,7 +4,7 @@
 #
 . ${TESTDIR}/common.sh
 
-PORT2=`expr $$ + 3000 % 64000`
+PORT2=`expr $$ % 60000 + 3000`
 
 hitch $HITCH_ARGS --backend=[hitch-tls.org]:80 \
 	"--frontend=[${LISTENADDR}]:$LISTENPORT" \

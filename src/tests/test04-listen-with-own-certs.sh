@@ -5,7 +5,7 @@
 . ${TESTDIR}/common.sh
 set +o errexit
 
-PORT2=`expr $$ + 4000 % 64000`
+PORT2=`expr $$ % 60000 + 4000`
 
 hitch $HITCH_ARGS --backend=[hitch-tls.org]:80 \
 	"--frontend=[${LISTENADDR}]:$LISTENPORT+${CERTSDIR}/site1.example.com" \
