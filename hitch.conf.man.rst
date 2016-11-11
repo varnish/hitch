@@ -133,12 +133,13 @@ ocsp-dir = <string>
 -------------------
 
 Directory where Hitch will store and read OCSP responses for
-stapling. Directory must be readable and writable for the configured
-Hitch user. Setting this option enables automatic retrieval and
-updating of OCSP responses.
+stapling. Default is "/var/lib/hitch/".
 
-If you have a manually pre-loaded OCSP staple, and alternative
-pem-file syntax can be used for stapling, given by an example here:
+Directory must be readable and writable for the configured Hitch user, or
+automatic retrieval and updating of OCSP responses will not take place.
+
+If you have a manually pre-loaded OCSP staple, an alternative
+pem-file syntax can be used for stapling:
 
 ::
 
@@ -146,7 +147,6 @@ pem-file syntax can be used for stapling, given by an example here:
        cert = "mycert.pem"
        ocsp-resp-file = "ocsp-resp.der"
    }
-
 
 
 ocsp-connect-tmo = <number>
