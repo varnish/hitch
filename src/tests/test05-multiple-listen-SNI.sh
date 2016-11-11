@@ -2,11 +2,8 @@
 #
 # Test multiple certificates (SNI) on a listening socket.
 #
-# This implements T4 in the original test plan.
-. ${TESTDIR}common.sh
+. ${TESTDIR}/common.sh
 set +o errexit
-
-#PORT2=$(($RANDOM + 1024))
 
 hitch $HITCH_ARGS --backend=[hitch-tls.org]:80 "--frontend=[${LISTENADDR}]:$LISTENPORT" \
 	${CERTSDIR}/site1.example.com ${CERTSDIR}/site2.example.com ${CERTSDIR}/default.example.com

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Test tls-protos inside a frontend block
-. ${TESTDIR}common.sh
+. ${TESTDIR}/common.sh
 set +o errexit
 
 mk_cfg <<EOF

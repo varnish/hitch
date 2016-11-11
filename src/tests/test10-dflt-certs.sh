@@ -1,14 +1,13 @@
 #!/bin/sh
 #
 #
-#
-. ${TESTDIR}common.sh
+. ${TESTDIR}/common.sh
 set +o errexit
 
-PORT1=$(($RANDOM + 1024))
-PORT2=$(($RANDOM + 1024))
-PORT3=$(($RANDOM + 1024))
-PORT4=$(($RANDOM + 1024))
+PORT1=`expr $$ % 60000 + 1024`
+PORT2=`expr $$ % 60000 + 2048`
+PORT3=`expr $$ % 60000 + 3072`
+PORT4=`expr $$ % 60000 + 4096`
 
 mk_cfg <<EOF
 pem-file = "${CERTSDIR}/site1.example.com"
@@ -75,3 +74,4 @@ echo | openssl s_client -servername invalid.example.com -prexit -connect $LISTEN
 test "$?" = "0" || die "s_client failed"
 grep -q -c "subject=/CN=default.example.com" $DUMPFILE
 test "$?" = "0" || die "s_client got wrong certificate in listen port #2 (expected default.example.com)"
+

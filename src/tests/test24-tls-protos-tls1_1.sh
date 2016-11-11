@@ -1,6 +1,6 @@
 #!/bin/sh
 # Test tls-protos in global scope
-. ${TESTDIR}common.sh
+. ${TESTDIR}/common.sh
 set +o errexit
 
 # only TLSv1.1
