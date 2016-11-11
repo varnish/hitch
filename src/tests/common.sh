@@ -1,4 +1,7 @@
 #
+# To run tests manually, do:
+# export TESTDIR=`pwd`/; export PATH=$PATH:`pwd`/../:`pwd`/../util/
+#
 export LC_ALL=C
 set -o errexit
 
@@ -12,13 +15,16 @@ CONFDIR="${TESTDIR}/configs"
 
 HITCH_ARGS="--pidfile=$PIDFILE --daemon --quiet"
 
-if [ "$USER" == "root" ]; then
+if [ "$USER" = "root" ]; then
 	HITCH_ARGS="$HITCH_ARGS --user=nobody"
 fi
 
 cleanup() {
-        test -s $PIDFILE && kill `cat "$PIDFILE"`
-        rm -f "$PIDFILE" "$CONFFILE" "$DUMPFILE"
+        test -f "$CONFFILE" && rm -f "$CONFFILE"
+        test -f "$DUMPFILE" && rm -f "$DUMPFILE"
+        if [ -s $PIDFILE ]; then
+		kill `cat "$PIDFILE"`
+	fi
 }
 trap cleanup EXIT
 
