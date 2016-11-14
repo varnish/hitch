@@ -237,7 +237,7 @@ FB_TLS: TOK_TLS '=' BOOL {
 		cur_fa->selected_protos = TLS_OPTION_PROTOS;
 	else
 		fprintf(stderr,
-		    "Warning: tsl = off is deprecated and has no effect.\n");
+		    "Warning: tls = off is deprecated and has no effect.\n");
 }
 FB_SSL: TOK_SSL '=' BOOL {
 	if (cur_fa->selected_protos != 0) {
@@ -298,7 +298,7 @@ TLS_REC: TOK_TLS '=' BOOL {
 		cfg->SELECTED_TLS_PROTOS = TLS_OPTION_PROTOS;
 	else
 		fprintf(stderr,
-		    "Warning: tsl = off is deprecated and has no effect.\n");
+		    "Warning: tls = off is deprecated and has no effect.\n");
 };
 
 SSL_REC: TOK_SSL '=' BOOL {
