@@ -4,7 +4,7 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
-hitch-1.4.3 (unreleased)
+hitch-1.4.3 (2016-11-14)
 ------------------------
 
 * OCSP stapling is now enabled by default.
