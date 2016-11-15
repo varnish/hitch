@@ -346,12 +346,17 @@ config_param_host_port_wildcard(const char *str, char **addr,
 		return 0;
 	}
 
+	unsigned addrlen = x - ptr;
 	// address
-	if ((unsigned)(x - ptr) >= sizeof(addr_buf)) {
+	if (addrlen >= sizeof(addr_buf)) {
 		config_error_set("Invalid address '%s'.", str);
 		return 0;
 	}
-	strncpy(addr_buf, ptr, (x - ptr));
+
+	if (strcmp(str, "[*]") == 0)
+		*addr_buf = '\0';
+	else
+		strncpy(addr_buf, ptr, addrlen);
 
 	// port
 	if (x[1] != ':' || x[2] == '\0') {
