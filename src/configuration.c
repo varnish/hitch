@@ -333,43 +333,41 @@ config_param_host_port_wildcard(const char *str, char **addr,
 	memset(port_buf, '\0', sizeof(port_buf));
 	memset(addr_buf, '\0', sizeof(addr_buf));
 
-	// NEW FORMAT: [address]:port
-	if (*str == '[') {
-		const char *ptr = str + 1;
-		const char *x = strrchr(ptr, ']');
-		if (x == NULL) {
-			config_error_set("Invalid address '%s'.", str);
-			return 0;
-		}
-
-		// address
-		if ((unsigned)(x - ptr) >= sizeof(addr_buf)) {
-			config_error_set("Invalid address '%s'.", str);
-			return 0;
-		}
-		strncpy(addr_buf, ptr, (x - ptr));
-
-		// port
-		if (x[1] != ':' || x[2] == '\0') {
-			config_error_set("Invalid port specifier in string '%s'.", str);
-			return 0;
-		}
-		ptr = x + 2;
-		x = strchr(ptr, '+');
-		if (x == NULL)
-			memcpy(port_buf, ptr, sizeof(port_buf) - 1);
-		else
-			memcpy(port_buf, ptr, (x - ptr));
-
-		// cert
-		if (cert && x) {
-			cert_ptr = x + 1;
-		}
-	}
-	// OLD FORMAT: address,port
-	else {
+	// FORMAT IS: [address]:port
+	if (*str != '[') {
 		config_error_set("Invalid address string '%s'", str);
 		return 0;
+	}
+
+	const char *ptr = str + 1;
+	const char *x = strrchr(ptr, ']');
+	if (x == NULL) {
+		config_error_set("Invalid address '%s'.", str);
+		return 0;
+	}
+
+	// address
+	if ((unsigned)(x - ptr) >= sizeof(addr_buf)) {
+		config_error_set("Invalid address '%s'.", str);
+		return 0;
+	}
+	strncpy(addr_buf, ptr, (x - ptr));
+
+	// port
+	if (x[1] != ':' || x[2] == '\0') {
+		config_error_set("Invalid port specifier in string '%s'.", str);
+		return 0;
+	}
+	ptr = x + 2;
+	x = strchr(ptr, '+');
+	if (x == NULL)
+		memcpy(port_buf, ptr, sizeof(port_buf) - 1);
+	else
+		memcpy(port_buf, ptr, (x - ptr));
+
+	// cert
+	if (cert && x) {
+		cert_ptr = x + 1;
 	}
 
 	// printf("PARSED ADDR '%s', PORT '%s'\n", addr_buf, port_buf);
