@@ -683,9 +683,13 @@ load_privatekey(SSL_CTX *ctx, const char *file)
 		return NULL;
 	}
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#define SSL_CTX_get_default_passwd_cb(ctx) (ctx->default_passwd_callback)
+#define SSL_CTX_get_default_passwd_cb_userdata(ctx) (ctx->default_passwd_callback_userdata)
+#endif
 	pkey = PEM_read_bio_PrivateKey(bio, NULL,
-	    ctx->default_passwd_callback,
-	    ctx->default_passwd_callback_userdata);
+	    SSL_CTX_get_default_passwd_cb(ctx),
+	    SSL_CTX_get_default_passwd_cb_userdata(ctx));
 	BIO_free(bio);
 
 	return (pkey);
@@ -1091,8 +1095,11 @@ load_cert_ctx(sslctx *so)
 		return (1);
 	}
 	x509_entry = X509_NAME_get_entry(x509_name, i);
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#define X509_NAME_ENTRY_get_data(e) (e->value)
+#endif
 	AN(x509_entry);
-	PUSH_CTX(x509_entry->value, ctx);
+	PUSH_CTX(X509_NAME_ENTRY_get_data(x509_entry), ctx);
 
 	return (0);
 }
@@ -1883,9 +1890,15 @@ static void end_handshake(proxystate *ps) {
 #endif
 	LOGPROXY(ps,"ssl end handshake\n");
 	/* Disable renegotiation (CVE-2009-3555) */
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+	/* For OpenSSL 1.1, setting the following flag does not seem
+	 * to be possible. This is OK, since SSLv3 negotiation will
+	 * not happen in OpenSSL 0.9.8m or later unless
+	 * SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION is set. */
 	if (ps->ssl->s3) {
 		ps->ssl->s3->flags |= SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS;
 	}
+#endif
 	ps->handshaked = 1;
 
 	/* Check if clear side is connected */
