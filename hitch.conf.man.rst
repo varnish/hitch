@@ -135,6 +135,20 @@ backend-refresh = <number>
 Number of seconds between periodic backend IP lookups, 0 to disable.
 Default is 0.
 
+backend-connection-timeout = <number>
+-------------------------------------
+
+Backend connection timeout.
+
+Default is 30 seconds.
+
+ssl-handshake-timeout = <number>
+--------------------------------
+
+SSL handshake timeout.
+
+Default is 30 seconds.
+
 ocsp-dir = <string>
 -------------------
 

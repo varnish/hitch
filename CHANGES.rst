@@ -4,6 +4,12 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.4.8 (unreleased)
+------------------------
+
+* Added backend-connect-timeout and ssl-handshake-timeout to the config file
+  options.
+
 hitch-1.4.7 (2018-01-11)
 ------------------------
 
