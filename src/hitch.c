@@ -2896,12 +2896,26 @@ start_workers(int start_index, int count)
 		if (c->pid == -1) {
 			ERR("{core} fork() failed: %s; Goodbye cruel world!\n",
 			    strerror(errno));
-			exit(1);
+			_exit(1);
 		} else if (c->pid == 0) { /* child */
 			close(pfd[1]);
 			FREE_OBJ(c);
 			if (CONFIG->CHROOT && CONFIG->CHROOT[0])
 				change_root();
+
+#ifdef SO_REUSEPORT_WORKS
+			// initialize configuration
+			struct front_arg *fa, *ftmp;
+			HASH_ITER(hh, CONFIG->LISTEN_ARGS, fa, ftmp) {
+				struct frontend *fr = create_frontend(fa);
+				if (fr == NULL) {
+					ERR("{core} create_frontend failed: %s\n", strerror(errno));
+					exit(1);
+				}
+				VTAILQ_INSERT_TAIL(&frontends, fr, list);
+			}
+#endif
+
 			if (CONFIG->UID >= 0 || CONFIG->GID >= 0)
 				drop_privileges();
 			if (geteuid() == 0) {
@@ -3643,8 +3657,6 @@ sleep_and_refresh(hitch_config *CONFIG)
 int
 main(int argc, char **argv)
 {
-	// initialize configuration
-	struct front_arg *fa, *ftmp;
 	int rv;
 
 	CONFIG = config_new();
@@ -3698,12 +3710,16 @@ main(int argc, char **argv)
 	init_globals();
 	init_openssl();
 
+#ifndef SO_REUSEPORT_WORKS
+	// initialize configuration
+	struct front_arg *fa, *ftmp;
 	HASH_ITER(hh, CONFIG->LISTEN_ARGS, fa, ftmp) {
 		struct frontend *fr = create_frontend(fa);
 		if (fr == NULL)
 			exit(1);
 		VTAILQ_INSERT_TAIL(&frontends, fr, list);
 	}
+#endif
 
 	/* load certificates, pass to handle_connections */
 	LOGL("{core} Loading certificate pem files (%d)\n",

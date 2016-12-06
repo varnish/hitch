@@ -182,15 +182,25 @@ hitch_pid() {
 }
 
 #-
-# Usage: hitch_hosts
+# Usage: hitch_worker_pids
 #
-# Print a list of hosts for the daemon started with `start_hitch`, usually in
+# Print the PIDs of the children of the daemon started with `start_hitch`
+
+hitch_worker_pids() {
+	ps --ppid "$(hitch_pid)" | grep -Eo  "^[ ]*[0-9]+"
+}
+
+#-
+# Usage: hosts_of_pid [PID]
+#
+# Print a list of hosts for the process started with PID, usually in
 # a loop. Only IPv4 listen addresses are listed.
 
-hitch_hosts() {
+hosts_of_pid() {
+	HITCH_PID=$1
 	if cmd lsof
 	then
-		lsof -F -P -n -a -p "$(hitch_pid)" -i 4 -i TCP -s TCP:LISTEN |
+		lsof -F -P -n -a -p "$HITCH_PID" -i 4 -i TCP -s TCP:LISTEN |
 		awk '/^n/ {
 			sub("\\*", "127.0.0.1", $1)
 			print substr($1,2)
@@ -201,7 +211,7 @@ hitch_hosts() {
 	if cmd sockstat && test "$(uname)" = FreeBSD
 	then
 		sockstat -P tcp -4 |
-		awk '$3 == '"$(hitch_pid)"' {
+		awk '$3 == '"$$HITCH_PID"' {
 			sub("\\*", "127.0.0.1", $6)
 			print $6
 		}'
@@ -210,7 +220,7 @@ hitch_hosts() {
 
 	if cmd fstat && test "$(uname)" = OpenBSD
 	then
-		fstat -p "$(hitch_pid)" |
+		fstat -p "$$HITCH_PID" |
 		awk '$5 == "internet" && $7 == "tcp" && NF == 9 {
 			sub("\\*", "127.0.0.1", $9)
 			print $9
@@ -219,6 +229,42 @@ hitch_hosts() {
 	fi
 
 	fail "none of supported lsof, sockstat or fstat available"
+}
+
+#-
+# Usage: hitch_worker_hosts
+#
+# Print a list of hosts of the children processes.
+
+hitch_worker_hosts() {
+	HITCH_WORKER_PIDS="$(hitch_worker_pids)"
+	for WORKER_PID in $HITCH_WORKER_PIDS
+	do
+		hosts_of_pid $WORKER_PID
+	done
+}
+
+#-
+# Usage: hitch_hosts
+#
+# Print a list of hosts of the parent or children processes, depending on the
+# availabilty of SO_REUSEPORT_WORKS. In which case the port initialization
+# is done in the worker processes.
+
+hitch_hosts() {
+	SO_REUSEPORT_WORKS=false
+	if test "$(python -c 'import socket; print(1 if hasattr(socket, "SO_REUSEPORT") else 0)')" = "1"
+	then
+		SO_REUSEPORT_WORKS=true
+	fi
+	echo "SO_REUSEPORT_WORKS: $SO_REUSEPORT_WORKS" >&2
+
+	if "$SO_REUSEPORT_WORKS"
+	then
+		echo "$(hitch_worker_hosts)"
+	else
+		echo "$(hosts_of_pid $(hitch_pid))"
+	fi
 }
 
 #-
@@ -252,6 +298,11 @@ curl_hitch() {
 	if ! $HAS_SPECIFIC_ARG
 	then
 		HITCH_HOST=$(hitch_hosts | sed 1q)
+		if [ -z $HITCH_HOST ];
+		then
+			error "No hitch hosts found."
+		fi
+
 		curl_hitch "$@" -- "https://$HITCH_HOST/"
 		return $?
 	fi
@@ -318,6 +369,10 @@ s_client() {
 	if ! $HAS_CONNECT_OPT
 	then
 		HITCH_HOST=$(hitch_hosts | sed 1q)
+		if [ -z $HITCH_HOST ];
+		then
+			error "No hitch hosts found."
+		fi
 		s_client "$@" -connect "$HITCH_HOST"
 		return $?
 	fi
