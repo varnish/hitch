@@ -63,6 +63,10 @@
 #include <sys/prctl.h>
 #endif
 
+#ifdef __sun
+#include <sys/filio.h>
+#endif
+
 #include "config.h"
 #include "configuration.h"
 #include "hitch.h"
