@@ -556,7 +556,7 @@ hocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 	fd_set fds;
 	struct timeval tv;
 	int n, fd;
-	double refresh_hint = -1.0;
+	double refresh_hint = 60;
 
 	(void) loop;
 	(void) revents;
