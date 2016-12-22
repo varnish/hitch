@@ -4,6 +4,18 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.4.4 (2016-12-22)
+------------------------
+
+* OpenSSL 1.1.0 compatibility fixes. OpenSSL 1.1.0 is now fully
+  supported with Hitch.
+* Fix a bug in the OCSP refresh code that could make it loop with
+  immediate refreshes flooding an OCSP responder.
+* Force the SSL_OP_SINGLE_DH_USE setting. This protects against an
+  OpenSSL vulnerability where a remote attacker could discover private
+  DH exponents (CVE-2016-0701).
+
+
 hitch-1.4.3 (2016-11-14)
 ------------------------
 
