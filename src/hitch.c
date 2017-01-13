@@ -3610,8 +3610,9 @@ main(int argc, char **argv)
 				ev_loop(loop, EVRUN_ONCE);
 			}
 		} else
-#else
 			pause();
+#else
+		pause();
 		/* Sleep and let the children work.
 		 * Parent will be woken up if a signal arrives */
 #endif /* USE_SHARED_CACHE */
