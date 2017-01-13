@@ -1025,10 +1025,10 @@ config_print_usage_fd(char *prog, FILE *out)
 
 #ifdef USE_SHARED_CACHE
 	fprintf(out, "\n");
-	fprintf(out, "  -U  --shared-cache-listen=HOST,PORT\n");
+	fprintf(out, "  -U  --shared-cache-listen=[HOST]:PORT\n");
 	fprintf(out, "                              Accept cache updates on UDP (Default: \"%s\")\n", config_disp_hostport(cfg->SHCUPD_IP, cfg->SHCUPD_PORT));
 	fprintf(out, "                              NOTE: This option requires enabled SSL session cache.\n");
-	fprintf(out, "  -P  --shared-cache-peer=HOST,PORT\n");
+	fprintf(out, "  -P  --shared-cache-peer=[HOST]:PORT\n");
 	fprintf(out, "                              Send cache updates to specified peer\n");
 	fprintf(out, "                              NOTE: This option can be specified multiple times.\n");
 	fprintf(out, "  -M  --shared-cache-if=IFACE[,TTL]\n");

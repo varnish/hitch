@@ -167,6 +167,8 @@ int shctx_new_cb(SSL *ssl, SSL_SESSION *sess) {
 	(void)ssl;
 	struct shared_session *shsess;
 	unsigned char *data,*p;
+	const unsigned char *key;
+	unsigned int keylen;
 	unsigned int data_len;
 	unsigned char encsess[SHSESS_MAX_ENCODED_LEN];
 
@@ -185,7 +187,8 @@ int shctx_new_cb(SSL *ssl, SSL_SESSION *sess) {
 
 	shsess_tree_delete(shsess);
 
-	shsess_set_key(shsess, sess->session_id, sess->session_id_length);
+	key = SSL_SESSION_get_id(sess, &keylen);
+	shsess_set_key(shsess, key, keylen);
 
 	/* it returns the already existing node or current node if none, never returns null */
 	shsess = shsess_tree_insert(shsess);
@@ -204,9 +207,9 @@ int shctx_new_cb(SSL *ssl, SSL_SESSION *sess) {
 	if (shared_session_new_cbk) { /* if user level callback is set */
 
 		/* copy sessionid padded with 0 into the sessionid + data aligned buffer */
-		memcpy(encsess, sess->session_id, sess->session_id_length);
-		if (sess->session_id_length < SSL_MAX_SSL_SESSION_ID_LENGTH)
-			memset(encsess+sess->session_id_length, 0, SSL_MAX_SSL_SESSION_ID_LENGTH-sess->session_id_length);
+		memcpy(encsess, key, keylen);
+		if (keylen < SSL_MAX_SSL_SESSION_ID_LENGTH)
+			memset(encsess+keylen, 0, SSL_MAX_SSL_SESSION_ID_LENGTH-keylen);
 
 		shared_session_new_cbk(encsess, SSL_MAX_SSL_SESSION_ID_LENGTH+data_len, SSL_SESSION_get_time(sess));
 	}
@@ -215,7 +218,7 @@ int shctx_new_cb(SSL *ssl, SSL_SESSION *sess) {
 }
 
 /* SSL callback used on lookup an existing session cause none found in internal cache */
-SSL_SESSION *shctx_get_cb(SSL *ssl, unsigned char *key, int key_len, int *do_copy) {
+SSL_SESSION *shctx_get_cb(SSL *ssl, const unsigned char *key, int key_len, int *do_copy) {
 	(void)ssl;
 	struct shared_session *shsess;
 	unsigned char data[SHSESS_MAX_DATA_LEN], *p;
@@ -272,12 +275,15 @@ void shctx_remove_cb(SSL_CTX *ctx, SSL_SESSION *sess) {
 	(void)ctx;
 	struct shared_session *shsess;
 	unsigned char tmpkey[SSL_MAX_SSL_SESSION_ID_LENGTH];
-	unsigned char *key = sess->session_id;
+	const unsigned char *key;
+	unsigned int keylen;
+
+	key = SSL_SESSION_get_id(sess, &keylen);
 
 	/* tree key is zeros padded sessionid */
-	if ( sess->session_id_length < SSL_MAX_SSL_SESSION_ID_LENGTH ) {
-		memcpy(tmpkey, sess->session_id, sess->session_id_length);
-		memset(tmpkey+sess->session_id_length, 0, SSL_MAX_SSL_SESSION_ID_LENGTH-sess->session_id_length);
+	if (keylen < SSL_MAX_SSL_SESSION_ID_LENGTH) {
+		memcpy(tmpkey, key, keylen);
+		memset(tmpkey+keylen, 0, SSL_MAX_SSL_SESSION_ID_LENGTH-keylen);
 		key = tmpkey;
 	}
 
