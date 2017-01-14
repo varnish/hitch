@@ -684,7 +684,7 @@ load_privatekey(SSL_CTX *ctx, const char *file)
 		return NULL;
 	}
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 #define SSL_CTX_get_default_passwd_cb(ctx) (ctx->default_passwd_callback)
 #define SSL_CTX_get_default_passwd_cb_userdata(ctx) (ctx->default_passwd_callback_userdata)
 #endif
