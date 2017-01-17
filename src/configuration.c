@@ -1169,6 +1169,13 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 			long_options, &option_index);
 		if (c == -1)
 			break;
+		else if (c == '?') {
+			config_error_set("Invalid command line parameters. "
+			    "Run %s --help for instructions.",
+			    basename(argv[0]));
+			*retval = 1;
+			return (1);
+		}
 		else if (c == CFG_PARAM_CFGFILE) {
 			if (config_file_parse(optarg, cfg) != 0) {
 				*retval = 1;
