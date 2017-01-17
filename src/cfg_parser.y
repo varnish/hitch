@@ -134,7 +134,16 @@ FB_REC
 	| FB_PREF_SRV_CIPH
 	;
 
-FB_HOST: TOK_HOST '=' STRING { if ($3) cur_fa->ip = strdup($3); };
+FB_HOST: TOK_HOST '=' STRING
+{
+	if ($3) {
+		if (strcmp($3, "[*]"))
+			cur_fa->ip = NULL;
+	       	else
+			cur_fa->ip = strdup($3);
+	}
+};
+
 FB_PORT: TOK_PORT '=' STRING { if ($3) cur_fa->port = strdup($3); };
 
 PEM_BLK: PB_RECS;
