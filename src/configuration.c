@@ -318,12 +318,12 @@ config_param_host_port_wildcard(const char *str, char **addr,
 
 	if (str == NULL) {
 		config_error_set("Invalid/unset host/port string.");
-		return 0;
+		return (0);
 	}
 
 	if (strlen(str) > ADDR_LEN) {
 		config_error_set("Host address too long.");
-		return 0;
+		return (0);
 	}
 
 	// address/port buffers
@@ -336,32 +336,28 @@ config_param_host_port_wildcard(const char *str, char **addr,
 	// FORMAT IS: [address]:port
 	if (*str != '[') {
 		config_error_set("Invalid address string '%s'", str);
-		return 0;
+		return (0);
 	}
 
 	const char *ptr = str + 1;
 	const char *x = strrchr(ptr, ']');
 	if (x == NULL) {
 		config_error_set("Invalid address '%s'.", str);
-		return 0;
+		return (0);
 	}
 
 	unsigned addrlen = x - ptr;
 	// address
 	if (addrlen >= sizeof(addr_buf)) {
 		config_error_set("Invalid address '%s'.", str);
-		return 0;
+		return (0);
 	}
-
-	if (strcmp(str, "[*]") == 0)
-		*addr_buf = '\0';
-	else
-		strncpy(addr_buf, ptr, addrlen);
+	strncpy(addr_buf, ptr, addrlen);
 
 	// port
 	if (x[1] != ':' || x[2] == '\0') {
 		config_error_set("Invalid port specifier in string '%s'.", str);
-		return 0;
+		return (0);
 	}
 	ptr = x + 2;
 	x = strchr(ptr, '+');
@@ -380,15 +376,17 @@ config_param_host_port_wildcard(const char *str, char **addr,
 	int p = atoi(port_buf);
 	if (p < 1 || p > 65536) {
 		config_error_set("Invalid port number '%s'", port_buf);
-		return 0;
+		return (0);
 	}
 
 	if (strcmp(addr_buf, "*") == 0) {
-		if (wildcard_okay)
+		if (wildcard_okay) {
 			free(*addr);
+			*addr = NULL;
+		    }
 		else {
 			config_error_set("Invalid address: wildcards are not allowed.");
-			return 0;
+			return (0);
 		}
 	} else {
 		*addr = strdup(addr_buf);
@@ -400,7 +398,7 @@ config_param_host_port_wildcard(const char *str, char **addr,
 	/* printf("ADDR FINAL: '%s', '%s', '%s'\n", *addr, *port, */
 	/*     cert ? *cert : ""); */
 
-	return 1;
+	return (1);
 }
 
 int
