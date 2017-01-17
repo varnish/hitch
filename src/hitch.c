@@ -863,6 +863,9 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 #ifdef SSL_OP_SINGLE_DH_USE
 	ssloptions |= SSL_OP_SINGLE_DH_USE;
 #endif
+#ifdef SSL_OP_SINGLE_ECDH_USE
+	ssloptions |= SSL_OP_SINGLE_ECDH_USE;
+#endif
 	if (!(selected_protos & SSLv3_PROTO))
 		ssloptions |= SSL_OP_NO_SSLv3;
 	if (!(selected_protos & TLSv1_0_PROTO))
