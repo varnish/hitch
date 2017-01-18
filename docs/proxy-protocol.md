@@ -7,9 +7,11 @@ The short header describes which IP address and port was used to connect to
 the proxy (Hitch), and which IP address and port was connected to. The last
 one is useful if Hitch is listening to more than one IP or port.
 
-PROXY exists in two different versions; PROXY1 which is a simple text header,
-and PROXY2 which is a binary representation (default). Hitch supports both 
-through the global `--write-proxy-v1` and `--write-proxy-v2` configuration keys.
+The PROXY protocol was specified by Willy Tarreau of HAProxy
+Technologies [1] and exists in two different versions: PROXY1 which is
+a simple text header, and PROXY2 which is a binary representation
+(default). Hitch supports both through the global `--write-proxy-v1`
+and `--write-proxy-v2` configuration keys.
 
 Backend servers that support PROXY will read this first and most likely use
 it instead of the Hitch IP/port for when writing access logs. If Hitch is
@@ -25,5 +27,4 @@ performance penalty of doing string search and replace in the bytes we proxy.
 
 
 
-
-
+[1]: http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt
