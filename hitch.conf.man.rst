@@ -80,7 +80,7 @@ List of ciphers to use in the secure communication. Refer to the
 OpenSSL documentation for a complete list of supported ciphers.
 
 If not specified, OpenSSL will allow all ciphers. System
-administrators are adviced to either only support strong ciphers (as in
+administrators are advised to either only support strong ciphers (as in
 the example file below) or to pay close attention to security advisories
 related OpenSSL's ciphers.
 
