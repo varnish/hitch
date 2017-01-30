@@ -20,14 +20,12 @@ nobase_noinst_HEADERS = hitch.h ringbuffer.h configuration.h shctx.h \
 	foreign/flopen.h foreign/uthash.h \
 	foreign/vas.h foreign/vsb.h
 
-BUILT_SOURCES = cfg_parser.h cfg_parser.c
 hitch_SOURCES = configuration.c ringbuffer.c hitch.c cfg_parser.y \
 	cfg_lex.l hssl_locks.c asn_gentm.c ocsp.c logging.c \
 	foreign/vpf.c foreign/flopen.c foreign/vas.c \
 	foreign/vsb.c
 
 hitch_LDADD = $(SSL_LIBS) $(CRYPTO_LIBS) $(EV_LIBS) -lrt
-CLEANFILES = cfg_parser.h cfg_parser.c cfg_lex.c
 
 if USE_SHCTX
 AM_CFLAGS += -DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX
