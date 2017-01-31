@@ -92,8 +92,10 @@ fi
 SH_TESTS="$(cd $srcdir/src && echo tests/test*.sh)"
 AC_SUBST(SH_TESTS)
 
-AC_CONFIG_FILES([Makefile])
-AC_CONFIG_FILES([src/Makefile])
-AC_CONFIG_FILES([src/util/Makefile])
+AC_CONFIG_FILES([
+	Makefile
+	src/Makefile
+	src/util/Makefile
+])
 
 AC_OUTPUT
