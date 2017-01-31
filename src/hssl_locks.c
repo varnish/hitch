@@ -36,6 +36,13 @@
 #include "foreign/vas.h"
 #include "hssl_locks.h"
 
+/*
+ * OpenSSL 1.1 has a new threading implementation that no longer
+ * requires the application to set its own locking callbacks.
+ */
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+
 static int num_locks = 0;
 static pthread_mutex_t *locks = NULL;
 
@@ -72,3 +79,12 @@ HSSL_Locks_Init(void)
 	AZ(CRYPTO_get_locking_callback());
 	CRYPTO_set_locking_callback(hssl_lock_cb);
 }
+
+#else
+
+void
+HSSL_Locks_Init(void)
+{
+}
+
+#endif
