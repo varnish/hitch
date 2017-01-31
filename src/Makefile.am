@@ -32,6 +32,11 @@ nobase_noinst_HEADERS = \
 	foreign/vqueue.h \
 	foreign/vsb.h
 
+BUILT_SOURCES = \
+	cfg_lex.c \
+	cfg_parser.c \
+	cfg_parser.h
+
 hitch_SOURCES = \
 	asn_gentm.c \
 	cfg_lex.l \
