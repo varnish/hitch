@@ -1,6 +1,6 @@
 
 sbin_PROGRAMS = hitch
-noinst_LIBRARIES = cfg.a
+noinst_LIBRARIES = cfg.a foreign.a
 
 EXTRA_DIST = tests
 
@@ -43,6 +43,13 @@ cfg_a_SOURCES = \
 	cfg_parser.y
 
 hitch_CFLAGS = $(AM_CFLAGS) -Werror
+foreign_a_SOURCES = \
+	foreign/flopen.c \
+	foreign/vas.c \
+	foreign/vpf.c \
+	foreign/vsb.c
+
+hitch_CFLAGS = $(AM_CFLAGS) -Werror
 hitch_SOURCES = \
 	asn_gentm.c \
 	configuration.c \
@@ -50,11 +57,7 @@ hitch_SOURCES = \
 	hssl_locks.c \
 	logging.c \
 	ocsp.c \
-	ringbuffer.c \
-	foreign/flopen.c \
-	foreign/vas.c \
-	foreign/vpf.c \
-	foreign/vsb.c
+	ringbuffer.c
 
 hitch_LDADD = \
 	$(SSL_LIBS) \
@@ -63,7 +66,8 @@ hitch_LDADD = \
 	$(NSL_LIBS) \
 	$(EV_LIBS) \
 	$(RT_LIBS) \
-	cfg.a
+	cfg.a \
+	foreign.a
 
 if USE_SHCTX
 AM_CFLAGS += -DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX

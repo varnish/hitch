@@ -2,6 +2,7 @@ conf
 ebtree*
 core
 core.*
+*.a
 *.o
 *.in
 *~
@@ -18,7 +19,6 @@ Makefile
 /autom4te.cache
 /hitch.8
 # Flex/Bison output files.
-cfg.a
 /src/cfg_lex.c
 /src/cfg_parser.c
 /src/cfg_parser.h
