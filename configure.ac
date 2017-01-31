@@ -8,6 +8,7 @@ AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_AUX_DIR([build-aux])
 
 AM_INIT_AUTOMAKE([foreign color-tests parallel-tests subdir-objects])
+AM_SILENT_RULES([yes])
 
 # Checks for programs.
 AC_PROG_CC
