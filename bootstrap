@@ -1,6 +1,6 @@
 #!/bin/sh -x
 set -o errexit
-aclocal
+aclocal -I .
 autoconf
 autoheader
 mkdir -p build-aux

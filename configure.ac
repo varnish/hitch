@@ -31,12 +31,16 @@ AM_MAINTAINER_MODE([disable])
 
 # Checks for libraries.
 PKG_CHECK_EXISTS([libev], [
-  PKG_CHECK_MODULES([EV], [libev])], [
-  AC_SEARCH_LIBS([ev_default_loop], [ev], [], AC_MSG_ERROR([Cannot find libev.]))
+	PKG_CHECK_MODULES([EV], [libev])], [
+	HITCH_SEARCH_LIBS([EV], [ev], [ev_default_loop],
+		[AC_MSG_ERROR([Cannot find libev.])])
 ])
 
 PKG_CHECK_MODULES([SSL], [libssl])
 PKG_CHECK_MODULES([CRYPTO], [libcrypto])
+HITCH_SEARCH_LIBS([SOCKET], [socket], [socket])
+HITCH_SEARCH_LIBS([NSL], [nsl], [getaddrinfo])
+HITCH_SEARCH_LIBS([RT], [rt], [clock_gettime])
 
 AC_CHECK_MEMBERS([struct stat.st_mtim, struct stat.st_mtimespec])
 

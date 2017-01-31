@@ -56,7 +56,14 @@ hitch_SOURCES = \
 	foreign/vpf.c \
 	foreign/vsb.c
 
-hitch_LDADD = $(SSL_LIBS) $(CRYPTO_LIBS) $(EV_LIBS) -lrt cfg.a
+hitch_LDADD = \
+	$(SSL_LIBS) \
+	$(CRYPTO_LIBS) \
+	$(SOCKET_LIBS) \
+	$(NSL_LIBS) \
+	$(EV_LIBS) \
+	$(RT_LIBS) \
+	cfg.a
 
 if USE_SHCTX
 AM_CFLAGS += -DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX
