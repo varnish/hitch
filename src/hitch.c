@@ -236,7 +236,7 @@ union ha_proxy_v2_addr {
 	struct {        /* for AF_UNIX sockets, len = 216 */
 		uint8_t src_addr[108];
 		uint8_t dst_addr[108];
-	} unix;
+	} local;
 };
 
 struct ha_proxy_v2_hdr {
