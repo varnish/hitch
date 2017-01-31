@@ -1,5 +1,6 @@
 
 sbin_PROGRAMS = hitch
+noinst_LIBRARIES = cfg.a
 
 EXTRA_DIST = tests
 
@@ -37,10 +38,13 @@ BUILT_SOURCES = \
 	cfg_parser.c \
 	cfg_parser.h
 
+cfg_a_SOURCES = \
+	cfg_lex.l \
+	cfg_parser.y
+
+hitch_CFLAGS = $(AM_CFLAGS) -Werror
 hitch_SOURCES = \
 	asn_gentm.c \
-	cfg_lex.l \
-	cfg_parser.y \
 	configuration.c \
 	hitch.c \
 	hssl_locks.c \
@@ -52,7 +56,7 @@ hitch_SOURCES = \
 	foreign/vpf.c \
 	foreign/vsb.c
 
-hitch_LDADD = $(SSL_LIBS) $(CRYPTO_LIBS) $(EV_LIBS) -lrt
+hitch_LDADD = $(SSL_LIBS) $(CRYPTO_LIBS) $(EV_LIBS) -lrt cfg.a
 
 if USE_SHCTX
 AM_CFLAGS += -DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX

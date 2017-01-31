@@ -2,11 +2,11 @@ conf
 ebtree*
 core
 core.*
-**.o
-**.in
-**.in~
+*.o
+*.in
+*~
 .deps
-**.sw[op]
+*.sw[op]
 /src/hitch
 Makefile
 /aclocal.m4
@@ -17,7 +17,8 @@ Makefile
 /configure
 /autom4te.cache
 /hitch.8
-# Flex output files.
+# Flex/Bison output files.
+cfg.a
 /src/cfg_lex.c
 /src/cfg_parser.c
 /src/cfg_parser.h
