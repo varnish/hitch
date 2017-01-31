@@ -13,16 +13,38 @@ TESTS_ENVIRONMENT = \
 TESTS = @SH_TESTS@
 TEST_EXTENSIONS = .sh
 
-nobase_noinst_HEADERS = hitch.h ringbuffer.h configuration.h shctx.h \
-	logging.h sysl_tbl.h hssl_locks.h asn_gentm.h ssl_err.h \
+nobase_noinst_HEADERS = \
+	asn_gentm.h \
+	configuration.h \
+	hitch.h \
+	hssl_locks.h \
+	logging.h \
 	ocsp.h \
-	foreign/miniobj.h foreign/vqueue.h foreign/vpf.h \
-	foreign/flopen.h foreign/uthash.h \
-	foreign/vas.h foreign/vsb.h
+	ringbuffer.h \
+	shctx.h \
+	ssl_err.h \
+	sysl_tbl.h \
+	foreign/flopen.h \
+	foreign/miniobj.h \
+	foreign/uthash.h \
+	foreign/vas.h \
+	foreign/vpf.h \
+	foreign/vqueue.h \
+	foreign/vsb.h
 
-hitch_SOURCES = configuration.c ringbuffer.c hitch.c cfg_parser.y \
-	cfg_lex.l hssl_locks.c asn_gentm.c ocsp.c logging.c \
-	foreign/vpf.c foreign/flopen.c foreign/vas.c \
+hitch_SOURCES = \
+	asn_gentm.c \
+	cfg_lex.l \
+	cfg_parser.y \
+	configuration.c \
+	hitch.c \
+	hssl_locks.c \
+	logging.c \
+	ocsp.c \
+	ringbuffer.c \
+	foreign/flopen.c \
+	foreign/vas.c \
+	foreign/vpf.c \
 	foreign/vsb.c
 
 hitch_LDADD = $(SSL_LIBS) $(CRYPTO_LIBS) $(EV_LIBS) -lrt
