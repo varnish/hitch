@@ -70,8 +70,7 @@ hitch_LDADD = \
 	foreign.a
 
 if USE_SHCTX
-AM_CFLAGS += -DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX
+AM_CFLAGS += -DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX -Iebtree
 hitch_SOURCES += shctx.c
 hitch_LDADD += ebtree/libebtree.a
-AM_CFLAGS += -Iebtree
 endif
