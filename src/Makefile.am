@@ -4,7 +4,6 @@ noinst_LIBRARIES = cfg.a foreign.a
 
 EXTRA_DIST = tests
 
-AM_CPPFLAGS = $(EV_CFLAGS)
 AM_CFLAGS = -O2 -g -std=c99 -fno-strict-aliasing -Wall -W
 AM_YFLAGS = -d -t
 
@@ -49,7 +48,6 @@ foreign_a_SOURCES = \
 	foreign/vpf.c \
 	foreign/vsb.c
 
-hitch_CFLAGS = $(AM_CFLAGS) -Werror
 hitch_SOURCES = \
 	asn_gentm.c \
 	configuration.c \
@@ -58,6 +56,12 @@ hitch_SOURCES = \
 	logging.c \
 	ocsp.c \
 	ringbuffer.c
+
+hitch_CFLAGS = \
+	$(SSL_CFLAGS) \
+	$(CRYPTO_CFLAGS) \
+	$(EV_CFLAGS) \
+	-Werror
 
 hitch_LDADD = \
 	$(SSL_LIBS) \
@@ -70,7 +74,7 @@ hitch_LDADD = \
 	foreign.a
 
 if USE_SHCTX
-AM_CFLAGS += -DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX -Iebtree
+hitch_CFLAGS += -DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX -Iebtree
 hitch_SOURCES += shctx.c
 hitch_LDADD += ebtree/libebtree.a
 endif
