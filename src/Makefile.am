@@ -41,6 +41,10 @@ cfg_a_SOURCES = \
 	cfg_lex.l \
 	cfg_parser.y
 
+cfg_a_CFLAGS = \
+	$(AM_CFLAGS) \
+	$(SSL_CFLAGS)
+
 foreign_a_SOURCES = \
 	foreign/flopen.c \
 	foreign/vas.c \
