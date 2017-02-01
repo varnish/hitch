@@ -62,7 +62,7 @@ int main(int argc, const char **argv) {
 
 #if OPENSSL_VERSION_NUMBER < 0x1000100fL
 	printf("Warning:\tThis OpenSSL version is too old for NPN.\n");
-#elseif OPENSSL_VERSION_NUMBER < 0x1000200fL
+#elif OPENSSL_VERSION_NUMBER < 0x1000200fL
 	printf("Warning:\tThis OpenSSL version is too old for ALPN.\n");
 #endif
 	if (argc == 1)
