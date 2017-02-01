@@ -35,6 +35,8 @@
   *
   */
 
+#include "config.h"
+
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>  /* TCP_NODELAY */
@@ -67,7 +69,6 @@
 #include <sys/filio.h>
 #endif
 
-#include "config.h"
 #include "configuration.h"
 #include "hitch.h"
 #include "hssl_locks.h"

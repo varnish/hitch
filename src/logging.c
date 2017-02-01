@@ -29,6 +29,8 @@
   *
   */
 
+#include "config.h"
+
 #include <netdb.h>
 #include <netinet/tcp.h>  /* TCP_NODELAY */
 #include <net/if.h>
@@ -54,7 +56,6 @@
 #include <unistd.h>
 
 #include "logging.h"
-#include "config.h"
 #include "configuration.h"
 #include "hitch.h"
 #include "hssl_locks.h"

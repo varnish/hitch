@@ -32,6 +32,8 @@
 #ifndef LOGGING_H_INCLUDED
 #define LOGGING_H_INCLUDED
 
+#include "config.h"
+
 #include <arpa/inet.h>
 
 #include <ev.h>
@@ -41,7 +43,6 @@
 #include <sys/ioctl.h>
 
 // #include "asn_gentm.h"
-#include "config.h"
 #include "configuration.h"
 #include "hitch.h"
 // #include "miniobj.h"

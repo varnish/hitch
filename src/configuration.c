@@ -4,6 +4,8 @@
  * Original author: Brane F. Gracnar
  */
 
+#include "config.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -19,7 +21,6 @@
 #include <syslog.h>
 #include <libgen.h>
 
-#include "config.h"
 #include "configuration.h"
 #include "foreign/miniobj.h"
 #include "foreign/vas.h"
