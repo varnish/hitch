@@ -1,3 +1,5 @@
 
 noinst_PROGRAMS = parse_proxy_v2
-parse_proxy_v2_LDADD = $(NSL_LIBS)
+parse_proxy_v2_LDADD = \
+	$(NSL_LIBS) \
+	$(SOCKET_LIBS)
