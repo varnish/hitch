@@ -4,6 +4,7 @@ noinst_LIBRARIES = cfg.a foreign.a
 
 EXTRA_DIST = tests
 
+AM_CFLAGS = $(HITCH_CFLAGS)
 AM_YFLAGS = -d -t
 
 TESTS_ENVIRONMENT = \
@@ -40,7 +41,6 @@ cfg_a_SOURCES = \
 	cfg_lex.l \
 	cfg_parser.y
 
-hitch_CFLAGS = $(AM_CFLAGS) -Werror
 foreign_a_SOURCES = \
 	foreign/flopen.c \
 	foreign/vas.c \
@@ -57,6 +57,7 @@ hitch_SOURCES = \
 	ringbuffer.c
 
 hitch_CFLAGS = \
+	$(AM_CFLAGS) \
 	$(SSL_CFLAGS) \
 	$(CRYPTO_CFLAGS) \
 	$(EV_CFLAGS) \
