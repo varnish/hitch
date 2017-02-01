@@ -99,6 +99,19 @@ fi
 SH_TESTS="$(cd $srcdir/src && echo tests/test*.sh)"
 AC_SUBST(SH_TESTS)
 
+dnl Desired CFLAGS
+HITCH_CHECK_FLAGS([BASE_CFLAGS], [
+	-std=c99
+	-D_POSIX_C_SOURCE=200809L
+	-O2
+	-g
+	-Wall
+	-W
+	-Wno-strict-aliasing
+])
+
+CFLAGS="$BASE_CFLAGS $CFLAGS"
+
 AC_CONFIG_FILES([
 	Makefile
 	src/Makefile

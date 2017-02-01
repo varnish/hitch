@@ -4,7 +4,6 @@ noinst_LIBRARIES = cfg.a foreign.a
 
 EXTRA_DIST = tests
 
-AM_CFLAGS = -O2 -g -std=c99 -fno-strict-aliasing -Wall -W
 AM_YFLAGS = -d -t
 
 TESTS_ENVIRONMENT = \
