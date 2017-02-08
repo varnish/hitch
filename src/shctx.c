@@ -218,7 +218,12 @@ int shctx_new_cb(SSL *ssl, SSL_SESSION *sess) {
 }
 
 /* SSL callback used on lookup an existing session cause none found in internal cache */
-SSL_SESSION *shctx_get_cb(SSL *ssl, const unsigned char *key, int key_len, int *do_copy) {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+SSL_SESSION *shctx_get_cb(SSL *ssl, unsigned char *key, int key_len, int *do_copy)
+#else
+SSL_SESSION *shctx_get_cb(SSL *ssl, const unsigned char *key, int key_len, int *do_copy)
+#endif
+{
 	(void)ssl;
 	struct shared_session *shsess;
 	unsigned char data[SHSESS_MAX_DATA_LEN], *p;
