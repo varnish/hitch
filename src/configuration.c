@@ -946,7 +946,8 @@ config_disp_uid(uid_t uid)
 	if (uid == 0 && geteuid() != 0) return tmp_buf;
 	struct passwd *pw = getpwuid(uid);
 	if (pw) {
-		memcpy(tmp_buf, pw->pw_name, strlen(pw->pw_name));
+		strncpy(tmp_buf, pw->pw_name, sizeof(tmp_buf));
+		tmp_buf[sizeof(tmp_buf) - 1] = '\0';
 	}
 	return tmp_buf;
 }
@@ -958,7 +959,8 @@ config_disp_gid (gid_t gid)
 	if (gid == 0 && geteuid() != 0) return tmp_buf;
 	struct group *gr = getgrgid(gid);
 	if (gr) {
-		memcpy(tmp_buf, gr->gr_name, strlen(gr->gr_name));
+		strncpy(tmp_buf, gr->gr_name, sizeof(tmp_buf));
+		tmp_buf[sizeof(tmp_buf) - 1] = '\0';
 	}
 	return tmp_buf;
 }
