@@ -32,6 +32,8 @@
 #ifndef HITCH_H_INCLUDED
 #define HITCH_H_INCLUDED
 
+#include "config.h"
+
 #include <arpa/inet.h>
 
 #include <ev.h>
@@ -49,7 +51,6 @@
 #include <openssl/x509v3.h>
 
 #include "asn_gentm.h"
-#include "config.h"
 #include "configuration.h"
 #include "ringbuffer.h"
 #include "foreign/miniobj.h"

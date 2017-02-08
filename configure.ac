@@ -7,6 +7,8 @@ AC_CONFIG_SRCDIR([src/configuration.c])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_AUX_DIR([build-aux])
 
+AC_USE_SYSTEM_EXTENSIONS
+
 AM_INIT_AUTOMAKE([foreign color-tests parallel-tests subdir-objects])
 AM_SILENT_RULES([yes])
 
@@ -31,12 +33,16 @@ AM_MAINTAINER_MODE([disable])
 
 # Checks for libraries.
 PKG_CHECK_EXISTS([libev], [
-  PKG_CHECK_MODULES([EV], [libev])], [
-  AC_SEARCH_LIBS([ev_default_loop], [ev], [], AC_MSG_ERROR([Cannot find libev.]))
+	PKG_CHECK_MODULES([EV], [libev])], [
+	HITCH_SEARCH_LIBS([EV], [ev], [ev_default_loop],
+		[AC_MSG_ERROR([Cannot find libev.])])
 ])
 
 PKG_CHECK_MODULES([SSL], [libssl])
 PKG_CHECK_MODULES([CRYPTO], [libcrypto])
+HITCH_SEARCH_LIBS([SOCKET], [socket], [socket])
+HITCH_SEARCH_LIBS([NSL], [nsl], [inet_ntop])
+HITCH_SEARCH_LIBS([RT], [rt], [clock_gettime])
 
 AC_CHECK_MEMBERS([struct stat.st_mtim, struct stat.st_mtimespec])
 
@@ -92,6 +98,21 @@ fi
 
 SH_TESTS="$(cd $srcdir/src && echo tests/test*.sh)"
 AC_SUBST(SH_TESTS)
+
+dnl Desired CFLAGS
+HITCH_CHECK_FLAGS([HITCH_CFLAGS], [
+	-std=c99
+	-D_POSIX_C_SOURCE=200809L
+	-O2
+	-g
+	-Wall
+	-W
+])
+
+AC_SUBST([HITCH_CFLAGS])
+
+dnl Help libev macros
+HITCH_CHECK_FLAGS([EV_CFLAGS], [-Wno-strict-aliasing])
 
 AC_CONFIG_FILES([
 	Makefile

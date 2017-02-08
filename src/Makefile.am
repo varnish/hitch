@@ -1,11 +1,10 @@
 
 sbin_PROGRAMS = hitch
-noinst_LIBRARIES = cfg.a
+noinst_LIBRARIES = cfg.a foreign.a
 
 EXTRA_DIST = tests
 
-AM_CPPFLAGS = $(EV_CFLAGS)
-AM_CFLAGS = -O2 -g -std=c99 -fno-strict-aliasing -Wall -W -D_GNU_SOURCE
+AM_CFLAGS = $(HITCH_CFLAGS)
 AM_YFLAGS = -d -t
 
 TESTS_ENVIRONMENT = \
@@ -42,7 +41,16 @@ cfg_a_SOURCES = \
 	cfg_lex.l \
 	cfg_parser.y
 
-hitch_CFLAGS = $(AM_CFLAGS) -Werror
+cfg_a_CFLAGS = \
+	$(AM_CFLAGS) \
+	$(SSL_CFLAGS)
+
+foreign_a_SOURCES = \
+	foreign/flopen.c \
+	foreign/vas.c \
+	foreign/vpf.c \
+	foreign/vsb.c
+
 hitch_SOURCES = \
 	asn_gentm.c \
 	configuration.c \
@@ -50,17 +58,27 @@ hitch_SOURCES = \
 	hssl_locks.c \
 	logging.c \
 	ocsp.c \
-	ringbuffer.c \
-	foreign/flopen.c \
-	foreign/vas.c \
-	foreign/vpf.c \
-	foreign/vsb.c
+	ringbuffer.c
 
-hitch_LDADD = $(SSL_LIBS) $(CRYPTO_LIBS) $(EV_LIBS) -lrt cfg.a
+hitch_CFLAGS = \
+	$(AM_CFLAGS) \
+	$(SSL_CFLAGS) \
+	$(CRYPTO_CFLAGS) \
+	$(EV_CFLAGS) \
+	-Werror
+
+hitch_LDADD = \
+	$(SSL_LIBS) \
+	$(CRYPTO_LIBS) \
+	$(SOCKET_LIBS) \
+	$(NSL_LIBS) \
+	$(EV_LIBS) \
+	$(RT_LIBS) \
+	cfg.a \
+	foreign.a
 
 if USE_SHCTX
-AM_CFLAGS += -DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX
+hitch_CFLAGS += -DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX -Iebtree
 hitch_SOURCES += shctx.c
 hitch_LDADD += ebtree/libebtree.a
-AM_CFLAGS += -Iebtree
 endif
