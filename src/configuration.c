@@ -927,19 +927,19 @@ config_file_parse(char *file, hitch_config *cfg)
 	return (r);
 }
 
-char *
+static char *
 config_disp_str(char *str)
 {
 	return (str == NULL) ? "" : str;
 }
 
-char *
+static char *
 config_disp_bool(int v)
 {
 	return (v > 0) ? CFG_BOOL_ON : "off";
 }
 
-char *
+static char *
 config_disp_uid(uid_t uid)
 {
 	memset(tmp_buf, '\0', sizeof(tmp_buf));
@@ -951,7 +951,7 @@ config_disp_uid(uid_t uid)
 	return tmp_buf;
 }
 
-char *
+static char *
 config_disp_gid (gid_t gid)
 {
 	memset(tmp_buf, '\0', sizeof(tmp_buf));
@@ -963,7 +963,7 @@ config_disp_gid (gid_t gid)
 	return tmp_buf;
 }
 
-char *
+static char *
 config_disp_hostport(char *host, char *port)
 {
 	memset(tmp_buf, '\0', sizeof(tmp_buf));
@@ -981,7 +981,7 @@ config_disp_hostport(char *host, char *port)
 	return tmp_buf;
 }
 
-const char *
+static const char *
 config_disp_log_facility (int facility)
 {
 	switch (facility)
