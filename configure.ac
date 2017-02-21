@@ -101,7 +101,6 @@ AC_SUBST(SH_TESTS)
 
 dnl Desired CFLAGS
 HITCH_CHECK_FLAGS([HITCH_CFLAGS], [
-	-std=c99
 	-O2
 	-g
 	-Wall
