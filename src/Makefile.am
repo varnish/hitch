@@ -1,6 +1,6 @@
 
 sbin_PROGRAMS = hitch
-noinst_LIBRARIES = cfg.a foreign.a
+noinst_LIBRARIES = libcfg.a libforeign.a
 
 EXTRA_DIST = tests
 
@@ -37,15 +37,15 @@ BUILT_SOURCES = \
 	cfg_parser.c \
 	cfg_parser.h
 
-cfg_a_SOURCES = \
+libcfg_a_SOURCES = \
 	cfg_lex.l \
 	cfg_parser.y
 
-cfg_a_CFLAGS = \
+libcfg_a_CFLAGS = \
 	$(AM_CFLAGS) \
 	$(SSL_CFLAGS)
 
-foreign_a_SOURCES = \
+libforeign_a_SOURCES = \
 	foreign/flopen.c \
 	foreign/vas.c \
 	foreign/vpf.c \
@@ -74,8 +74,8 @@ hitch_LDADD = \
 	$(NSL_LIBS) \
 	$(EV_LIBS) \
 	$(RT_LIBS) \
-	cfg.a \
-	foreign.a
+	libcfg.a \
+	libforeign.a
 
 if USE_SHCTX
 hitch_CFLAGS += -DUSE_SHARED_CACHE -DUSE_SYSCALL_FUTEX -Iebtree

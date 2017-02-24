@@ -9,8 +9,16 @@ AC_CONFIG_AUX_DIR([build-aux])
 
 AC_USE_SYSTEM_EXTENSIONS
 
-AM_INIT_AUTOMAKE([foreign color-tests parallel-tests subdir-objects])
+AM_INIT_AUTOMAKE([
+	-Wall
+	-Werror
+	foreign
+	color-tests
+	parallel-tests
+	subdir-objects
+])
 AM_SILENT_RULES([yes])
+AM_PROG_AR
 
 # Checks for programs.
 AC_PROG_CC
