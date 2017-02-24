@@ -1254,65 +1254,40 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		case CFG_PARAM_CFGFILE:
 			/* Handled above */
 			break;
-		case CFG_PARAM_SYSLOG_FACILITY:
-			ret = config_param_validate(CFG_SYSLOG_FACILITY, optarg, cfg, NULL, 0);
+#define CFG_ARG(opt, key)							\
+		case opt:							\
+			ret = config_param_validate(key, optarg, cfg, NULL, 0);	\
 			break;
-		case 'c':
-			ret = config_param_validate(CFG_CIPHERS, optarg, cfg, NULL, 0);
+#define CFG_ON(opt, key)							\
+		case opt:							\
+			ret = config_param_validate(key, CFG_BOOL_ON, cfg, 	\
+			    NULL, 0);						\
 			break;
-		case 'e':
-			ret = config_param_validate(CFG_SSL_ENGINE, optarg, cfg, NULL, 0);
-			break;
-		case 'O':
-			ret = config_param_validate(CFG_PREFER_SERVER_CIPHERS, CFG_BOOL_ON, cfg, NULL, 0);
-			break;
-		case 'b':
-			ret = config_param_validate(CFG_BACKEND, optarg, cfg, NULL, 0);
-			break;
-		case 'f':
-			ret = config_param_validate(CFG_FRONTEND, optarg, cfg, NULL, 0);
-			break;
-		case 'n':
-			ret = config_param_validate(CFG_WORKERS, optarg, cfg, NULL, 0);
-			break;
-		case 'B':
-			ret = config_param_validate(CFG_BACKLOG, optarg, cfg, NULL, 0);
-			break;
+CFG_ARG(CFG_PARAM_SYSLOG_FACILITY, CFG_SYSLOG_FACILITY);
+CFG_ARG(CFG_PARAM_ALPN_PROTOS, CFG_ALPN_PROTOS);
+CFG_ARG('c', CFG_CIPHERS);
+CFG_ARG('e', CFG_SSL_ENGINE);
+CFG_ARG('b', CFG_BACKEND);
+CFG_ARG('f', CFG_FRONTEND);
+CFG_ARG('n', CFG_WORKERS);
+CFG_ARG('B', CFG_BACKLOG);
 #ifdef USE_SHARED_CACHE
-		case 'C':
-			ret = config_param_validate(CFG_SHARED_CACHE, optarg, cfg, NULL, 0);
-			break;
-		case 'U':
-			ret = config_param_validate(CFG_SHARED_CACHE_LISTEN, optarg, cfg, NULL, 0);
-			break;
-		case 'P':
-			ret = config_param_validate(CFG_SHARED_CACHE_PEER, optarg, cfg, NULL, 0);
-			break;
-		case 'M':
-			ret =config_param_validate(CFG_SHARED_CACHE_MCASTIF, optarg, cfg, NULL, 0);
-			break;
+CFG_ARG('C', CFG_SHARED_CACHE);
+CFG_ARG('U', CFG_SHARED_CACHE_LISTEN);
+CFG_ARG('P', CFG_SHARED_CACHE_PEER);
+CFG_ARG('M', CFG_SHARED_CACHE_MCASTIF);
 #endif
-		case 'p':
-			ret = config_param_validate(CFG_PIDFILE, optarg, cfg, NULL, 0);
-			break;
-		case 'k':
-			ret = config_param_validate(CFG_KEEPALIVE, optarg, cfg, NULL, 0);
-			break;
-		case 'r':
-			ret = config_param_validate(CFG_CHROOT, optarg, cfg, NULL, 0);
-			break;
-		case 'u':
-			ret = config_param_validate(CFG_USER, optarg, cfg, NULL, 0);
-			break;
-		case 'g':
-			ret = config_param_validate(CFG_GROUP, optarg, cfg, NULL, 0);
-			break;
-		case 'q':
-			ret = config_param_validate(CFG_QUIET, CFG_BOOL_ON, cfg, NULL, 0);
-			break;
-		case 's':
-			ret = config_param_validate(CFG_SYSLOG, CFG_BOOL_ON, cfg, NULL, 0);
-			break;
+CFG_ARG('p', CFG_PIDFILE);
+CFG_ARG('k', CFG_KEEPALIVE);
+CFG_ARG('r', CFG_CHROOT);
+CFG_ARG('u', CFG_USER);
+CFG_ARG('g', CFG_GROUP);
+CFG_ARG('o', CFG_OCSP_DIR);
+CFG_ON('O', CFG_PREFER_SERVER_CIPHERS);
+CFG_ON('q', CFG_QUIET);
+CFG_ON('s', CFG_SYSLOG);
+#undef CFG_ARG
+#undef CFG_ON
 		case 't':
 			cfg->TEST = 1;
 			break;
@@ -1325,12 +1300,6 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 			config_print_usage(argv[0]);
 			*retval = 0;
 			return (1);
-			break;
-		case 'o':
-			ret = config_param_validate(CFG_OCSP_DIR, optarg, cfg, NULL, 0);
-			break;
-		case CFG_PARAM_ALPN_PROTOS:
-			ret = config_param_validate(CFG_ALPN_PROTOS, optarg, cfg, NULL, 0);
 			break;
 
 		default:
