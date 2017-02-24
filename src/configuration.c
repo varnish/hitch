@@ -1102,7 +1102,56 @@ config_print_usage(char *prog)
 	config_print_usage_fd(prog, stdout);
 }
 
-static int create_alpn_callback_data(hitch_config *cfg, char **error);
+static int
+create_alpn_callback_data(hitch_config *cfg, char **error)
+{
+	size_t i = 1, j, l;
+
+	AN(cfg->ALPN_PROTOS);
+	l = strlen(cfg->ALPN_PROTOS);
+	cfg->ALPN_PROTOS_LV = malloc(l + 1);
+	AN(cfg->ALPN_PROTOS_LV);
+
+	// first remove spaces while copying to cfg->ALPN_PROTOS_LV
+	for(j = 0; j < l; j++)
+		if (!isspace(cfg->ALPN_PROTOS[j])) {
+			cfg->ALPN_PROTOS_LV[i] = cfg->ALPN_PROTOS[j];
+			i++;
+		}
+
+	l = i - 1; // same as before iff cfg->ALPN_PROTOS has no spaces
+	i = 0; // location of next "length" byte
+	for(j = 1; j <= l; j++) {
+		if (cfg->ALPN_PROTOS_LV[j] == ',') {
+			if (i + 1 == j) {
+				*error = "alpn-protos has empty proto in list";
+				return (0); // failure
+			}
+			if (j - i > 256) {
+				free(cfg->ALPN_PROTOS_LV);
+				cfg->ALPN_PROTOS_LV = NULL;
+				*error = "alpn protocol too long";
+				return (0);
+			}
+			cfg->ALPN_PROTOS_LV[i] = (unsigned char)(j - i - 1);
+			i = j;
+		}
+	}
+	if (i == j) {
+		// alpn-protos ends with a comma - we let it slide
+		cfg->ALPN_PROTOS_LV_LEN = l;
+	} else {
+		if (j - i > 256) {
+			free(cfg->ALPN_PROTOS_LV);
+			cfg->ALPN_PROTOS_LV = NULL;
+			*error = "alpn protocol too long";
+			return (0);
+		}
+		cfg->ALPN_PROTOS_LV[i] = (unsigned char)(j - i - 1);
+		cfg->ALPN_PROTOS_LV_LEN = l + 1;
+	}
+	return (1); // ok!
+}
 
 int
 config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
@@ -1449,55 +1498,4 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 	}
 
 	return (0);
-}
-
-static int
-create_alpn_callback_data(hitch_config *cfg, char **error)
-{
-	size_t i = 1, j, l;
-
-	AN(cfg->ALPN_PROTOS);
-	l = strlen(cfg->ALPN_PROTOS);
-	cfg->ALPN_PROTOS_LV = malloc(l + 1);
-	AN(cfg->ALPN_PROTOS_LV);
-
-	// first remove spaces while copying to cfg->ALPN_PROTOS_LV
-	for(j = 0; j < l; j++)
-		if (!isspace(cfg->ALPN_PROTOS[j])) {
-			cfg->ALPN_PROTOS_LV[i] = cfg->ALPN_PROTOS[j];
-			i++;
-		}
-
-	l = i - 1; // same as before iff cfg->ALPN_PROTOS has no spaces
-	i = 0; // location of next "length" byte
-	for(j = 1; j <= l; j++) {
-		if (cfg->ALPN_PROTOS_LV[j] == ',') {
-			if (i + 1 == j) {
-				*error = "alpn-protos has empty proto in list";
-				return (0); // failure
-			}
-			if (j - i > 256) {
-				free(cfg->ALPN_PROTOS_LV);
-				cfg->ALPN_PROTOS_LV = NULL;
-				*error = "alpn protocol too long";
-				return (0);
-			}
-			cfg->ALPN_PROTOS_LV[i] = (unsigned char)(j - i - 1);
-			i = j;
-		}
-	}
-	if (i == j) {
-		// alpn-protos ends with a comma - we let it slide
-		cfg->ALPN_PROTOS_LV_LEN = l;
-	} else {
-		if (j - i > 256) {
-			free(cfg->ALPN_PROTOS_LV);
-			cfg->ALPN_PROTOS_LV = NULL;
-			*error = "alpn protocol too long";
-			return (0);
-		}
-		cfg->ALPN_PROTOS_LV[i] = (unsigned char)(j - i - 1);
-		cfg->ALPN_PROTOS_LV_LEN = l + 1;
-	}
-	return (1); // ok!
 }
