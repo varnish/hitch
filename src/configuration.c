@@ -118,7 +118,7 @@ config_error_set(char *fmt, ...)
 	memcpy(error_buf, buf, len);
 }
 
-char *
+const char *
 config_error_get(void)
 {
 	return error_buf;
@@ -232,7 +232,7 @@ config_new(void)
 	r->RING_SLOTS = 0;
 	r->RING_DATA_LEN = 0;
 
-	return r;
+	return (r);
 }
 
 void
@@ -259,9 +259,8 @@ config_destroy(hitch_config *cfg)
 		cfg_cert_file_free(&cf);
 	}
 
-	if (cfg->CERT_DEFAULT != NULL) {
+	if (cfg->CERT_DEFAULT != NULL)
 		cfg_cert_file_free(&cfg->CERT_DEFAULT);
-	}
 
 	free(cfg->CIPHER_SUITE);
 	free(cfg->ENGINE);
@@ -285,20 +284,21 @@ config_destroy(hitch_config *cfg)
 	free(cfg);
 }
 
-char *
+static char *
 config_assign_str(char **dst, char *v)
 {
 	assert(v != NULL);
 
-	if (strlen(v) <= 0) return(NULL);
+	if (strlen(v) <= 0)
+		return(NULL);
 	if (*dst != NULL)
 		free(*dst);
 
 	*dst = strdup(v);
-	return *dst;
+	return (*dst);
 }
 
-int
+static int
 config_param_val_bool(char *val, int *res)
 {
 	assert(val != NULL);
@@ -309,10 +309,10 @@ config_param_val_bool(char *val, int *res)
 		*res = 1;
 	}
 
-	return 1;
+	return (1);
 }
 
-int
+static int
 config_param_host_port_wildcard(const char *str, char **addr,
     char **port, char **cert, int wildcard_okay)
 {
@@ -369,9 +369,8 @@ config_param_host_port_wildcard(const char *str, char **addr,
 		memcpy(port_buf, ptr, (x - ptr));
 
 	// cert
-	if (cert && x) {
+	if (cert && x)
 		cert_ptr = x + 1;
-	}
 
 	// printf("PARSED ADDR '%s', PORT '%s'\n", addr_buf, port_buf);
 
@@ -385,9 +384,10 @@ config_param_host_port_wildcard(const char *str, char **addr,
 		if (wildcard_okay) {
 			free(*addr);
 			*addr = NULL;
-		    }
+		}
 		else {
-			config_error_set("Invalid address: wildcards are not allowed.");
+			config_error_set(
+			    "Invalid address: wildcards are not allowed.");
 			return (0);
 		}
 	} else {
@@ -403,14 +403,14 @@ config_param_host_port_wildcard(const char *str, char **addr,
 	return (1);
 }
 
-int
+static int
 config_param_host_port(char *str, char **addr, char **port)
 {
-	return config_param_host_port_wildcard(str, addr, port, NULL, 0);
+	return (config_param_host_port_wildcard(str, addr, port, NULL, 0));
 }
 
 
-int
+static int
 config_param_val_int(char *str, int *dst, int positive_only)
 {
 	int num;
@@ -420,14 +420,14 @@ config_param_val_int(char *str, int *dst, int positive_only)
 
 	if (positive_only && num < 0) {
 		config_error_set("Not a positive number.");
-		return 0;
+		return (0);
 	}
 
 	*dst = num;
 	return 1;
 }
 
-int
+static int
 config_param_val_long(char *str, long *dst, int positive_only)
 {
 	long num;
@@ -437,11 +437,11 @@ config_param_val_long(char *str, long *dst, int positive_only)
 
 	if (positive_only && num <= 0) {
 		config_error_set("Not a positive number.");
-		return 0;
+		return (0);
 	}
 
 	*dst = num;
-	return 1;
+	return (1);
 }
 
 static double
@@ -486,7 +486,6 @@ cfg_cert_vfy(struct cfg_cert_file *cf)
 	struct stat st;
 
 	CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
-
 	AN(cf->filename);
 
 	if (cf->filename == NULL || strlen(cf->filename) <= 0)
@@ -529,14 +528,12 @@ cfg_cert_add(struct cfg_cert_file *cf, struct cfg_cert_file **dst)
 	CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
 	AN(dst);
 	CHECK_OBJ_ORNULL(*dst, CFG_CERT_FILE_MAGIC);
-
-	HASH_ADD_KEYPTR(hh, *dst, cf->filename,
-	    strlen(cf->filename), cf);
+	HASH_ADD_KEYPTR(hh, *dst, cf->filename, strlen(cf->filename), cf);
 }
 
 #ifdef USE_SHARED_CACHE
 /* Parse mcast and ttl options */
-int
+static int
 config_param_shcupd_mcastif(char *str, char **iface, char **ttl)
 {
 	char buf[150];
@@ -544,7 +541,7 @@ config_param_shcupd_mcastif(char *str, char **iface, char **ttl)
 
 	if (strlen(str) >= sizeof buf) {
 		config_error_set("Invalid option for IFACE[,TTL]");
-		return 0;
+		return (0);
 	}
 
 	sp = strchr(str, ',');
@@ -554,26 +551,25 @@ config_param_shcupd_mcastif(char *str, char **iface, char **ttl)
 		else
 			*iface = strdup(str);
 		*ttl = NULL;
-		return 1;
+		return (1);
 	}
-	else if (!strncmp(str, "*", sp - str)) {
+	else if (!strncmp(str, "*", sp - str))
 		*iface = NULL;
-	}
 	else {
 		*sp = 0;
 		*iface = strdup(str);
 	}
 	*ttl = strdup(sp + 1);
 
-	return 1;
+	return (1);
 }
 
-int
+static int
 config_param_shcupd_peer(char *str, hitch_config *cfg)
 {
 	if (cfg == NULL) {
 		config_error_set("Configuration pointer is NULL.");
-		return 0;
+		return (0);
 	}
 
 	// parse result
@@ -594,7 +590,7 @@ config_param_shcupd_peer(char *str, hitch_config *cfg)
 		    "Reached maximum number of shared cache update peers (%d).",
 		    MAX_SHCUPD_PEERS
 		);
-		return 0;
+		return (0);
 	}
 
 	// create place for new peer
@@ -628,14 +624,14 @@ config_param_shcupd_peer(char *str, hitch_config *cfg)
 	outta_parse_peer:
 
 	if (! r) {
-		if (addr != NULL) free(addr);
-		if (port != NULL) free(port);
+		free(addr);
+		free(port);
 	} else {
 		cfg->SHCUPD_PEERS[offset].ip = addr;
 		cfg->SHCUPD_PEERS[offset].port = port;
 	}
 
-	return r;
+	return (r);
 }
 
 #endif /* USE_SHARED_CACHE */
@@ -896,7 +892,7 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 	return (0);
 }
 
-int
+static int
 config_file_parse(char *file, hitch_config *cfg)
 {
 	FILE *fp = NULL;
@@ -931,57 +927,58 @@ config_file_parse(char *file, hitch_config *cfg)
 static char *
 config_disp_str(char *str)
 {
-	return (str == NULL) ? "" : str;
+	return ((str == NULL) ? "" : str);
 }
 
 static char *
 config_disp_bool(int v)
 {
-	return (v > 0) ? CFG_BOOL_ON : "off";
+	return ((v > 0) ? CFG_BOOL_ON : "off");
 }
 
 static char *
 config_disp_uid(uid_t uid)
 {
 	memset(tmp_buf, '\0', sizeof(tmp_buf));
-	if (uid == 0 && geteuid() != 0) return tmp_buf;
+	if (uid == 0 && geteuid() != 0)
+		return (tmp_buf);
 	struct passwd *pw = getpwuid(uid);
 	if (pw) {
 		strncpy(tmp_buf, pw->pw_name, sizeof(tmp_buf));
 		tmp_buf[sizeof(tmp_buf) - 1] = '\0';
 	}
-	return tmp_buf;
+	return (tmp_buf);
 }
 
 static char *
 config_disp_gid (gid_t gid)
 {
 	memset(tmp_buf, '\0', sizeof(tmp_buf));
-	if (gid == 0 && geteuid() != 0) return tmp_buf;
+	if (gid == 0 && geteuid() != 0)
+		return (tmp_buf);
 	struct group *gr = getgrgid(gid);
 	if (gr) {
 		strncpy(tmp_buf, gr->gr_name, sizeof(tmp_buf));
 		tmp_buf[sizeof(tmp_buf) - 1] = '\0';
 	}
-	return tmp_buf;
+	return (tmp_buf);
 }
 
-static char *
+static const char *
 config_disp_hostport(char *host, char *port)
 {
 	memset(tmp_buf, '\0', sizeof(tmp_buf));
 	if (host == NULL && port == NULL)
-		return "";
+		return ("");
 
 	strcat(tmp_buf, "[");
 	if (host == NULL)
 		strcat(tmp_buf, "*");
-	else {
+	else
 		strncat(tmp_buf, host, 40);
-	}
 	strcat(tmp_buf, "]:");
 	strncat(tmp_buf, port, 5);
-	return tmp_buf;
+	return (tmp_buf);
 }
 
 static const char *
@@ -995,7 +992,7 @@ config_disp_log_facility (int facility)
 #include "sysl_tbl.h"
 #undef SYSLOG_FAC
 		default:
-			return "UNKNOWN";
+			return ("UNKNOWN");
 	}
 }
 
@@ -1099,11 +1096,13 @@ config_print_usage_fd(char *prog, FILE *out)
 	config_destroy(cfg);
 }
 
-void
+static void
 config_print_usage(char *prog)
 {
 	config_print_usage_fd(prog, stdout);
 }
+
+static int create_alpn_callback_data(hitch_config *cfg, char **error);
 
 int
 config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
@@ -1419,15 +1418,13 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 
 	if (cfg->PMODE == SSL_SERVER && cfg->CERT_DEFAULT == NULL) {
 		struct front_arg *fa, *fatmp;
-		HASH_ITER(hh, cfg->LISTEN_ARGS, fa, fatmp) {
+		HASH_ITER(hh, cfg->LISTEN_ARGS, fa, fatmp)
 			if (HASH_CNT(hh, fa->certs) == 0) {
 				config_error_set("No x509 certificate PEM file "
 				    "specified for frontend '%s'!", fa->pspec);
 				*retval = 1;
 				return (1);
-
 			}
-		}
 	}
 
 	if (cfg->OCSP_DIR != NULL) {
@@ -1454,7 +1451,8 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 	return (0);
 }
 
-int create_alpn_callback_data(hitch_config *cfg, char **error)
+static int
+create_alpn_callback_data(hitch_config *cfg, char **error)
 {
 	size_t i = 1, j, l;
 
@@ -1464,12 +1462,12 @@ int create_alpn_callback_data(hitch_config *cfg, char **error)
 	AN(cfg->ALPN_PROTOS_LV);
 
 	// first remove spaces while copying to cfg->ALPN_PROTOS_LV
-	for(j = 0; j < l; j++) {
+	for(j = 0; j < l; j++)
 		if (!isspace(cfg->ALPN_PROTOS[j])) {
 			cfg->ALPN_PROTOS_LV[i] = cfg->ALPN_PROTOS[j];
 			i++;
 		}
-	}
+
 	l = i - 1; // same as before iff cfg->ALPN_PROTOS has no spaces
 	i = 0; // location of next "length" byte
 	for(j = 1; j <= l; j++) {
