@@ -375,7 +375,7 @@ config_param_host_port_wildcard(const char *str, char **addr,
 	// printf("PARSED ADDR '%s', PORT '%s'\n", addr_buf, port_buf);
 
 	int p = atoi(port_buf);
-	if (p < 1 || p > 65536) {
+	if (p < 0 || p > 65536) {
 		config_error_set("Invalid port number '%s'", port_buf);
 		return (0);
 	}
