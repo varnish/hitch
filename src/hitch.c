@@ -3483,7 +3483,10 @@ reconfigure(int argc, char **argv)
 
 	if (CONFIG->OCSP_DIR != NULL) {
 		(void) kill(ocsp_proc_pid, SIGTERM);
-		start_ocsp_proc();
+		/*
+		 * Restarting the OCSP process is taken
+		 * care of in do_wait
+		 */
 	}
 
 	config_destroy(CONFIG);
