@@ -2801,6 +2801,8 @@ start_workers(int start_index, int count)
 		} else if (c->pid == 0) { /* child */
 			close(pfd[1]);
 			FREE_OBJ(c);
+			if (CONFIG->CHROOT && CONFIG->CHROOT[0])
+				change_root();
 			if (CONFIG->UID >= 0 || CONFIG->GID >= 0)
 				drop_privileges();
 			if (geteuid() == 0) {
@@ -3573,8 +3575,11 @@ main(int argc, char **argv)
 	}
 #endif /* USE_SHARED_CACHE */
 
-	if (CONFIG->CHROOT && CONFIG->CHROOT[0])
-		change_root();
+	if (CONFIG->CHROOT && CONFIG->CHROOT[0] && geteuid() != 0) {
+		ERR("{core} ERROR: chroot requires hitch to be"
+		    " started as root.\n");
+		exit(1);
+	}
 
 	if (geteuid() == 0 && CONFIG->UID < 0) {
 		ERR("{core} ERROR: Refusing to run workers as root.\n");
