@@ -160,12 +160,14 @@ front_arg_destroy(struct front_arg *fa)
 hitch_config *
 config_new(void)
 {
+	int i;
 	hitch_config *r;
 	struct front_arg *fa;
 
 	r = calloc(1, sizeof(hitch_config));
 	AN(r);
 
+	(void) i;
 	// set default values
 
 	r->PMODE              = SSL_SERVER;
@@ -205,7 +207,7 @@ config_new(void)
 	r->SHCUPD_IP          = NULL;
 	r->SHCUPD_PORT        = NULL;
 
-	for (int i = 0 ; i < MAX_SHCUPD_PEERS; i++)
+	for (i = 0 ; i < MAX_SHCUPD_PEERS; i++)
 		memset(&r->SHCUPD_PEERS[i], 0, sizeof(shcupd_peer_opt));
 
 	r->SHCUPD_MCASTIF     = NULL;
