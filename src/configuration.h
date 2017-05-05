@@ -87,7 +87,6 @@ struct front_arg {
 	int			sni_nomatch_abort;
 	int			prefer_server_ciphers;
 	char			*ciphers;
-	// ENC_TYPE		etype;
 	int			selected_protos;
 	int			mark;
 	UT_hash_handle		hh;
@@ -95,7 +94,6 @@ struct front_arg {
 
 /* configuration structure */
 struct __hitch_config {
-    // ENC_TYPE ETYPE;
     PROXY_MODE PMODE;
     int SELECTED_TLS_PROTOS;
     int WRITE_IP_OCTET;
