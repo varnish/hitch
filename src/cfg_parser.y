@@ -25,6 +25,7 @@ void cfg_cert_add(struct cfg_cert_file *cf, struct cfg_cert_file **dst);
 
 static struct front_arg *cur_fa;
 static struct cfg_cert_file *cur_pem;
+extern char input_line[512];
 
 %}
 
@@ -51,6 +52,7 @@ static struct cfg_cert_file *cur_pem;
 %token TOK_TLS_PROTOS TOK_SSLv3 TOK_TLSv1_0 TOK_TLSv1_1 TOK_TLSv1_2
 
 %parse-param { hitch_config *cfg }
+%locations
 
 %%
 CFG
@@ -456,5 +458,7 @@ yyerror(hitch_config *cfg, const char *s)
 	if (cur_fa != NULL)
 		FREE_OBJ(cur_fa);
 
-	fprintf(stderr, "parsing error: line: %d: %s\n", yyget_lineno(), s);
+	fprintf(stderr, "Parsing error in line %d: %s\n", yyget_lineno(), s);
+	if (strlen(input_line) > 0)
+		fprintf(stderr, "'%s'", input_line);
 }

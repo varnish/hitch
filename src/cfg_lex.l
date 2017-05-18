@@ -5,12 +5,18 @@
 #include "configuration.h"
 #include "cfg_parser.h"
 
+char input_line[512];
+
 %}
 
 %option nounput noinput
 %option yylineno
 %option noyywrap
 %%
+\n.* {
+	strncpy(input_line, yytext + 1, sizeof (input_line));
+	yyless(1);
+}
 [ \t\n\r]         ;
 #.*$            ;
 "{"             { return ('{'); }
