@@ -52,7 +52,6 @@ extern char input_line[512];
 %token TOK_TLS_PROTOS TOK_SSLv3 TOK_TLSv1_0 TOK_TLSv1_1 TOK_TLSv1_2
 
 %parse-param { hitch_config *cfg }
-%locations
 
 %%
 CFG
