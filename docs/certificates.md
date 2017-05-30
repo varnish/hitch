@@ -7,7 +7,17 @@ The minimum requirement for hitch to work is a PEM file with:
   - (if you are doing DH ciphers: Diffie-Hellman parameters)
 
 For production use, you probably want to buy one from a friendly Certificate
-Authority (CA) nearby. For testing/playing around with hitch, you can create one using openssl:
+Authority (CA) nearby. To create the PEM bundle from a commercial CA, you need to merge:
+
+* the private-key
+* the certificate
+* the Certificate Authority bundle
+
+Create the PEM like this:
+
+    $ cat example.com.key example.com.crt my-ca-bundle.crt > example.com.pem 
+
+For testing/playing around with hitch, you can create one using openssl:
 
     $ openssl req -newkey rsa:2048 -sha256 -keyout example.com.key -nodes -x509 -days 365 -out example.crt
 
@@ -23,7 +33,7 @@ To complete this chain you merge the files into a single PEM file that you give 
 
 And then start Hitch:
 
-  $ hitch --backend=[127.0.0.1]:80 example.pem
+    $ hitch --backend=[127.0.0.1]:80 example.pem
 
 and you're done!
 
