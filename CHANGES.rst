@@ -4,6 +4,23 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.4.5 (2017-05-31)
+------------------------
+
+* Set SSL_OP_SINGLE_ECDH_USE to force a fresh ECDH key pair per
+  handshake (Issue 155_)
+* Fix a bug where we ended up leaking a zombie process on reload
+  (Issue 167_). Thank you to @dward
+* Fix a bug where the management process could not find its
+  configuration files after a reload when chroot was configured (Issue 176_)
+* Output the offending line on a configuration file parsing error
+* Fix build for non-C99/C11 compilers (Issue 173_)
+* Fix the shared cache code to make it work also with OpenSSL 1.1.0
+* Fix an unchecked loop situtation that that could occur when runnign
+  with shard cache enabled (Issue 152_)
+* Various autotools configuration fixes
+* A few minor doc fixes
+
 hitch-1.4.4 (2016-12-22)
 ------------------------
 
