@@ -2,7 +2,11 @@
 sbin_PROGRAMS = hitch
 noinst_LIBRARIES = libcfg.a libforeign.a
 
-EXTRA_DIST = tests
+EXTRA_DIST = \
+	$(top_srcdir)/src/tests/common.sh \
+	$(top_srcdir)/src/tests/test*.sh \
+	$(top_srcdir)/src/tests/certs/* \
+	$(top_srcdir)/src/tests/configs/default.cfg
 
 AM_CFLAGS = $(HITCH_CFLAGS)
 AM_YFLAGS = -d -t
@@ -12,6 +16,8 @@ TESTS_ENVIRONMENT = \
 	PATH=$(abs_top_builddir)/src:$(abs_top_builddir)/src/util:$$PATH; export PATH;
 TESTS = @SH_TESTS@
 TEST_EXTENSIONS = .sh
+$(top_srcdir)/src/tests/test15-proxy-v2-npn.sh: $(top_builddir)/src/util/parse_proxy_v2
+$(top_srcdir)/src/tests/test16-proxy-v2-alpn.sh:  $(top_builddir)/src/util/parse_proxy_v2
 
 nobase_noinst_HEADERS = \
 	asn_gentm.h \
@@ -36,6 +42,8 @@ BUILT_SOURCES = \
 	cfg_lex.c \
 	cfg_parser.c \
 	cfg_parser.h
+
+DISTCLEANFILES = cfg_parser.h cfg_parser.c
 
 libcfg_a_SOURCES = \
 	cfg_lex.l \
