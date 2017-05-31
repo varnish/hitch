@@ -21,6 +21,13 @@ hitch-1.4.5 (2017-05-31)
 * Various autotools configuration fixes
 * A few minor doc fixes
 
+.. _155: https://github.com/varnish/hitch/issues/155
+.. _167: https://github.com/varnish/hitch/issues/167
+.. _176: https://github.com/varnish/hitch/issues/176
+.. _173: https://github.com/varnish/hitch/issues/173
+.. _152: https://github.com/varnish/hitch/issues/152
+
+
 hitch-1.4.4 (2016-12-22)
 ------------------------
 
