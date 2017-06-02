@@ -16,8 +16,8 @@ hitch-1.4.5 (2017-05-31)
 * Output the offending line on a configuration file parsing error
 * Fix build for non-C99/C11 compilers (Issue 173_)
 * Fix the shared cache code to make it work also with OpenSSL 1.1.0
-* Fix an unchecked loop situation that that could occur when running
-  with shard cache enabled (Issue 152_)
+* Fix an unchecked loop situation that could occur when running
+  with shared cache enabled (Issue 152_)
 * Various autotools configuration fixes
 * A few minor doc fixes
 
