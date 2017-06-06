@@ -4,6 +4,14 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.4.6 (2017-06-06)
+------------------------
+
+* Fix a problem that broke mock-based builds for el6/el7 (Issue 181_)
+
+.. _181:  https://github.com/varnish/hitch/issues/181
+
+
 hitch-1.4.5 (2017-05-31)
 ------------------------
 
