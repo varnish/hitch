@@ -118,7 +118,7 @@ HITCH_CHECK_FLAGS([HITCH_CFLAGS], [
 AC_SUBST([HITCH_CFLAGS])
 
 dnl Help libev macros
-HITCH_CHECK_FLAGS([EV_CFLAGS], [-Wno-strict-aliasing])
+HITCH_CHECK_FLAGS([EV_CFLAGS], [-fno-strict-aliasing])
 
 AC_CONFIG_FILES([
 	Makefile
