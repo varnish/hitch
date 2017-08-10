@@ -272,10 +272,11 @@ config_destroy(hitch_config *cfg)
 	free(cfg->ALPN_PROTOS_LV);
 
 #ifdef USE_SHARED_CACHE
+	int i;
 	free(cfg->SHCUPD_IP);
 	free(cfg->SHCUPD_PORT);
 
-	for (int i = 0; i < MAX_SHCUPD_PEERS; i++) {
+	for (i = 0; i < MAX_SHCUPD_PEERS; i++) {
 		free(cfg->SHCUPD_PEERS[i].ip);
 		free(cfg->SHCUPD_PEERS[i].port);
 	}
