@@ -3480,6 +3480,7 @@ reconfigure(int argc, char **argv)
 					break;
 				}
 			} while (i == -1 && errno == EINTR);
+			(void)close(c->pfd);
 		}
 	}
 
