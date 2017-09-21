@@ -138,7 +138,7 @@ FB_REC
 FB_HOST: TOK_HOST '=' STRING
 {
 	if ($3) {
-		if (strcmp($3, "*"))
+		if (strcmp($3, "*") == 0)
 			cur_fa->ip = NULL;
 		else
 			cur_fa->ip = strdup($3);
