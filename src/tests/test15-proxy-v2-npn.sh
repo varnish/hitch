@@ -24,15 +24,13 @@ echo -e "\n" | openssl s_client -nextprotoneg 'h2-14' -prexit -connect $LISTENAD
 test "$?" = "0" || die "s_client failed"
 
 grep -q -c "too old for NPN" $DUMPFILE
-if [ "$" = "0" ]; then
-    echo "Skipping test: SSL too old for NPN"
-else
-    grep -q -c "ERROR" $DUMPFILE
-    test "$?" != "0" || die "The utility parse_proxy_v2 gave an ERROR"
+test "$?" = "0" || skip "Skipping test: SSL too old for NPN"
 
-    grep -q -c "h2-14" $DUMPFILE
-    test "$?" = "0" || die "No ALPN extension reported"
+grep -q -c "ERROR" $DUMPFILE
+test "$?" != "0" || die "The utility parse_proxy_v2 gave an ERROR"
 
-    grep -q -c "ALPN extension" $DUMPFILE
-    test "$?" = "0" || die "No ALPN extension reported"
-fi
+grep -q -c "h2-14" $DUMPFILE
+test "$?" = "0" || die "No ALPN extension reported"
+
+grep -q -c "ALPN extension" $DUMPFILE
+test "$?" = "0" || die "No ALPN extension reported"
