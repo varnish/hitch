@@ -10,7 +10,7 @@ backend = "[hitch-tls.org]:80"
 EOF
 
 hitch $HITCH_ARGS --config=$CONFFILE
-test "$?" = "0" || die "Hitch did not start."
+test $? -eq 0 || die "Hitch did not start."
 
 runcurl $LISTENADDR $LISTENPORT
 
@@ -25,4 +25,4 @@ sleep 1
 runcurl $LISTENADDR `expr $LISTENPORT + 1100`
 
 curl --max-time 5 --silent --insecure https://$LISTENADDR:$LISTENPORT/
-test "$?" != "0" || die "Removed listen endpoint should not be available."
+test $? -ne 0 || die "Removed listen endpoint should not be available."

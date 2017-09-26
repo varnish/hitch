@@ -16,6 +16,6 @@ frontend = {
 EOF
 
 hitch $HITCH_ARGS --config=$CONFFILE
-test "$?" = "0" || die "Hitch did not start."
+test $? -eq 0 || die "Hitch did not start."
 
 runcurl $LISTENADDR `expr $LISTENPORT + 1200`

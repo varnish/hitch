@@ -51,5 +51,5 @@ mk_cfg() {
 runcurl() {
 	# Verify that we got a HTTP reply.
 	curl $CURL_EXTRA -I -X GET --max-time 5 --silent --insecure https://$1:$2/
-	test "$?" = "0" || die "Incorrect HTTP response code."
+	test $? -eq 0 || die "Incorrect HTTP response code."
 }

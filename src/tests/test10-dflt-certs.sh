@@ -43,35 +43,35 @@ EOF
 
 hitch $HITCH_ARGS --config=$CONFFILE
 
-test "$?" = "0" || die "Hitch did not start."
+test $? -eq 0 || die "Hitch did not start."
 
 # :PORT1 without SNI
 echo | openssl s_client -prexit -connect $LISTENADDR:$PORT1 >$DUMPFILE 2>&1
-test "$?" = "0" || die "s_client failed"
+test $? -eq 0 || die "s_client failed"
 grep -q -c "subject=/CN=site1.example.com" $DUMPFILE
-test "$?" = "0" || die "s_client got wrong certificate on listen port #1"
+test $? -eq 0 || die "s_client got wrong certificate on listen port #1"
 
 # :PORT1 w/ SNI
 echo | openssl s_client -servername site1.example.com -prexit -connect $LISTENADDR:$PORT1 >$DUMPFILE 2>&1
-test "$?" = "0" || die "s_client failed"
+test $? -eq 0 || die "s_client failed"
 grep -q -c "subject=/CN=site1.example.com" $DUMPFILE
-test "$?" = "0" || die "s_client got wrong certificate in listen port #2  (expected site1.example.com)"
+test $? -eq 0 || die "s_client got wrong certificate in listen port #2  (expected site1.example.com)"
 
 # :PORT1 w/ different matching SNI name
 echo | openssl s_client -servername site3.example.com -prexit -connect $LISTENADDR:$PORT2 >$DUMPFILE 2>&1
-test "$?" = "0" || die "s_client failed"
+test $? -eq 0 || die "s_client failed"
 grep -q -c "subject=/CN=site3.example.com" $DUMPFILE
-test "$?" = "0" || die "s_client got wrong certificate in listen port #2 (expected site3.example.com)"
+test $? -eq 0 || die "s_client got wrong certificate in listen port #2 (expected site3.example.com)"
 
 # :PORT2 no SNI
 echo | openssl s_client -prexit -connect $LISTENADDR:$PORT2 >$DUMPFILE 2>&1
-test "$?" = "0" || die "s_client failed"
+test $? -eq 0 || die "s_client failed"
 grep -q -c "subject=/CN=site2.example.com" $DUMPFILE
-test "$?" = "0" || die "s_client got wrong certificate in listen port #2 (expected site2.example.com)"
+test $? -eq 0 || die "s_client got wrong certificate in listen port #2 (expected site2.example.com)"
 
 # :PORT4 SNI w/ unknown servername
 echo | openssl s_client -servername invalid.example.com -prexit -connect $LISTENADDR:$PORT4 >$DUMPFILE 2>&1
-test "$?" = "0" || die "s_client failed"
+test $? -eq 0 || die "s_client failed"
 grep -q -c "subject=/CN=default.example.com" $DUMPFILE
-test "$?" = "0" || die "s_client got wrong certificate in listen port #2 (expected default.example.com)"
+test $? -eq 0 || die "s_client got wrong certificate in listen port #2 (expected default.example.com)"
 

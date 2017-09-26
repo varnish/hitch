@@ -12,12 +12,12 @@ tls-protos = TLSv1.1
 EOF
 
 hitch $HITCH_ARGS --config=$CONFFILE
-test "$?" = "0" || die "Hitch did not start."
+test $? -eq 0 || die "Hitch did not start."
 
 # this will fail on platforms that have OpenSSL compiled without SSLv3
 openssl s_client -connect $LISTENADDR:$LISTENPORT -tls1_2
-test "$?" != "0" || die "Connecting using TLS 1.2 succeeded when it should have failed."
+test $? -ne 0 || die "Connecting using TLS 1.2 succeeded when it should have failed."
 
 # this will fail on platforms that have OpenSSL compiled without SSLv3
 openssl s_client -connect $LISTENADDR:$LISTENPORT -tls1_1
-test "$?" = "0" || die "Connecting using TLS 1.1 failed."
+test $? -eq 0 || die "Connecting using TLS 1.1 failed."

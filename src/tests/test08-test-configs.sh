@@ -10,7 +10,7 @@ GRP=`id -Gn nobody | cut -d' ' -f1`
 test "$GRP" != "" || die "No usable group found for user nobody."
 
 hitch --test --config=${CONFDIR}/default.cfg ${CERTSDIR}/default.example.com
-test "$?" = "0" || die "default.cfg is not testable."
+test $? -eq 0 || die "default.cfg is not testable."
 
 mk_cfg <<EOF
 frontend = "[*]:8443"
@@ -31,7 +31,7 @@ aemon = onwrite-ip =oxy = on
 syslog = on
 EOF
 hitch --test --config=$CONFFILE ${CERTSDIR}/default.example.com
-test "$?" = "1" || die "Invalid config test08a parsed correctly."
+test $? -eq 1 || die "Invalid config test08a parsed correctly."
 
 mk_cfg <<EOF
 frontend = "[*]:8443"
@@ -53,7 +53,7 @@ write-ip = off
 write-proxy = on
 EOF
 hitch --test --config=$CONFFILE ${CERTSDIR}/default.example.com
-test "$?" = "1" || die "Invalid config test08b parsed correctly."
+test $? -eq 1 || die "Invalid config test08b parsed correctly."
 
 mk_cfg <<EOF
 frontend = "[*]:8443"
@@ -76,7 +76,7 @@ write-proxy = on
 EOF
 
 hitch --test --config=$CONFFILE ${CERTSDIR}/default.example.com
-test "$?" = "0" || die "Valid config test08c unparseable?"
+test $? -eq 0 || die "Valid config test08c unparseable?"
 
 mk_cfg <<EOF
 # Test extra whitespace.
@@ -99,15 +99,15 @@ write-ip = off
 write-proxy = on
 EOF
 hitch --test --config=$CONFFILE ${CERTSDIR}/default.example.com
-test "$?" = "0" || die "Valid config test08d unparseable?"
+test $? -eq 0 || die "Valid config test08d unparseable?"
 
 # Issue #52.
 hitch --config=${CONFDIR}/default.cfg --help
-test "$?" = "0" || die "--help after --config does not work as expected."
+test $? -eq 0 || die "--help after --config does not work as expected."
 
 # Works as expected.
 hitch --test --config=${CONFDIR}/default.cfg
-test "$?" = "1" || die "--help with --config does not work as expected."
+test $? -eq 1 || die "--help with --config does not work as expected."
 
 # Test that our example configuration is in fact usable.
 TMPFILE=$(mktemp -u)
@@ -115,6 +115,6 @@ sed -e "s|nogroup|$GRP|" ${TESTDIR}/../../hitch.conf.example > $TMPFILE
 hitch --test --config=$TMPFILE ${CERTSDIR}/default.example.com
 RCODE=$?
 rm $TMPFILE
-if [ "$RCODE" != "0" ]; then
+if [ $RCODE -ne 0 ]; then
 	die "hitch.conf.example is not valid"
 fi

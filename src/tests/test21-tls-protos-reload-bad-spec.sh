@@ -11,7 +11,7 @@ backend = "[hitch-tls.org]:80"
 EOF
 
 hitch $HITCH_ARGS --config=$CONFFILE
-test "$?" = "0" || die "Hitch did not start."
+test $? -eq 0 || die "Hitch did not start."
 
 runcurl $LISTENADDR $LISTENPORT
 
@@ -27,7 +27,7 @@ EOF
 kill -HUP $(cat $PIDFILE)
 sleep 0.5
 curl --max-time 5 --silent --insecure https://$LISTENADDR:`expr $LISTENPORT + 1`/
-test "$?" != "0" || die "New listen endpoint should not be available."
+test $? -ne 0 || die "New listen endpoint should not be available."
 
 curl --max-time 5 --silent --insecure https://$LISTENADDR:$LISTENPORT/
-test "$?" = "0" || die "Old listen endpoint should be available."
+test $? -eq 0 || die "Old listen endpoint should be available."

@@ -14,4 +14,4 @@ frontend = {
 EOF
 
 hitch $HITCH_ARGS --config=$CONFFILE
-test "$?" = "1" || die "invalid config parsed correctly?"
+test $? -eq 1 || die "invalid config parsed correctly?"

@@ -21,11 +21,11 @@ pem-file = {
 EOF
 
 hitch --test $HITCH_ARGS --config=$CONFFILE
-test "$?" != "0" || die "Hitch started when it shouldn't have."
+test $? -ne 0 || die "Hitch started when it shouldn't have."
 
 export SSL_CERT_FILE=$CERTSDIR/valid.example.com-ca-chain.pem
 hitch --test $HITCH_ARGS --config=$CONFFILE
-test "$?" = "0" || die "Hitch did not start."
+test $? -eq 0 || die "Hitch did not start."
 
 unset SSL_CERT_FILE
 
@@ -45,7 +45,7 @@ pem-file = {
 EOF
 
 hitch --test $HITCH_ARGS --config=$CONFFILE
-test "$?" = "0" || die "Hitch did not start."
+test $? -eq 0 || die "Hitch did not start."
 
 # Test that timeouts are valid configuration file entries. Actually
 # testing the timeouts will be complicated and is deemed unnecessary for now.
@@ -66,4 +66,4 @@ ocsp-resp-tmo = 10
 EOF
 
 hitch --test $HITCH_ARGS --config=$CONFFILE
-test "$?" = "0" || die "Hitch did not start."
+test $? -eq 0 || die "Hitch did not start."

@@ -128,7 +128,7 @@ proxy-proxy = off
 EOF
 
 hitch --test --config=$CONFFILE > $DUMPFILE
-test "$?" = "0" || die "Hitch did not start. (config #1)"
+test $? -eq 0 || die "Hitch did not start. (config #1)"
 
 # hitch 1.0.0
 mk_cfg <<EOF
@@ -268,7 +268,7 @@ sni-nomatch-abort = off
 EOF
 
 hitch --test --config=$CONFFILE > $DUMPFILE
-test "$?" = "0" || die "Hitch did not start. (config #2)"
+test $? -eq 0 || die "Hitch did not start. (config #2)"
 
 # 1.1.0 didn't see any config file changes
 # hitch 1.2.0
@@ -451,7 +451,7 @@ sni-nomatch-abort = off
 EOF
 
 hitch --test --config=$CONFFILE > $DUMPFILE
-test "$?" = "0" || die "Hitch did not start. (config #3)"
+test $? -eq 0 || die "Hitch did not start. (config #3)"
 
 # hitch 1.3.0
 mk_cfg <<EOF
@@ -659,7 +659,7 @@ sni-nomatch-abort = off
 EOF
 
 hitch --test --config=$CONFFILE > $DUMPFILE
-test "$?" = "0" || die "Hitch did not start. (config #4)"
+test $? -eq 0 || die "Hitch did not start. (config #4)"
 
 
 # hitch 1.4.0
@@ -869,4 +869,4 @@ sni-nomatch-abort = off
 EOF
 
 hitch --test --config=$CONFFILE > $DUMPFILE
-test "$?" = "0" || die "Hitch did not start (config #5 return code: $?)"
+test $? -eq 0 || die "Hitch did not start (config #5 return code: $?)"
