@@ -12,8 +12,8 @@ AM_CFLAGS = $(HITCH_CFLAGS)
 AM_YFLAGS = -d -t
 
 TESTS_ENVIRONMENT = \
-	TESTDIR=$(abs_top_srcdir)/src/tests/; export TESTDIR; \
-	PATH=$(abs_top_builddir)/src:$(abs_top_builddir)/src/util:$$PATH; export PATH;
+	TESTDIR=$(abs_srcdir)/tests/; export TESTDIR; \
+	PATH=$$TESTDIR:$(abs_builddir):$(abs_builddir)/util:$$PATH; export PATH;
 TESTS = @SH_TESTS@
 TEST_EXTENSIONS = .sh
 $(top_srcdir)/src/tests/test15-proxy-v2-npn.sh: $(top_builddir)/src/util/parse_proxy_v2

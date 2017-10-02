@@ -2,7 +2,7 @@
 #
 # Test multiple listening sockets, each with their own certificate.
 #
-. ${TESTDIR}/common.sh
+. hitch_test.sh
 set +o errexit
 
 PORT2=`expr $$ % 60000 + 4000`

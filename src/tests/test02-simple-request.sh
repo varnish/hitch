@@ -2,7 +2,7 @@
 #
 # Test basic argument handling.
 #
-. ${TESTDIR}/common.sh
+. hitch_test.sh
 set +o errexit
 
 hitch $HITCH_ARGS --backend=[hitch-tls.org]:80 "--frontend=[${LISTENADDR}]:$LISTENPORT" ${CERTSDIR}/site1.example.com

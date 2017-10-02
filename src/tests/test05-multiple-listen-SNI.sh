@@ -2,7 +2,7 @@
 #
 # Test multiple certificates (SNI) on a listening socket.
 #
-. ${TESTDIR}/common.sh
+. hitch_test.sh
 set +o errexit
 
 hitch $HITCH_ARGS --backend=[hitch-tls.org]:80 "--frontend=[${LISTENADDR}]:$LISTENPORT" \

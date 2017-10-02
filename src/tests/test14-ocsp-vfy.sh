@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. ${TESTDIR}/common.sh
+. hitch_test.sh
 set +o errexit
 unset SSL_CERT_DIR
 unset SSL_CERT_FILE

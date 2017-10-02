@@ -2,7 +2,7 @@
 
 # gh issue #82, per-frontend wildcard certificates
 
-. ${TESTDIR}/common.sh
+. hitch_test.sh
 set +o errexit
 
 PORT1=`expr $LISTENPORT + 1301`

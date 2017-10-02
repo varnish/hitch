@@ -1,7 +1,7 @@
 #!/bin/sh
 # Test basic argument handling.
 
-. ${TESTDIR}/common.sh
+. hitch_test.sh
 
 run_cmd hitch --help
 run_cmd hitch --version

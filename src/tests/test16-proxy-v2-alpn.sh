@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. ${TESTDIR}/common.sh
+. hitch_test.sh
 set +o errexit
 
 openssl s_client -help 2>&1 |

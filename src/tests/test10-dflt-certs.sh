@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 #
-. ${TESTDIR}/common.sh
+. hitch_test.sh
 set +o errexit
 
 PORT1=`expr $$ % 60000 + 1024`

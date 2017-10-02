@@ -2,7 +2,7 @@
 #
 # Test --sni-nomatch-abort
 #
-. ${TESTDIR}/common.sh
+. hitch_test.sh
 set +o errexit
 
 mk_cfg <<EOF

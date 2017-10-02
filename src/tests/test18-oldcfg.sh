@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. ${TESTDIR}/common.sh
+. hitch_test.sh
 set +o errexit
 
 # stud config

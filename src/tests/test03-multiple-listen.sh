@@ -2,7 +2,7 @@
 #
 # Test multiple listening sockets.
 #
-. ${TESTDIR}/common.sh
+. hitch_test.sh
 
 PORT2=`expr $$ % 60000 + 3000`
 

@@ -2,7 +2,7 @@
 #
 # Test resuming a session via a session ticket
 
-. ${TESTDIR}/common.sh
+. hitch_test.sh
 set +o errexit
 
 SESSFILE=`mktemp`
