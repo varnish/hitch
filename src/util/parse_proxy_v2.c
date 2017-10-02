@@ -50,115 +50,6 @@ unsigned char PROXY_V2_HEADER[12] = { 0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D,
 
 #define MAX_HEADER_SIZE 536
 
-ssize_t read_from_socket(const char *port, unsigned char *buf, int len);
-void print_addr_with_ports(int af, int len, unsigned char *p);
-int print_extensions(unsigned char *extension_start, int extensions_len);
-
-int
-main(int argc, const char **argv)
-{
-	unsigned char proxy_header[MAX_HEADER_SIZE + 1];
-	ssize_t n = 0;
-	int address_len = 0;
-
-	if (argc == 1)
-		n = read(STDIN_FILENO, proxy_header, MAX_HEADER_SIZE);
-	else if (argc == 2)
-		n = read_from_socket(argv[1], proxy_header, MAX_HEADER_SIZE);
-	else {
-		fprintf(stderr, "Usage: parse_proxy_v2 [port]\n");
-		return (1);
-	}
-
-	if (n < 16) {
-		printf("ERROR:\tread too few bytes.\n");
-		return (1);
-	}
-	proxy_header[n] = '\0';
-
-	if (strncmp("PROXY TCP", (char *)proxy_header, 9) == 0) {
-		/* PROXY version 1 over TCP */
-		fprintf(stdout,
-		    "ERROR:\tPROXY v1 parsing not supported in this tool.\n");
-		return (1);
-	} else if (memcmp(PROXY_V2_HEADER, proxy_header, 12) != 0) {
-		printf("ERROR:\tNot a valid PROXY header\n");
-		return (1);
-	}
-	printf("PROXY v2 detected.\n");
-	switch (proxy_header[12]) {
-	case 0x20:
-		printf("ERROR:\tLOCAL connection\n");
-		return (1);
-	case 0x21:
-		printf("Connection:\tPROXYed connection detected\n");
-		break;
-	default:
-		printf("ERROR:\t13th byte has illegal value %d\n",
-		    (int)proxy_header[12]);
-		return (1);
-	}
-	switch (proxy_header[13]) {
-	case 0x00:
-		printf("ERROR:\tProtocol:\tUnspecified/unsupported\n");
-		return (1);
-	case 0x11:
-		printf("Protocol:\tTCP over IPv4\n");
-		address_len = 12;
-		break;
-	case 0x12:
-		printf("Protocol:\tUDP over IPv4\n");
-		printf("ERROR:\tProtocol unsupported in hitch seen\n");
-		address_len = 12;
-		break;
-	case 0x21:
-		printf("Protocol:\tTCP over IPv6\n");
-		address_len = 36;
-		break;
-	case 0x22:
-		printf("Protocol:\tUDP over IPv6\n");
-		printf("ERROR:\tProtocol unsupported in hitch\n");
-		address_len = 36;
-		break;
-	case 0x31:
-		printf("Protocol:\tUNIX stream\n");
-		address_len = 216;
-		break;
-	case 0x32:
-		printf("Protocol:\tUNIX datagram\n");
-		printf("ERROR:\tProtocol unsupported in hitch\n");
-		address_len = 216;
-		break;
-	default:
-		printf("ERROR:\t14th byte has illegal value %d\n",
-		    (int)proxy_header[13]);
-		return (1);
-	}
-	int additional_len = (proxy_header[14] << 8) + proxy_header[15];
-	if (additional_len < address_len) {
-		printf("ERROR:\tThe the total header length %d does"
-		    " not leave room for the addresses\n",
-		    additional_len + 16);
-		return (1);
-	}
-	if (additional_len + 16 > n) {
-		printf("ERROR:\tToo few bytes was read; %zd\n", n);
-		return (1);
-	}
-	if (address_len == 12)
-		print_addr_with_ports(AF_INET, 4, proxy_header + 16);
-	else if (address_len == 36)
-		print_addr_with_ports(AF_INET6, 16, proxy_header + 16);
-	else {
-		printf("ERROR:\tPrinting of UNIX socket addresses"
-		    " not implemented.\n");
-	}
-	if (address_len < additional_len)
-		return print_extensions(proxy_header + 16 + address_len,
-		    additional_len - address_len);
-	return (0);
-}
-
 ssize_t
 read_from_socket(const char *port, unsigned char *buf, int len)
 {
@@ -283,5 +174,110 @@ print_extensions(unsigned char *extensions, int extensions_len)
 		printf("ERROR:\tBuffer overrun (%d / %d)\n", i, extensions_len);
 		return (1);
 	}
+	return (0);
+}
+
+int
+main(int argc, const char **argv)
+{
+	unsigned char proxy_header[MAX_HEADER_SIZE + 1];
+	ssize_t n = 0;
+	int address_len = 0;
+
+	if (argc == 1)
+		n = read(STDIN_FILENO, proxy_header, MAX_HEADER_SIZE);
+	else if (argc == 2)
+		n = read_from_socket(argv[1], proxy_header, MAX_HEADER_SIZE);
+	else {
+		fprintf(stderr, "Usage: parse_proxy_v2 [port]\n");
+		return (1);
+	}
+
+	if (n < 16) {
+		printf("ERROR:\tread too few bytes.\n");
+		return (1);
+	}
+	proxy_header[n] = '\0';
+
+	if (strncmp("PROXY TCP", (char *)proxy_header, 9) == 0) {
+		/* PROXY version 1 over TCP */
+		fprintf(stdout,
+		    "ERROR:\tPROXY v1 parsing not supported in this tool.\n");
+		return (1);
+	} else if (memcmp(PROXY_V2_HEADER, proxy_header, 12) != 0) {
+		printf("ERROR:\tNot a valid PROXY header\n");
+		return (1);
+	}
+	printf("PROXY v2 detected.\n");
+	switch (proxy_header[12]) {
+	case 0x20:
+		printf("ERROR:\tLOCAL connection\n");
+		return (1);
+	case 0x21:
+		printf("Connection:\tPROXYed connection detected\n");
+		break;
+	default:
+		printf("ERROR:\t13th byte has illegal value %d\n",
+		    (int)proxy_header[12]);
+		return (1);
+	}
+	switch (proxy_header[13]) {
+	case 0x00:
+		printf("ERROR:\tProtocol:\tUnspecified/unsupported\n");
+		return (1);
+	case 0x11:
+		printf("Protocol:\tTCP over IPv4\n");
+		address_len = 12;
+		break;
+	case 0x12:
+		printf("Protocol:\tUDP over IPv4\n");
+		printf("ERROR:\tProtocol unsupported in hitch seen\n");
+		address_len = 12;
+		break;
+	case 0x21:
+		printf("Protocol:\tTCP over IPv6\n");
+		address_len = 36;
+		break;
+	case 0x22:
+		printf("Protocol:\tUDP over IPv6\n");
+		printf("ERROR:\tProtocol unsupported in hitch\n");
+		address_len = 36;
+		break;
+	case 0x31:
+		printf("Protocol:\tUNIX stream\n");
+		address_len = 216;
+		break;
+	case 0x32:
+		printf("Protocol:\tUNIX datagram\n");
+		printf("ERROR:\tProtocol unsupported in hitch\n");
+		address_len = 216;
+		break;
+	default:
+		printf("ERROR:\t14th byte has illegal value %d\n",
+		    (int)proxy_header[13]);
+		return (1);
+	}
+	int additional_len = (proxy_header[14] << 8) + proxy_header[15];
+	if (additional_len < address_len) {
+		printf("ERROR:\tThe the total header length %d does"
+		    " not leave room for the addresses\n",
+		    additional_len + 16);
+		return (1);
+	}
+	if (additional_len + 16 > n) {
+		printf("ERROR:\tToo few bytes was read; %zd\n", n);
+		return (1);
+	}
+	if (address_len == 12)
+		print_addr_with_ports(AF_INET, 4, proxy_header + 16);
+	else if (address_len == 36)
+		print_addr_with_ports(AF_INET6, 16, proxy_header + 16);
+	else {
+		printf("ERROR:\tPrinting of UNIX socket addresses"
+		    " not implemented.\n");
+	}
+	if (address_len < additional_len)
+		return print_extensions(proxy_header + 16 + address_len,
+		    additional_len - address_len);
 	return (0);
 }
