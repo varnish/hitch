@@ -53,3 +53,31 @@ runcurl() {
 	curl $CURL_EXTRA -I -X GET --max-time 5 --silent --insecure https://$1:$2/
 	test $? -eq 0 || die "Incorrect HTTP response code."
 }
+
+run_cmd() (
+	set -e
+	set -u
+
+	OPTIND=1
+	CMD_STATUS=0
+
+	while getopts s: OPT
+	do
+		case $OPT in
+		s) CMD_STATUS=$OPTARG ;;
+		*) return 1 ;;
+		esac
+	done
+
+	shift $((OPTIND - 1))
+
+	printf 'Running: %s\n' "$*"
+
+	RUN_STATUS=0
+	"$@" || RUN_STATUS=$?
+
+	if [ "$RUN_STATUS" -ne "$CMD_STATUS" ]
+	then
+		die "expected exit status $CMD_STATUS got $RUN_STATUS"
+	fi
+)
