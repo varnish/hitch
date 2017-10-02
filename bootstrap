@@ -1,7 +1,11 @@
-#!/bin/sh -x
-set -o errexit
+#!/bin/sh
+
+set -e
+set -x
+
+mkdir -p build-aux
+
 aclocal -I .
 autoconf
 autoheader
-mkdir -p build-aux
 automake --add-missing --foreign

@@ -2,14 +2,15 @@
 # To run tests manually, do:
 # export TESTDIR=`pwd`/; export PATH=$PATH:`pwd`/../:`pwd`/../util/
 #
+
 export LC_ALL=C
-set -o errexit
+set -e
 
 LISTENADDR="localhost"
 LISTENPORT=`expr $$ % 62000 + 1024`
-PIDFILE="$(mktemp -u)"
-CONFFILE="$(mktemp -u)"
-DUMPFILE="$(mktemp -u)"
+PIDFILE=$(mktemp -u)
+CONFFILE=$(mktemp -u)
+DUMPFILE=$(mktemp -u)
 CERTSDIR="${TESTDIR}/certs"
 CONFDIR="${TESTDIR}/configs"
 
