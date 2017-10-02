@@ -3,6 +3,10 @@
 . ${TESTDIR}/common.sh
 set +o errexit
 
+openssl s_client -help 2>&1 |
+grep -q nextprotoneg ||
+skip "OpenSSL does not support NPN"
+
 BACKENDPORT=`expr $LISTENPORT + 1500`
 
 echo Listen port is $LISTENPORT
@@ -22,9 +26,6 @@ sleep 0.1
 
 echo -e "\n" | openssl s_client -nextprotoneg 'h2-14' -prexit -connect $LISTENADDR:$LISTENPORT > /dev/null
 test $? -eq 0 || die "s_client failed"
-
-grep -q -c "too old for NPN" $DUMPFILE
-test $? -ne 0 || skip "Skipping test: SSL too old for NPN"
 
 grep -q -c "ERROR" $DUMPFILE
 test $? -ne 0 || die "The utility parse_proxy_v2 gave an ERROR"

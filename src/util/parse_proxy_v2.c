@@ -60,11 +60,6 @@ int main(int argc, const char **argv) {
 	ssize_t n = 0;
 	int address_len = 0;
 
-#if OPENSSL_VERSION_NUMBER < 0x1000100fL
-	printf("Warning:\tThis OpenSSL version is too old for NPN.\n");
-#elif OPENSSL_VERSION_NUMBER < 0x1000200fL
-	printf("Warning:\tThis OpenSSL version is too old for ALPN.\n");
-#endif
 	if (argc == 1)
 		n = read(STDIN_FILENO, proxy_header, MAX_HEADER_SIZE);
 	else if (argc == 2)

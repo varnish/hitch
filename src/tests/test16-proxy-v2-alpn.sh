@@ -3,11 +3,11 @@
 . ${TESTDIR}/common.sh
 set +o errexit
 
-BACKENDPORT=`expr $LISTENPORT + 1600`
+openssl s_client -help 2>&1 |
+grep -q alpn ||
+skip "OpenSSL does not support ALPN"
 
-openssl version > $DUMPFILE
-grep -q -c "OpenSSL 1.0.1" $DUMPFILE
-test $? -ne 0 || skip "OpenSSL does not support ALPN"
+BACKENDPORT=`expr $LISTENPORT + 1600`
 
 hitch $HITCH_ARGS --backend=[127.0.0.1]:$BACKENDPORT "--frontend=[${LISTENADDR}]:$LISTENPORT" \
 	--write-proxy-v2 --alpn-protos="tor,h2,h2-14,http/1.1" \
@@ -25,9 +25,6 @@ sleep 0.1
 
 echo -e "\n" | openssl s_client -alpn 'h2' -prexit -connect $LISTENADDR:$LISTENPORT > /dev/null
 test $? -eq 0 || die "s_client failed"
-
-grep -q -c "too old for ALPN" $DUMPFILE
-test $? -ne 0 || skip "Skipping test: SSL too old for ALPN"
 
 grep -q -c "ERROR" $DUMPFILE
 test $? -ne 0 || die "The utility parse_proxy_v2 gave an ERROR"
