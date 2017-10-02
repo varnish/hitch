@@ -50,12 +50,13 @@ unsigned char PROXY_V2_HEADER[12] = { 0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D,
 
 #define MAX_HEADER_SIZE 536
 
-int main(int argc, const char **argv);
 ssize_t read_from_socket(const char *port, unsigned char *buf, int len);
 void print_addr_with_ports(int af, int len, unsigned char *p);
 int print_extensions(unsigned char *extension_start, int extensions_len);
 
-int main(int argc, const char **argv) {
+int
+main(int argc, const char **argv)
+{
 	unsigned char proxy_header[MAX_HEADER_SIZE + 1];
 	ssize_t n = 0;
 	int address_len = 0;
@@ -158,15 +159,14 @@ int main(int argc, const char **argv) {
 	return (0);
 }
 
-ssize_t read_from_socket(const char *port, unsigned char *buf, int len) {
+ssize_t
+read_from_socket(const char *port, unsigned char *buf, int len)
+{
 	struct addrinfo hints;
 	struct addrinfo *result;
 	struct addrinfo *rp;
 	int listen_socket = -1;
 
-	(void)port;
-	(void)buf;
-	(void)len;
 	memset(&hints, 0, sizeof(struct addrinfo));
 	hints.ai_family = AF_INET;     /* Allow IPv4 or IPv6 */
 	hints.ai_socktype = SOCK_STREAM;
@@ -222,16 +222,20 @@ ssize_t read_from_socket(const char *port, unsigned char *buf, int len) {
 	return n;
 }
 
-void print_addr_with_ports(int af, int len, unsigned char *p) {
+void
+print_addr_with_ports(int af, int len, unsigned char *p)
+{
 	char buf1[256], buf2[256];
 	const char *addr1 = inet_ntop(af, p, buf1, 256);
 	const char *addr2 = inet_ntop(af, p + len, buf2, 256);
+	int src_port, dest_port;
+
 	if (addr1 == NULL || addr2 == NULL) {
 		printf("ERROR:\tIP addresses printing failed.\n");
 		exit(1);
 	}
-	int src_port = (p[2 * len] << 8) + p[2 * len + 1];
-	int dest_port = (p[2 * len + 2] << 8) + p[2 * len + 3];
+	src_port = (p[2 * len] << 8) + p[2 * len + 1];
+	dest_port = (p[2 * len + 2] << 8) + p[2 * len + 3];
 
 	printf("Source IP:\t%s\n", addr1);
 	printf("Destination IP:\t%s\n", addr2);
@@ -239,23 +243,39 @@ void print_addr_with_ports(int af, int len, unsigned char *p) {
 	printf("Destination port:\t%d\n", dest_port);
 }
 
-int print_extensions(unsigned char *extensions, int extensions_len) {
+int
+extensions_error(unsigned char *ext, int n_ext)
+{
+	int i;
+
+	printf("ERROR:\tExtension parse error\n");
+	printf("Extensions data:");
+	for (i = 0; i < n_ext; i++)
+		printf(" 0x%x", (int)ext[i]);
+	printf("\n");
+	return (1);
+}
+
+int
+print_extensions(unsigned char *extensions, int extensions_len)
+{
 	int i, l, type;
 
 	for (i = 0; i < extensions_len; i++) {
 		if(i > extensions_len - 4)
-			goto ext_parse_error;
+			return (extensions_error(extensions, extensions_len));
 		type = extensions[i];
 		l = (extensions[i + 1] << 8) + extensions[i + 2];
 		i += 3;
 		if (l <= 0 || i + l > extensions_len)
-			goto ext_parse_error;
+			return (extensions_error(extensions, extensions_len));
 		switch(type) {
 		case 0x1: // PP2_TYPE_ALPN
 			printf("ALPN extension:\t%.*s\n", l, extensions + i);
 			break;
 		default:
 			printf("ERROR:\tUnknown extension %d\n", type);
+			break;
 		}
 		i += l - 1;
 	}
@@ -264,12 +284,4 @@ int print_extensions(unsigned char *extensions, int extensions_len) {
 		return (1);
 	}
 	return (0);
-
- ext_parse_error:
-	printf("ERROR:\tExtension parse error\n");
-	printf("Extensions data:");
-	for (i = 0; i < extensions_len; i++)
-		printf(" 0x%x", (int)extensions[i]);
-	printf("\n");
-	return (1);
 }
