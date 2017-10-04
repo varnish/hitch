@@ -48,17 +48,17 @@ cleanup() {
 trap cleanup EXIT
 
 die() {
-	echo "FAILED: $*"
+	echo "FAILED: $*" >&2
 	if [ -r "$DUMPFILE" ]; then
-		cat $DUMPFILE;
+		cat $DUMPFILE >&2
 	fi
 	exit 255
 }
 
 skip() {
-	echo "SKIPPED: $*"
+	echo "SKIPPED: $*" >&2
 	if [ -r "$DUMPFILE" ]; then
-		cat $DUMPFILE;
+		cat $DUMPFILE >&2
 	fi
 	exit 77
 }
@@ -92,7 +92,7 @@ run_cmd() (
 
 	shift $((OPTIND - 1))
 
-	printf 'Running: %s\n' "$*"
+	printf 'Running: %s\n' "$*" >&2
 
 	RUN_STATUS=0
 	"$@" || RUN_STATUS=$?
