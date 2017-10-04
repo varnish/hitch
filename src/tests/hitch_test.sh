@@ -104,9 +104,9 @@ run_cmd() (
 )
 
 start_hitch() {
-	uid=$(id -u)
+	TEST_UID=$(id -u)
 	HITCH_USER=
-	test "$uid" -eq 0 && HITCH_USER=--user=nobody
+	test "$TEST_UID" -eq 0 && HITCH_USER=--user=nobody
 
 	run_cmd hitch \
 		--pidfile="$TEST_TMPDIR/hitch.pid" \
@@ -114,13 +114,17 @@ start_hitch() {
 		--quiet \
 		$HITCH_USER \
 		"$@"
+}
 
-	lsof -a -p "$(cat "$TEST_TMPDIR/hitch.pid")" -i TCP -F |
-	awk '/^n/ { print substr($1,2); exit }' >"$TEST_TMPDIR/hitch.host"
+hitch_hosts() {
+	HITCH_PID="$(cat "$TEST_TMPDIR/hitch.pid")"
+
+	lsof -F -P -n -a -p "$HITCH_PID" -i 4 -i TCP |
+	awk '/^n/ { print substr($1,2) }'
 }
 
 curl_hitch() {
-	HITCH_HOST=$(cat "$TEST_TMPDIR/hitch.host")
+	HITCH_HOST=$(hitch_hosts | sed 1q)
 
 	CURL_STATUS=${CURL_STATUS:-200}
 	RESP_STATUS=$(run_cmd curl \
