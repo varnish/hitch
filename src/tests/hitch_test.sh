@@ -6,6 +6,12 @@
 set -e
 # TODO: set -u
 
+readonly TEST_TMPDIR=$(mktemp -d)
+
+cd "$TEST_TMPDIR"
+
+# begin old setup
+
 export LC_ALL=C
 
 LISTENADDR="localhost"
@@ -56,6 +62,8 @@ runcurl() {
 	curl $CURL_EXTRA -I -X GET --max-time 5 --silent --insecure https://$1:$2/
 	test $? -eq 0 || die "Incorrect HTTP response code."
 }
+
+# end old setup
 
 run_cmd() (
 	set -e
