@@ -3,8 +3,10 @@
 # export TESTDIR=`pwd`/; export PATH=$PATH:`pwd`/../:`pwd`/../util/
 #
 
-export LC_ALL=C
 set -e
+# TODO: set -u
+
+export LC_ALL=C
 
 LISTENADDR="localhost"
 LISTENPORT=`expr $$ % 62000 + 1024`
