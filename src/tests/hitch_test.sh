@@ -115,3 +115,20 @@ start_hitch() {
 		$HITCH_USER \
 		"$@"
 }
+
+s_client() {
+	printf 'Running: %s\n' "$*" >&2
+
+	for ARG
+	do
+		# ignore non-option arguments
+		test "${ARG#-}" = "$ARG" && continue
+
+		openssl s_client -help 2>&1 |
+		grep -q -e "$ARG" ||
+		skip "openssl s_client: unknown option $ARG"
+	done
+
+	printf '\n' |
+	openssl s_client "$@" 2>&1
+}
