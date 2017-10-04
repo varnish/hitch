@@ -144,15 +144,26 @@ curl_hitch() {
 s_client() {
 	printf 'Running: s_client %s\n' "$*" >&2
 
+	HAS_CONNECT_OPT=false
+
 	for ARG
 	do
 		# ignore non-option arguments
 		test "${ARG#-}" = "$ARG" && continue
 
+		test "$ARG" = -connect && HAS_CONNECT_OPT=true
+
 		openssl s_client -help 2>&1 |
 		grep -q -e "$ARG" ||
 		skip "openssl s_client: unknown option $ARG"
 	done
+
+	if ! $HAS_CONNECT_OPT
+	then
+		HITCH_HOST=$(hitch_hosts | sed 1q)
+		s_client "$@" -connect "$HITCH_HOST"
+		return $?
+	fi
 
 	printf '\n' |
 	openssl s_client -prexit "$@" 2>&1
