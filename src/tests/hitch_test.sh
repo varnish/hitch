@@ -138,7 +138,7 @@ curl_hitch() {
 }
 
 s_client() {
-	printf 'Running: %s\n' "$*" >&2
+	printf 'Running: s_client %s\n' "$*" >&2
 
 	for ARG
 	do
@@ -151,5 +151,5 @@ s_client() {
 	done
 
 	printf '\n' |
-	openssl s_client "$@" 2>&1
+	openssl s_client -prexit "$@" 2>&1
 }
