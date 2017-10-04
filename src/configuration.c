@@ -43,6 +43,7 @@
 #define CFG_WORKERS "workers"
 #define CFG_BACKLOG "backlog"
 #define CFG_KEEPALIVE "keepalive"
+#define CFG_BACKEND_REFRESH "backendrefresh"
 #define CFG_CHROOT "chroot"
 #define CFG_USER "user"
 #define CFG_GROUP "group"
@@ -218,6 +219,7 @@ config_new(void)
 	r->SYSLOG             = 0;
 	r->SYSLOG_FACILITY    = LOG_DAEMON;
 	r->TCP_KEEPALIVE_TIME = 3600;
+	r->BACKEND_REFRESH_TIME = 1;
 	r->DAEMONIZE          = 0;
 	r->PREFER_SERVER_CIPHERS = 0;
 	r->TEST	              = 0;
@@ -748,6 +750,8 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		r = config_param_val_int(v, &cfg->BACKLOG, 0);
 	} else if (strcmp(k, CFG_KEEPALIVE) == 0) {
 		r = config_param_val_int(v, &cfg->TCP_KEEPALIVE_TIME, 1);
+	} else if (strcmp(k, CFG_BACKEND_REFRESH) == 0) {
+		r = config_param_val_int(v, &cfg->BACKEND_REFRESH_TIME, 1);
 	}
 #ifdef USE_SHARED_CACHE
 	else if (strcmp(k, CFG_SHARED_CACHE) == 0) {
@@ -1048,6 +1052,7 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "  -n  --workers=NUM          Number of worker processes (Default: %ld)\n", cfg->NCORES);
 	fprintf(out, "  -B  --backlog=NUM          Set listen backlog size (Default: %d)\n", cfg->BACKLOG);
 	fprintf(out, "  -k  --keepalive=SECS       TCP keepalive on client socket (Default: %d)\n", cfg->TCP_KEEPALIVE_TIME);
+	fprintf(out, "  -R  --backendrefresh=SECS  Periodic backend IP lookup (Default: %d, 0 to disable)\n", cfg->BACKEND_REFRESH_TIME);
 
 #ifdef USE_SHARED_CACHE
 	fprintf(out, "  -C  --session-cache=NUM    Enable and set SSL session cache to specified number\n");
@@ -1187,6 +1192,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 #endif
 		{ CFG_PIDFILE, 1, NULL, 'p' },
 		{ CFG_KEEPALIVE, 1, NULL, 'k' },
+		{ CFG_BACKEND_REFRESH, 1, NULL, 'R' },
 		{ CFG_CHROOT, 1, NULL, 'r' },
 		{ CFG_USER, 1, NULL, 'u' },
 		{ CFG_GROUP, 1, NULL, 'g' },
@@ -1282,6 +1288,7 @@ CFG_ARG('M', CFG_SHARED_CACHE_MCASTIF);
 #endif
 CFG_ARG('p', CFG_PIDFILE);
 CFG_ARG('k', CFG_KEEPALIVE);
+CFG_ARG('R', CFG_BACKEND_REFRESH);
 CFG_ARG('r', CFG_CHROOT);
 CFG_ARG('u', CFG_USER);
 CFG_ARG('g', CFG_GROUP);
