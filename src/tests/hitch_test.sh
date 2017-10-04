@@ -109,11 +109,32 @@ start_hitch() {
 	test "$uid" -eq 0 && HITCH_USER=--user=nobody
 
 	run_cmd hitch \
-		--pidfile="$PWD/hitch.pid" \
+		--pidfile="$TEST_TMPDIR/hitch.pid" \
 		--daemon \
 		--quiet \
 		$HITCH_USER \
 		"$@"
+
+	lsof -a -p "$(cat "$TEST_TMPDIR/hitch.pid")" -i TCP -F |
+	awk '/^n/ { print substr($1,2); exit }' >"$TEST_TMPDIR/hitch.host"
+}
+
+curl_hitch() {
+	HITCH_HOST=$(cat "$TEST_TMPDIR/hitch.host")
+
+	CURL_STATUS=${CURL_STATUS:-200}
+	RESP_STATUS=$(run_cmd curl \
+		"$@" \
+		--head \
+		--max-time 5 \
+		--silent \
+		--insecure \
+		--output /dev/null \
+		--write-out %{http_code} \
+		"https://$HITCH_HOST/")
+
+	test "$CURL_STATUS" = "$RESP_STATUS" ||
+	die "expected status $CURL_STATUS got $RESP_STATUS"
 }
 
 s_client() {
