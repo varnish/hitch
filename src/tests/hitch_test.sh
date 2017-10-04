@@ -34,6 +34,16 @@ cleanup() {
         if [ -s $PIDFILE ]; then
 		kill `cat "$PIDFILE"`
 	fi
+
+	cd "$TEST_TMPDIR" # just in case a test wants to cd
+
+	for PID in *.pid
+	do
+		test -f "$PID" &&
+		kill "$(cat "$PID")"
+	done
+
+	rm -rf "$TEST_TMPDIR"
 }
 trap cleanup EXIT
 
@@ -92,3 +102,16 @@ run_cmd() (
 		die "expected exit status $CMD_STATUS got $RUN_STATUS"
 	fi
 )
+
+start_hitch() {
+	uid=$(id -u)
+	HITCH_USER=
+	test "$uid" -eq 0 && HITCH_USER=--user=nobody
+
+	run_cmd hitch \
+		--pidfile="$PWD/hitch.pid" \
+		--daemon \
+		--quiet \
+		$HITCH_USER \
+		"$@"
+}
