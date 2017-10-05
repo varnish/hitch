@@ -13,7 +13,6 @@ readonly TEST_TMPDIR=$(pwd)
 
 export LC_ALL=C
 
-LISTENADDR="localhost"
 LISTENPORT=`expr $$ % 62000 + 1024`
 CERTSDIR="${TESTDIR}/certs"
 CONFDIR="${TESTDIR}/configs"

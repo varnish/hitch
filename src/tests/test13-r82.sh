@@ -34,21 +34,21 @@ write-proxy-v1 = off
 proxy-proxy = off
 
 frontend = {
-  host = "$LISTENADDR"
+  host = "localhost"
   port = "$PORT1"
   pem-file = "$CERTSDIR/wildcard.example.com"
   sni-nomatch-abort = off
 }
 
 frontend = {
-  host = "$LISTENADDR"
+  host = "localhost"
   port = "$PORT2"
   pem-file = "$CERTSDIR/wildcard.example.com"
   pem-file = "$CERTSDIR/site1.example.com"
 }
 
 frontend = {
-  host = "$LISTENADDR"
+  host = "localhost"
   port = "$PORT3"
   pem-file = "$CERTSDIR/site2.example.com"
 }
@@ -58,31 +58,31 @@ start_hitch --config=hitch.cfg
 
 # Wildcard cert on frontend #1
 s_client -servername foo.example.com \
-	-connect $LISTENADDR:$PORT1 \
+	-connect localhost:$PORT1 \
 	>wildcard1.dump
 run_cmd grep -q '/CN=\*.example.com' wildcard1.dump
 
 # Wildcard cert on frontend #2
 s_client -servername bar.example.com \
-	-connect $LISTENADDR:$PORT2 \
+	-connect localhost:$PORT2 \
 	>wildcard2.dump
 run_cmd grep -q '/CN=\*.example.com' wildcard2.dump
 
 # Exact match on frontend #2
 s_client -servername site1.example.com \
-	-connect $LISTENADDR:$PORT2 \
+	-connect localhost:$PORT2 \
 	>exact2.dump
 run_cmd grep -q '/CN=site1.example.com' exact2.dump
 
 # Verify that sni-nomatch-abort = off is respected for frontend #1
 s_client -servername "asdf" \
-	-connect $LISTENADDR:$PORT1 \
+	-connect localhost:$PORT1 \
 	>abort1.dump
 run_cmd grep -q '/CN=\*.example.com' abort1.dump
 
 # And also verify that global setting sni-nomatch-abort = on is respected
 # for other frontend
 ! s_client -servername "asdf" \
-	-connect $LISTENADDR:$PORT3 \
+	-connect localhost:$PORT3 \
 	>abort3.dump
 run_cmd grep -q 'unrecognize' abort3.dump

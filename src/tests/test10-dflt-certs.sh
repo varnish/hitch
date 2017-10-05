@@ -14,26 +14,26 @@ pem-file = "${CERTSDIR}/default.example.com"
 backend = "[hitch-tls.org]:80"
 
 frontend = {
-	 host = "$LISTENADDR"
+	 host = "localhost"
 	 port = "$PORT1"
 	 pem-file = "${CERTSDIR}/site1.example.com"
 }
 
 frontend = {
-	 host = "$LISTENADDR"
+	 host = "localhost"
 	 port = "$PORT2"
 	 pem-file = "${CERTSDIR}/site2.example.com"
 	 match-global-certs = on
 }
 
 frontend = {
-	 host = "$LISTENADDR"
+	 host = "localhost"
 	 port = "$PORT3"
 	 pem-file = "${CERTSDIR}/site3.example.com"
 }
 
 frontend = {
-	 host = "$LISTENADDR"
+	 host = "localhost"
 	 port = "$PORT4"
 }
 EOF
@@ -41,27 +41,27 @@ EOF
 start_hitch --config=hitch.cfg
 
 # :PORT1 without SNI
-s_client -connect $LISTENADDR:$PORT1 >port1-no-sni.dump
+s_client -connect localhost:$PORT1 >port1-no-sni.dump
 run_cmd grep -q 'subject=/CN=site1.example.com' port1-no-sni.dump
 
 # :PORT1 w/ SNI
 s_client -servername site1.example.com \
-	-connect $LISTENADDR:$PORT1 \
+	-connect localhost:$PORT1 \
 	>port1-sni.dump
 run_cmd grep -q 'subject=/CN=site1.example.com' port1-sni.dump
 
 # :PORT1 w/ different matching SNI name
 s_client -servername site3.example.com \
-	-connect $LISTENADDR:$PORT2 \
+	-connect localhost:$PORT2 \
 	>port1-sni2.dump
 run_cmd grep -q 'subject=/CN=site3.example.com' port1-sni2.dump
 
 # :PORT2 no SNI
-s_client -connect $LISTENADDR:$PORT2 >port2-no-sni.dump
+s_client -connect localhost:$PORT2 >port2-no-sni.dump
 run_cmd grep -q 'subject=/CN=site2.example.com' port2-no-sni.dump
 
 # :PORT4 SNI w/ unknown servername
 s_client -servername invalid.example.com \
-	-connect $LISTENADDR:$PORT4 \
+	-connect localhost:$PORT4 \
 	>port4.dump
 run_cmd grep -q 'subject=/CN=default.example.com' port4.dump

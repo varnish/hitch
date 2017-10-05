@@ -6,7 +6,7 @@ cat >hitch.cfg <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
-	host = "$LISTENADDR"
+	host = "localhost"
 	port = ""
 	pem-file = "${CERTSDIR}/default.example.com"
 }

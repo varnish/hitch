@@ -7,7 +7,7 @@ cat >hitch.cfg <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
-	host = "$LISTENADDR"
+	host = "localhost"
 	port = "$LISTENPORT"
 	pem-file = "${CERTSDIR}/default.example.com"
 	tls-protos = SSLv3 TLSv1.0 TLSv1.2

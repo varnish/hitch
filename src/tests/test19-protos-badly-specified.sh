@@ -31,7 +31,7 @@ test_both_cfg tls-protos-then-ssl-on <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
-	host = "$LISTENADDR"
+	host = "localhost"
 	port = "$LISTENPORT"
 	pem-file = "${CERTSDIR}/default.example.com"
 	tls-protos = SSLv3 TLSv1.0 TLSv1.1 TLSv1.2
@@ -44,7 +44,7 @@ test_both_cfg ssl-on-then-tls-protos <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
-	host = "$LISTENADDR"
+	host = "localhost"
 	port = "$LISTENPORT"
 	pem-file = "${CERTSDIR}/default.example.com"
 	ssl = on
@@ -57,7 +57,7 @@ test_both_cfg tls-protos-then-tls-on <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
-	host = "$LISTENADDR"
+	host = "localhost"
 	port = "$LISTENPORT"
 	pem-file = "${CERTSDIR}/default.example.com"
 	tls-protos = SSLv3 TLSv1.0 TLSv1.1 TLSv1.2
@@ -70,7 +70,7 @@ test_both_cfg tls-on-then-tls-protos <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
-	host = "$LISTENADDR"
+	host = "localhost"
 	port = "$LISTENPORT"
 	pem-file = "${CERTSDIR}/default.example.com"
 	tls = on
@@ -83,7 +83,7 @@ test_both_cfg ssl-on-then-tls-off <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
-	host = "$LISTENADDR"
+	host = "localhost"
 	port = "$LISTENPORT"
 	pem-file = "${CERTSDIR}/default.example.com"
 	ssl = on
@@ -96,7 +96,7 @@ test_both_cfg tls-on-then-ssl-off <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
-	host = "$LISTENADDR"
+	host = "localhost"
 	port = "$LISTENPORT"
 	pem-file = "${CERTSDIR}/default.example.com"
 	tls = on

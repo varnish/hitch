@@ -5,7 +5,7 @@
 
 start_hitch \
 	--backend='[hitch-tls.org]:80' \
-	--frontend="[${LISTENADDR}]:$LISTENPORT" \
+	--frontend="[localhost]:$LISTENPORT" \
 	"${CERTSDIR}/ecc.example.com.pem"
 
 s_client >s_client.dump
