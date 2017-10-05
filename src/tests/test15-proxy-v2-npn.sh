@@ -2,7 +2,7 @@
 
 . hitch_test.sh
 
-BACKENDPORT=`expr $LISTENPORT + 1500`
+BACKENDPORT=$(expr $LISTENPORT + 1500)
 
 parse_proxy_v2 $BACKENDPORT >proxy.dump &
 
