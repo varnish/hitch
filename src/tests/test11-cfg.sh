@@ -25,5 +25,6 @@ kill -HUP "$(hitch_pid)"
 sleep 1
 curl_hitch -- "https://$LISTENADDR:$NEW_PORT/"
 
-# XXX: running in a subshell to not err the test
-! (curl_hitch -- "https://$LISTENADDR:$LISTENPORT/")
+# Make sure the old address is no longer bound
+hitch_hosts |
+run_cmd -s 1 grep "$LISTENADDR:$LISTENPORT"
