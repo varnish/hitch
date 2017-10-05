@@ -133,8 +133,12 @@ hitch_hosts() {
 curl_hitch() {
 	printf 'Running: curl %s\n' "$*" >&2
 
+	HAS_SPECIFIC_ARG=false
+
 	for ARG
 	do
+		test "$ARG" = -- && HAS_SPECIFIC_ARG=true
+
 		# ignore non-option arguments
 		test "${ARG#-}" = "$ARG" && continue
 
@@ -143,19 +147,23 @@ curl_hitch() {
 		skip "curl: unknown option $ARG"
 	done
 
-	HITCH_HOST=$(hitch_hosts | sed 1q)
+	if ! $HAS_SPECIFIC_ARG
+	then
+		HITCH_HOST=$(hitch_hosts | sed 1q)
+		curl_hitch "$@" -- "https://$HITCH_HOST/"
+		return $?
+	fi
 
 	CURL_STATUS=${CURL_STATUS:-200}
 	EXIT_STATUS=0
 	RESP_STATUS=$(curl \
-		"$@" \
 		--head \
 		--max-time 5 \
 		--silent \
 		--insecure \
 		--output /dev/null \
 		--write-out %{http_code} \
-		"https://$HITCH_HOST/") || EXIT_STATUS=$?
+		"$@") || EXIT_STATUS=$?
 
 	test $EXIT_STATUS -ne 0 &&
 	error "curl request failed or timed out (exit status: $EXIT_STATUS)"

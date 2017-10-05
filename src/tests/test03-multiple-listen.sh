@@ -16,8 +16,5 @@ for host in $(hitch_hosts)
 do
 	s_client -connect "$host" >$DUMPFILE
 	run_cmd grep -q "subject=/CN=site1.example.com" $DUMPFILE
+	curl_hitch -- "https://$host/"
 done
-
-# XXX: figure how to best move those inside the loop
-#runcurl $LISTENADDR $LISTENPORT
-#runcurl $LISTENADDR $PORT2
