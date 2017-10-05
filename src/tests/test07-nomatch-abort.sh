@@ -45,7 +45,7 @@ run_cmd grep -c 'subject=/CN=site1.example.com' valid-sni.dump
 run_cmd grep 'unrecognized name' unknown-sni.dump
 
 # SNI request w/ valid servername
-s_client -servername site1.example.com -prexit \
+s_client -servername site1.example.com \
 	-connect $LISTENADDR:$PORT2 >valid-sni-2.dump
 run_cmd grep -q 'subject=/CN=site3.example.com' valid-sni-2.dump
 

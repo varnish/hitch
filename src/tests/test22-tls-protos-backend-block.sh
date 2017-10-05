@@ -1,9 +1,9 @@
 #!/bin/sh
 # Test tls-protos inside a frontend block
-. hitch_test.sh
-set +o errexit
 
-mk_cfg <<EOF
+. hitch_test.sh
+
+cat >hitch.cfg <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
@@ -14,7 +14,5 @@ frontend = {
 }
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 0 || die "Hitch did not start."
-
-runcurl $LISTENADDR $LISTENPORT
+start_hitch --config=hitch.cfg
+curl_hitch

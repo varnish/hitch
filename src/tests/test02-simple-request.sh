@@ -9,7 +9,6 @@ start_hitch \
 	--frontend="[${LISTENADDR}]:$LISTENPORT" \
 	"${CERTSDIR}/site1.example.com"
 
-s_client >$DUMPFILE
-run_cmd grep -q "subject=/CN=site1.example.com" $DUMPFILE
-
+s_client >s_client.dump
+run_cmd grep -q "subject=/CN=site1.example.com" s_client.dump
 curl_hitch

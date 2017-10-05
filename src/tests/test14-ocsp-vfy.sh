@@ -1,11 +1,11 @@
 #!/bin/sh
 
 . hitch_test.sh
-set +o errexit
+
 unset SSL_CERT_DIR
 unset SSL_CERT_FILE
 
-mk_cfg <<EOF
+cat >hitch1.cfg <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
@@ -20,16 +20,14 @@ pem-file = {
 }
 EOF
 
-hitch --test $HITCH_ARGS --config=$CONFFILE
-test $? -ne 0 || die "Hitch started when it shouldn't have."
+run_cmd -s 1 hitch --test --config="$PWD/hitch1.cfg"
 
 export SSL_CERT_FILE=$CERTSDIR/valid.example.com-ca-chain.pem
-hitch --test $HITCH_ARGS --config=$CONFFILE
-test $? -eq 0 || die "Hitch did not start."
+run_cmd hitch --test --config="$PWD/hitch1.cfg"
 
 unset SSL_CERT_FILE
 
-mk_cfg <<EOF
+cat >hitch2.cfg <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
@@ -44,12 +42,11 @@ pem-file = {
 }
 EOF
 
-hitch --test $HITCH_ARGS --config=$CONFFILE
-test $? -eq 0 || die "Hitch did not start."
+run_cmd hitch --test --config="$PWD/hitch2.cfg"
 
 # Test that timeouts are valid configuration file entries. Actually
 # testing the timeouts will be complicated and is deemed unnecessary for now.
-mk_cfg <<EOF
+cat >hitch3.cfg <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
@@ -65,5 +62,4 @@ ocsp-connect-tmo = 10
 ocsp-resp-tmo = 10
 EOF
 
-hitch --test $HITCH_ARGS --config=$CONFFILE
-test $? -eq 0 || die "Hitch did not start."
+run_cmd hitch --test --config="$PWD/hitch3.cfg"

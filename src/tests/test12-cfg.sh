@@ -1,13 +1,12 @@
 #!/bin/sh
 
 . hitch_test.sh
-set +o errexit
 
-mk_cfg <<EOF
+cat >hitch.cfg <<EOF
 backend = "[hitch-tls.org]:80"
 frontend = {
 	 host = "*"
-	 port = "`expr $LISTENPORT + 1200`"
+	 port = "$LISTENPORT"
 	 pem-file = "${CERTSDIR}/default.example.com"
 	 tls = on
 	 ciphers = "HIGH"
@@ -15,7 +14,5 @@ frontend = {
 }
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 0 || die "Hitch did not start."
-
-runcurl $LISTENADDR `expr $LISTENPORT + 1200`
+start_hitch --config="$PWD/hitch.cfg"
+curl_hitch
