@@ -6,9 +6,8 @@
 set -e
 # TODO: set -u
 
-readonly TEST_TMPDIR=$(mktemp -d)
-
-cd "$TEST_TMPDIR"
+cd "$(mktemp -d)"
+readonly TEST_TMPDIR=$(pwd)
 
 # begin old setup
 
