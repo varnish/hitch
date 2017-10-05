@@ -1,28 +1,29 @@
 #!/bin/sh
 
 . hitch_test.sh
-set +o errexit
 
-mk_cfg <<EOF
+cat >hitch.cfg <<EOF
 pem-file = "${CERTSDIR}/default.example.com"
 frontend = "[$LISTENADDR]:$LISTENPORT"
 backend = "[hitch-tls.org]:80"
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 0 || die "Hitch did not start."
+start_hitch --config="$PWD/hitch.cfg"
 
-runcurl $LISTENADDR $LISTENPORT
+curl_hitch
 
-mk_cfg <<EOF
+NEW_PORT=$(expr $LISTENPORT + 1100)
+
+cat >hitch.cfg <<EOF
 pem-file = "${CERTSDIR}/default.example.com"
-frontend = "[$LISTENADDR]:`expr $LISTENPORT + 1100`"
+frontend = "[$LISTENADDR]:$NEW_PORT"
 backend = "[hitch-tls.org]:80"
 EOF
 
-kill -HUP $(cat $PIDFILE)
-sleep 1
-runcurl $LISTENADDR `expr $LISTENPORT + 1100`
+kill -HUP "$(hitch_pid)"
 
-curl --max-time 5 --silent --insecure https://$LISTENADDR:$LISTENPORT/
-test $? -ne 0 || die "Removed listen endpoint should not be available."
+sleep 1
+curl_hitch -- "https://$LISTENADDR:$NEW_PORT/"
+
+# XXX: running in a subshell to not err the test
+! (curl_hitch -- "https://$LISTENADDR:$LISTENPORT/")
