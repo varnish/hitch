@@ -12,4 +12,4 @@ frontend = {
 }
 EOF
 
-run_cmd -s 1 hitch --test --config="$PWD/hitch.cfg"
+run_cmd -s 1 hitch --test --config=hitch.cfg
