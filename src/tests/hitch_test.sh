@@ -4,7 +4,7 @@
 #
 
 set -e
-# TODO: set -u
+set -u
 
 cd "$(mktemp -d)"
 readonly TEST_TMPDIR=$(pwd)
