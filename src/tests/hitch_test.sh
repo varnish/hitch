@@ -48,17 +48,13 @@ trap cleanup EXIT
 
 die() {
 	echo "FAILED: $*" >&2
-	if [ -r "$DUMPFILE" ]; then
-		cat $DUMPFILE >&2
-	fi
+	dump
 	exit 255
 }
 
 skip() {
 	echo "SKIPPED: $*" >&2
-	if [ -r "$DUMPFILE" ]; then
-		cat $DUMPFILE >&2
-	fi
+	dump
 	exit 77
 }
 
@@ -73,6 +69,18 @@ runcurl() {
 }
 
 # end old setup
+
+dump() {
+	if [ -r "$DUMPFILE" ]; then
+		cat $DUMPFILE >&2
+	fi
+}
+
+error() {
+	echo "ERROR: $*" >&2
+	dump
+	exit 99
+}
 
 run_cmd() (
 	set -e
@@ -126,7 +134,8 @@ curl_hitch() {
 	HITCH_HOST=$(hitch_hosts | sed 1q)
 
 	CURL_STATUS=${CURL_STATUS:-200}
-	RESP_STATUS=$(run_cmd curl \
+	EXIT_STATUS=0
+	RESP_STATUS=$(curl \
 		"$@" \
 		--head \
 		--max-time 5 \
@@ -134,7 +143,10 @@ curl_hitch() {
 		--insecure \
 		--output /dev/null \
 		--write-out %{http_code} \
-		"https://$HITCH_HOST/")
+		"https://$HITCH_HOST/") || EXIT_STATUS=$?
+
+	test $EXIT_STATUS -ne 0 &&
+	error "curl request failed or timed out (exit status: $EXIT_STATUS)"
 
 	test "$CURL_STATUS" = "$RESP_STATUS" ||
 	die "expected status $CURL_STATUS got $RESP_STATUS"
