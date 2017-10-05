@@ -20,10 +20,10 @@ pem-file = {
 }
 EOF
 
-run_cmd -s 1 hitch --test --config="$PWD/hitch1.cfg"
+run_cmd -s 1 hitch --test --config=hitch1.cfg
 
 export SSL_CERT_FILE=$CERTSDIR/valid.example.com-ca-chain.pem
-run_cmd hitch --test --config="$PWD/hitch1.cfg"
+run_cmd hitch --test --config=hitch1.cfg
 
 unset SSL_CERT_FILE
 
@@ -42,7 +42,7 @@ pem-file = {
 }
 EOF
 
-run_cmd hitch --test --config="$PWD/hitch2.cfg"
+run_cmd hitch --test --config=hitch2.cfg
 
 # Test that timeouts are valid configuration file entries. Actually
 # testing the timeouts will be complicated and is deemed unnecessary for now.
@@ -62,4 +62,4 @@ ocsp-connect-tmo = 10
 ocsp-resp-tmo = 10
 EOF
 
-run_cmd hitch --test --config="$PWD/hitch3.cfg"
+run_cmd hitch --test --config=hitch3.cfg

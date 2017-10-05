@@ -3,7 +3,7 @@
 . hitch_test.sh
 
 test_cfg() {
-	cfg="$PWD/$1.cfg"
+	cfg=$1.cfg
 	pathchk "$cfg"
 	cat >"$cfg"
 	run_cmd hitch --test --config="$cfg"

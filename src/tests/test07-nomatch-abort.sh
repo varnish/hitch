@@ -28,7 +28,7 @@ frontend = {
 }
 EOF
 
-start_hitch --config="$PWD/hitch.cfg"
+start_hitch --config=hitch.cfg
 
 # No SNI - should not be affected.
 s_client -connect $LISTENADDR:$LISTENPORT >no-sni.dump

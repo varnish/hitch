@@ -14,5 +14,5 @@ frontend = {
 }
 EOF
 
-start_hitch --config="$PWD/hitch.cfg"
+start_hitch --config=hitch.cfg
 curl_hitch

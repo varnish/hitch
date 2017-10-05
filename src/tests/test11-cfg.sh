@@ -8,6 +8,7 @@ frontend = "[$LISTENADDR]:$LISTENPORT"
 backend = "[hitch-tls.org]:80"
 EOF
 
+# XXX: reload only works with absolute paths
 start_hitch --config="$PWD/hitch.cfg"
 
 curl_hitch
