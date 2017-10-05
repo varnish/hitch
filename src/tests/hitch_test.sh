@@ -123,10 +123,12 @@ start_hitch() {
 		"$@"
 }
 
-hitch_hosts() {
-	HITCH_PID="$(cat "$TEST_TMPDIR/hitch.pid")"
+hitch_pid() {
+	cat "$TEST_TMPDIR/hitch.pid"
+}
 
-	lsof -F -P -n -a -p "$HITCH_PID" -i 4 -i TCP |
+hitch_hosts() {
+	lsof -F -P -n -a -p "$(hitch_pid)" -i 4 -i TCP |
 	awk '/^n/ { print substr($1,2) }'
 }
 
@@ -163,9 +165,10 @@ curl_hitch() {
 		--verbose \
 		--insecure \
 		--output /dev/null \
-		--write-out %{http_code} \
+		--write-out '%{http_code}' \
 		"$@") || EXIT_STATUS=$?
 
+	# XXX: how to handle the cases where we expect an error?
 	test $EXIT_STATUS -ne 0 &&
 	error "curl request failed or timed out (exit status: $EXIT_STATUS)"
 
