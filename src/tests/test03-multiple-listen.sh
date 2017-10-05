@@ -4,7 +4,7 @@
 #
 . hitch_test.sh
 
-PORT2=`expr $$ % 60000 + 3000`
+PORT2=$(expr $$ % 60000 + 3000)
 
 start_hitch \
 	--backend=[hitch-tls.org]:80 \
