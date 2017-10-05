@@ -1,33 +1,34 @@
 #!/bin/sh
 
 . hitch_test.sh
-set +o errexit
 
-
-mk_cfg <<EOF
+cat >hitch.cfg <<EOF
 pem-file = "${CERTSDIR}/default.example.com"
 frontend = "[$LISTENADDR]:$LISTENPORT"
 backend = "[hitch-tls.org]:80"
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 0 || die "Hitch did not start."
+start_hitch --config=hitch.cfg
 
-runcurl $LISTENADDR $LISTENPORT
+curl_hitch
+
+NEW_PORT=$(expr $LISTENPORT + 1100)
 
 # make a faulty config (see test19...sh)
-mk_cfg <<EOF
+cat >hitch.cfg <<EOF
 pem-file = "${CERTSDIR}/default.example.com"
-frontend = "[$LISTENADDR]:`expr $LISTENPORT + 1`"
+frontend = "[$LISTENADDR]:$NEW_PORT"
 backend = "[hitch-tls.org]:80"
 tls-protos = SSLv3 TLSv1.0 TLSv1.1 TLSv1.2
 ssl = on
 EOF
 
-kill -HUP $(cat $PIDFILE)
+kill -HUP $(hitch_pid)
 sleep 0.5
-curl --max-time 5 --silent --insecure https://$LISTENADDR:`expr $LISTENPORT + 1`/
-test $? -ne 0 || die "New listen endpoint should not be available."
 
-curl --max-time 5 --silent --insecure https://$LISTENADDR:$LISTENPORT/
-test $? -eq 0 || die "Old listen endpoint should be available."
+# Make sure the old address is still bound
+curl_hitch -- "https://$LISTENADDR:$LISTENPORT/"
+
+# Make sure the new address is not bound
+hitch_hosts |
+run_cmd -s 1 grep "$LISTENADDR:$NEW_PORT"
