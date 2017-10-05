@@ -4,7 +4,7 @@
 
 BACKENDPORT=`expr $LISTENPORT + 1600`
 
-parse_proxy_v2 $BACKENDPORT > $DUMPFILE &
+parse_proxy_v2 $BACKENDPORT >proxy.dump &
 
 start_hitch \
 	--backend=[127.0.0.1]:$BACKENDPORT \
@@ -18,9 +18,9 @@ sleep 0.1
 # If you have nghttp installed, you can try it instead of openssl s_client:
 # nghttp -v "https://localhost:$LISTENPORT"
 
-s_client -alpn 'h2' -prexit -connect $LISTENADDR:$LISTENPORT
+s_client -alpn 'h2' >s_client.dump
 
-! grep ERROR $DUMPFILE
+! grep ERROR proxy.dump
 
-run_cmd grep -q h2 $DUMPFILE
-run_cmd grep -q "ALPN extension" $DUMPFILE
+run_cmd grep -q h2 proxy.dump
+run_cmd grep -q "ALPN extension" proxy.dump

@@ -1,9 +1,8 @@
 #!/bin/sh
 
 . hitch_test.sh
-set +o errexit
 
-mk_cfg <<EOF
+cat >hitch.cfg <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
@@ -13,5 +12,4 @@ frontend = {
 }
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 1 || die "invalid config parsed correctly?"
+run_cmd -s 1 hitch --test --config="$PWD/hitch.cfg"
