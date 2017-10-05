@@ -71,9 +71,19 @@ runcurl() {
 # end old setup
 
 dump() {
+	# XXX: Move tests away from $DUMPFILE
 	if [ -r "$DUMPFILE" ]; then
 		cat $DUMPFILE >&2
 	fi
+
+	for DUMP in *.dump
+	do
+		test -f "$DUMP" || continue
+
+		printf '\nFound dump file %s:\n\n<<<\n' "$DUMP"
+		cat -v "$DUMP"
+		printf '>>>\n'
+	done >&2
 }
 
 error() {
