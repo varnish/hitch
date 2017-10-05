@@ -48,9 +48,8 @@ dump() {
 	do
 		test -f "$DUMP" || continue
 
-		printf '\nFound dump file %s:\n\n<<<\n' "$DUMP"
-		cat -v "$DUMP"
-		printf '>>>\n'
+		printf '\nFound dump file %s:\n\n' "$DUMP"
+		cat -v "$DUMP" | sed -e 's/^/> /'
 	done >&2
 }
 
