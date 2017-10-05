@@ -1,18 +1,31 @@
 #!/bin/sh
 # Test configuration parser.
 . hitch_test.sh
-set +o errexit
 
 # This is a somewhat half-assed attempt at getting a usable group since the
 # redhats and debians can't seem to agree on which group user "nobody"
 # should be in.
-GRP=`id -Gn nobody | cut -d' ' -f1`
-test "$GRP" != "" || die "No usable group found for user nobody."
+GRP=$(id -gn nobody) ||
+skip 'no usable group found for user nobody'
 
-hitch --test --config=${CONFDIR}/default.cfg ${CERTSDIR}/default.example.com
-test $? -eq 0 || die "default.cfg is not testable."
+test_cfg() {
+	cfg=$1.cfg
+	shift
+	pathchk "$cfg"
+	cat >"$cfg"
+	run_cmd "$@" hitch \
+		--test \
+		--config="$cfg" \
+		"${CERTSDIR}/default.example.com"
+}
 
-mk_cfg <<EOF
+test_bad_cfg() {
+	test_cfg "$1" -s 1
+}
+
+test_cfg default <"${CONFDIR}/default.cfg"
+
+test_bad_cfg bad1  <<EOF
 frontend = "[*]:8443"
 backend = "[127.0.0-1]:6086"
 ciphers = "chrooert.pem"
@@ -30,10 +43,8 @@ quiet = on
 aemon = onwrite-ip =oxy = on
 syslog = on
 EOF
-hitch --test --config=$CONFFILE ${CERTSDIR}/default.example.com
-test $? -eq 1 || die "Invalid config test08a parsed correctly."
 
-mk_cfg <<EOF
+test_bad_cfg bad2  <<EOF
 frontend = "[*]:8443"
 backend = "[127.0.0.1]:6086"
 ciphers = "HIGH"
@@ -52,10 +63,8 @@ daemon = on
 write-ip = off
 write-proxy = on
 EOF
-hitch --test --config=$CONFFILE ${CERTSDIR}/default.example.com
-test $? -eq 1 || die "Invalid config test08b parsed correctly."
 
-mk_cfg <<EOF
+test_cfg good1  <<EOF
 frontend = "[*]:8443"
 backend = "[127.0.0.1]:6086"
 ciphers = "HIGH"
@@ -75,10 +84,7 @@ write-ip = n
 write-proxy = on
 EOF
 
-hitch --test --config=$CONFFILE ${CERTSDIR}/default.example.com
-test $? -eq 0 || die "Valid config test08c unparseable?"
-
-mk_cfg <<EOF
+test_cfg good2  <<EOF
 # Test extra whitespace.
 frontend = 		"[*]:8443"
 backend =        "[127.0.0.1]:6086"		
@@ -98,23 +104,16 @@ daemon = "on"
 write-ip = off
 write-proxy = on
 EOF
-hitch --test --config=$CONFFILE ${CERTSDIR}/default.example.com
-test $? -eq 0 || die "Valid config test08d unparseable?"
 
 # Issue #52.
-hitch --config=${CONFDIR}/default.cfg --help
-test $? -eq 0 || die "--help after --config does not work as expected."
+run_cmd hitch --config=${CONFDIR}/default.cfg --help
 
+# XXX: unclear check
 # Works as expected.
-hitch --test --config=${CONFDIR}/default.cfg
-test $? -eq 1 || die "--help with --config does not work as expected."
+#hitch --test --config=${CONFDIR}/default.cfg
+#test $? -eq 1 || die "--help with --config does not work as expected."
 
 # Test that our example configuration is in fact usable.
 TMPFILE=$(mktemp -u)
-sed -e "s|nogroup|$GRP|" ${TESTDIR}/../../hitch.conf.example > $TMPFILE
-hitch --test --config=$TMPFILE ${CERTSDIR}/default.example.com
-RCODE=$?
-rm $TMPFILE
-if [ $RCODE -ne 0 ]; then
-	die "hitch.conf.example is not valid"
-fi
+sed -e "s|nogroup|$GRP|" ${TESTDIR}/../../hitch.conf.example |
+test_cfg example
