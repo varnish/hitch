@@ -18,29 +18,6 @@ LISTENPORT=`expr $$ % 62000 + 1024`
 CERTSDIR="${TESTDIR}/certs"
 CONFDIR="${TESTDIR}/configs"
 
-cleanup() {
-	for PID in *.pid
-	do
-		test -f "$PID" &&
-		kill "$(cat "$PID")"
-	done
-
-	rm -rf "$TEST_TMPDIR"
-}
-trap cleanup EXIT
-
-die() {
-	echo "FAILED: $*" >&2
-	dump
-	exit 255
-}
-
-skip() {
-	echo "SKIPPED: $*" >&2
-	dump
-	exit 77
-}
-
 # end old setup
 
 dump() {
@@ -51,6 +28,30 @@ dump() {
 		printf '\nFound dump file %s:\n\n' "$DUMP"
 		cat -v "$DUMP" | sed -e 's/^/> /'
 	done >&2
+}
+
+cleanup() {
+	for PID in *.pid
+	do
+		test -f "$PID" &&
+		kill "$(cat "$PID")"
+	done
+
+	rm -rf "$TEST_TMPDIR"
+}
+
+trap cleanup EXIT
+
+fail() {
+	echo "FAIL: $*" >&2
+	dump
+	exit 255
+}
+
+skip() {
+	echo "SKIP: $*" >&2
+	dump
+	exit 77
 }
 
 error() {
@@ -83,7 +84,7 @@ run_cmd() (
 
 	if [ "$RUN_STATUS" -ne "$CMD_STATUS" ]
 	then
-		die "expected exit status $CMD_STATUS got $RUN_STATUS"
+		fail "expected exit status $CMD_STATUS got $RUN_STATUS"
 	fi
 )
 
@@ -150,7 +151,7 @@ curl_hitch() {
 	error "curl request failed or timed out (exit status: $EXIT_STATUS)"
 
 	test "$CURL_STATUS" = "$RESP_STATUS" ||
-	die "expected status $CURL_STATUS got $RESP_STATUS"
+	fail "expected status $CURL_STATUS got $RESP_STATUS"
 }
 
 s_client() {
