@@ -105,7 +105,9 @@ hitch_pid() {
 }
 
 hitch_hosts() {
+	# XXX: check lsof presence with autoconf
 	lsof -F -P -n -a -p "$(hitch_pid)" -i 4 -i TCP |
+	sed 's/*/localhost/' |
 	awk '/^n/ { print substr($1,2) }'
 }
 
