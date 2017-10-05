@@ -8,7 +8,7 @@ parse_proxy_v2 $BACKENDPORT >proxy.dump &
 
 start_hitch \
 	--backend=[127.0.0.1]:$BACKENDPORT \
-	--frontend="[${LISTENADDR}]:$LISTENPORT" \
+	--frontend="[localhost]:$LISTENPORT" \
 	--write-proxy-v2 \
 	--alpn-protos="tor,h2,h2-14,http/1.1" \
 	${CERTSDIR}/site1.example.com

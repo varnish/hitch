@@ -6,7 +6,7 @@
 
 start_hitch \
 	--backend="[hitch-tls.org]:80" \
-	--frontend="[${LISTENADDR}]:$LISTENPORT" \
+	--frontend="[localhost]:$LISTENPORT" \
 	"${CERTSDIR}/site1.example.com"
 
 s_client -sess_out sess_ticket.txt >out.dump

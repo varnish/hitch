@@ -16,12 +16,12 @@ pem-file = "${CERTSDIR}/default.example.com"
 backend = "[hitch-tls.org]:80"
 
 frontend = {
-	host = "$LISTENADDR"
+	host = "localhost"
 	port = "$LISTENPORT"
 }
 
 frontend = {
-	host = "$LISTENADDR"
+	host = "localhost"
 	port = "$PORT2"
 	pem-file = "${CERTSDIR}/site3.example.com"
 	sni-nomatch-abort = off
@@ -31,28 +31,28 @@ EOF
 start_hitch --config=hitch.cfg
 
 # No SNI - should not be affected.
-s_client -connect $LISTENADDR:$LISTENPORT >no-sni.dump
+s_client -connect localhost:$LISTENPORT >no-sni.dump
 run_cmd grep -q 'subject=/CN=default.example.com' no-sni.dump
 
 # SNI request w/ valid servername
 s_client -servername site1.example.com \
-	-connect $LISTENADDR:$LISTENPORT >valid-sni.dump
+	-connect localhost:$LISTENPORT >valid-sni.dump
 run_cmd grep -c 'subject=/CN=site1.example.com' valid-sni.dump
 
 # SNI w/ unknown servername
 ! s_client -servername invalid.example.com \
-	-connect $LISTENADDR:$LISTENPORT >unknown-sni.dump
+	-connect localhost:$LISTENPORT >unknown-sni.dump
 run_cmd grep 'unrecognized name' unknown-sni.dump
 
 # SNI request w/ valid servername
 s_client -servername site1.example.com \
-	-connect $LISTENADDR:$PORT2 >valid-sni-2.dump
+	-connect localhost:$PORT2 >valid-sni-2.dump
 run_cmd grep -q 'subject=/CN=site3.example.com' valid-sni-2.dump
 
 # SNI w/ unknown servername
 # XXX: why don't we expect 'unrecognized name' again?
 s_client -servername invalid.example.com \
-	-connect $LISTENADDR:$PORT2 >unknown-sni-2.dump
+	-connect localhost:$PORT2 >unknown-sni-2.dump
 run_cmd grep 'subject=/CN=site3.example.com' unknown-sni-2.dump
 
 # Ancient curl versions may not support --resolve

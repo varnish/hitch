@@ -4,7 +4,7 @@
 
 cat >hitch.cfg <<EOF
 pem-file = "${CERTSDIR}/default.example.com"
-frontend = "[$LISTENADDR]:$LISTENPORT"
+frontend = "[localhost]:$LISTENPORT"
 backend = "[hitch-tls.org]:80"
 EOF
 
@@ -17,15 +17,15 @@ NEW_PORT=$(expr $LISTENPORT + 1100)
 
 cat >hitch.cfg <<EOF
 pem-file = "${CERTSDIR}/default.example.com"
-frontend = "[$LISTENADDR]:$NEW_PORT"
+frontend = "[localhost]:$NEW_PORT"
 backend = "[hitch-tls.org]:80"
 EOF
 
 kill -HUP "$(hitch_pid)"
 
 sleep 1
-curl_hitch -- "https://$LISTENADDR:$NEW_PORT/"
+curl_hitch -- "https://localhost:$NEW_PORT/"
 
 # Make sure the old address is no longer bound
 hitch_hosts |
-run_cmd -s 1 grep "$LISTENADDR:$LISTENPORT"
+run_cmd -s 1 grep "localhost:$LISTENPORT"

@@ -6,7 +6,7 @@
 
 start_hitch \
 	--backend='[hitch-tls.org]:80' \
-	--frontend="[${LISTENADDR}]:$LISTENPORT" \
+	--frontend="[localhost]:$LISTENPORT" \
 	"${CERTSDIR}/site1.example.com" \
 	"${CERTSDIR}/site2.example.com" \
 	"${CERTSDIR}/default.example.com"

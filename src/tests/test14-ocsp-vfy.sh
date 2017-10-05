@@ -9,7 +9,7 @@ cat >hitch1.cfg <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
-  host = "$LISTENADDR"
+  host = "localhost"
   port = "$LISTENPORT"
 }
 
@@ -31,7 +31,7 @@ cat >hitch2.cfg <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
-  host = "$LISTENADDR"
+  host = "localhost"
   port = "$LISTENPORT"
 }
 
@@ -50,7 +50,7 @@ cat >hitch3.cfg <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
-  host = "$LISTENADDR"
+  host = "localhost"
   port = "$LISTENPORT"
 }
 
