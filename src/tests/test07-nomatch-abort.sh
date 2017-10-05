@@ -3,9 +3,10 @@
 # Test --sni-nomatch-abort
 #
 . hitch_test.sh
-set +o errexit
 
-mk_cfg <<EOF
+PORT2=$(expr $LISTENPORT + 701)
+
+cat >hitch.cfg <<EOF
 sni-nomatch-abort = on
 
 pem-file = "${CERTSDIR}/site1.example.com"
@@ -21,55 +22,43 @@ frontend = {
 
 frontend = {
 	host = "$LISTENADDR"
-	port = "`expr $LISTENPORT + 701`"
+	port = "$PORT2"
 	pem-file = "${CERTSDIR}/site3.example.com"
 	sni-nomatch-abort = off
 }
-
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 0 || die "Hitch did not start."
+start_hitch --config="$PWD/hitch.cfg"
 
 # No SNI - should not be affected.
-echo -e "\n" | openssl s_client -prexit -connect $LISTENADDR:$LISTENPORT >$DUMPFILE 2>&1
-test $? -eq 0 || die "s_client failed"
-grep -q -c "subject=/CN=default.example.com" $DUMPFILE
-test $? -eq 0 || die "s_client got wrong certificate on listen port #1"
+s_client -connect $LISTENADDR:$LISTENPORT >no-sni.dump
+run_cmd grep -q 'subject=/CN=default.example.com' no-sni.dump
 
 # SNI request w/ valid servername
-echo -e "\n" | openssl s_client -servername site1.example.com -prexit \
-	-connect $LISTENADDR:$LISTENPORT >$DUMPFILE 2>&1
-test $? -eq 0 || die "s_client failed"
-grep -q -c "subject=/CN=site1.example.com" $DUMPFILE
-test $? -eq 0 || die "s_client got wrong certificate in listen port #2"
+s_client -servername site1.example.com \
+	-connect $LISTENADDR:$LISTENPORT >valid-sni.dump
+run_cmd grep -c 'subject=/CN=site1.example.com' valid-sni.dump
 
 # SNI w/ unknown servername
-echo | openssl s_client -servername invalid.example.com -prexit \
-	-connect $LISTENADDR:$LISTENPORT >$DUMPFILE 2>&1
-test $? -ne 0 || die "s_client did NOT fail when it should have. "
-grep -q -c "unrecognized name" $DUMPFILE
-test $? -eq 0 || die "Expected 'unrecognized name' error."
+! s_client -servername invalid.example.com \
+	-connect $LISTENADDR:$LISTENPORT >unknown-sni.dump
+run_cmd grep 'unrecognized name' unknown-sni.dump
 
-
-HAVE_CURL_RESOLVE=`curl --help | grep -c -- '--resolve'`
-
-# Disable this part of the test case if the curl version is ancient
-if [ $HAVE_CURL_RESOLVE -ne 0 ]; then
-    CURL_EXTRA="--resolve site1.example.com:$LISTENPORT:127.0.0.1"
-    runcurl site1.example.com $LISTENPORT
-fi
+#HAVE_CURL_RESOLVE=`curl --help | grep -c -- '--resolve'`
+#
+## Disable this part of the test case if the curl version is ancient
+#if [ $HAVE_CURL_RESOLVE -ne 0 ]; then
+#    CURL_EXTRA="--resolve site1.example.com:$LISTENPORT:127.0.0.1"
+#    runcurl site1.example.com $LISTENPORT
+#fi
 
 # SNI request w/ valid servername
-echo -e "\n" | openssl s_client -servername site1.example.com -prexit \
-	-connect $LISTENADDR:`expr $LISTENPORT + 701` >$DUMPFILE 2>&1
-test $? -eq 0 || die "s_client failed"
-grep -q -c "subject=/CN=site3.example.com" $DUMPFILE
-test $? -eq 0 || die "s_client got wrong certificate in listen port #2"
+s_client -servername site1.example.com -prexit \
+	-connect $LISTENADDR:$PORT2 >valid-sni-2.dump
+run_cmd grep -q 'subject=/CN=site3.example.com' valid-sni-2.dump
 
 # SNI w/ unknown servername
-echo | openssl s_client -servername invalid.example.com -prexit \
-	-connect $LISTENADDR:`expr $LISTENPORT + 701` >$DUMPFILE 2>&1
-test $? -eq 0 || die "s_client failed"
-grep -q -c "subject=/CN=site3.example.com" $DUMPFILE
-test $? -eq 0 || die "s_client got wrong certificate in listen port #2"
+# XXX: why don't we expect 'unrecognized name' again?
+s_client -servername invalid.example.com \
+	-connect $LISTENADDR:$PORT2 >unknown-sni-2.dump
+run_cmd grep 'subject=/CN=site3.example.com' unknown-sni-2.dump
