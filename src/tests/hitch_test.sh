@@ -160,6 +160,7 @@ curl_hitch() {
 		--head \
 		--max-time 5 \
 		--silent \
+		--verbose \
 		--insecure \
 		--output /dev/null \
 		--write-out %{http_code} \
