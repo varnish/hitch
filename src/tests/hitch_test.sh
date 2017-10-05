@@ -15,27 +15,10 @@ export LC_ALL=C
 
 LISTENADDR="localhost"
 LISTENPORT=`expr $$ % 62000 + 1024`
-PIDFILE=$(mktemp -u)
-CONFFILE=$(mktemp -u)
-DUMPFILE=$(mktemp -u)
 CERTSDIR="${TESTDIR}/certs"
 CONFDIR="${TESTDIR}/configs"
 
-HITCH_ARGS="--pidfile=$PIDFILE --daemon --quiet"
-
-if [ "$USER" = "root" ]; then
-	HITCH_ARGS="$HITCH_ARGS --user=nobody"
-fi
-
 cleanup() {
-        test -f "$CONFFILE" && rm -f "$CONFFILE"
-        test -f "$DUMPFILE" && rm -f "$DUMPFILE"
-        if [ -s $PIDFILE ]; then
-		kill `cat "$PIDFILE"`
-	fi
-
-	cd "$TEST_TMPDIR" # just in case a test wants to cd
-
 	for PID in *.pid
 	do
 		test -f "$PID" &&
@@ -58,24 +41,9 @@ skip() {
 	exit 77
 }
 
-mk_cfg() {
-	cat > "$CONFFILE"
-}
-
-runcurl() {
-	# Verify that we got a HTTP reply.
-	curl $CURL_EXTRA -I -X GET --max-time 5 --silent --insecure https://$1:$2/
-	test $? -eq 0 || die "Incorrect HTTP response code."
-}
-
 # end old setup
 
 dump() {
-	# XXX: Move tests away from $DUMPFILE
-	if [ -r "$DUMPFILE" ]; then
-		cat $DUMPFILE >&2
-	fi
-
 	for DUMP in *.dump
 	do
 		test -f "$DUMP" || continue
