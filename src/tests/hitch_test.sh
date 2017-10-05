@@ -131,6 +131,18 @@ hitch_hosts() {
 }
 
 curl_hitch() {
+	printf 'Running: curl %s\n' "$*" >&2
+
+	for ARG
+	do
+		# ignore non-option arguments
+		test "${ARG#-}" = "$ARG" && continue
+
+		curl --help |
+		grep -q -e "$ARG" ||
+		skip "curl: unknown option $ARG"
+	done
+
 	HITCH_HOST=$(hitch_hosts | sed 1q)
 
 	CURL_STATUS=${CURL_STATUS:-200}
