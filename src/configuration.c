@@ -51,6 +51,8 @@
 #define CFG_SYSLOG "syslog"
 #define CFG_SYSLOG_FACILITY "syslog-facility"
 #define CFG_PARAM_SYSLOG_FACILITY 11015
+#define CFG_PARAM_SEND_BUFSIZE 11016
+#define CFG_PARAM_RECV_BUFSIZE 11017
 #define CFG_DAEMON "daemon"
 #define CFG_WRITE_IP "write-ip"
 #define CFG_WRITE_PROXY "write-proxy"
@@ -809,6 +811,10 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		}
 	} else if (strcmp(k, CFG_QUIET) == 0) {
 		r = config_param_val_bool(v, &cfg->QUIET);
+	} else if (strcmp(k, CFG_LOG_FILENAME) == 0) {
+		if (strlen(v) > 0) {
+			config_assign_str(&cfg->LOG_FILENAME, v);
+		}
 	} else if (strcmp(k, CFG_SYSLOG) == 0) {
 		r = config_param_val_bool(v, &cfg->SYSLOG);
 	} else if (strcmp(k, CFG_SYSLOG_FACILITY) == 0) {
@@ -1029,10 +1035,12 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "\n");
 	fprintf(out, "SOCKET:\n");
 	fprintf(out, "\n");
-	fprintf(out, "  --client                      Enable client proxy mode\n");
-	fprintf(out, "  -b  --backend=[HOST]:PORT     Backend [connect] (default is \"%s\")\n", config_disp_hostport(cfg->BACK_IP, cfg->BACK_PORT));
+	fprintf(out, "      --client                Enable client proxy mode\n");
+	fprintf(out, "  -b  --backend=[HOST]:PORT   Backend [connect] (default is \"%s\")\n", config_disp_hostport(cfg->BACK_IP, cfg->BACK_PORT));
 	fprintf(out, "  -f  --frontend=[HOST]:PORT[+CERT]    Frontend [bind] (default is \"%s\")\n", config_disp_hostport(cfg->LISTEN_DEFAULT->ip, cfg->LISTEN_DEFAULT->port));
-	fprintf(out, "                                (Note: brackets are mandatory in endpoint specifiers.)");
+	fprintf(out, "                                (Note: brackets are mandatory in endpoint specifiers.)\n");
+	fprintf(out, "      --recv-bufsize=SIZE    Receive buffer size on client socket (Default: %d)\n", cfg->RECV_BUFSIZE);
+	fprintf(out, "      --send-bufsize=SIZE    Send buffer size on client socket (Default: %d)\n", cfg->SEND_BUFSIZE);
 
 #ifdef USE_SHARED_CACHE
 	fprintf(out, "\n");
@@ -1054,6 +1062,7 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "  -k  --keepalive=SECS       TCP keepalive on client socket (Default: %d)\n", cfg->TCP_KEEPALIVE_TIME);
 	fprintf(out, "  -R  --backendrefresh=SECS  Periodic backend IP lookup (Default: %d, 0 to disable)\n", cfg->BACKEND_REFRESH_TIME);
 
+
 #ifdef USE_SHARED_CACHE
 	fprintf(out, "  -C  --session-cache=NUM    Enable and set SSL session cache to specified number\n");
 	fprintf(out, "                             of sessions (Default: %d)\n", cfg->SHARED_CACHE);
@@ -1068,8 +1077,9 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "\n");
 	fprintf(out, "LOGGING:\n");
 	fprintf(out, "  -q  --quiet                Be quiet; emit only error messages\n");
+	fprintf(out, "  -l  --log-filename=FILE    Send log message to a logfile instead of stderr/stdout\n");
 	fprintf(out, "  -s  --syslog               Send log message to syslog in addition to stderr/stdout\n");
-	fprintf(out, "  --syslog-facility=FACILITY Syslog facility to use (Default: \"%s\")\n", config_disp_log_facility(cfg->SYSLOG_FACILITY));
+	fprintf(out, "      --syslog-facility=FACILITY    Syslog facility to use (Default: \"%s\")\n", config_disp_log_facility(cfg->SYSLOG_FACILITY));
 	fprintf(out, "\n");
 	fprintf(out, "OTHER OPTIONS:\n");
 	fprintf(out, "      --daemon               Fork into background and become a daemon (Default: %s)\n", config_disp_bool(cfg->DAEMONIZE));
@@ -1197,8 +1207,11 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		{ CFG_USER, 1, NULL, 'u' },
 		{ CFG_GROUP, 1, NULL, 'g' },
 		{ CFG_QUIET, 0, NULL, 'q' },
+		{ CFG_LOG_FILENAME, 1, NULL, 'l' },
 		{ CFG_SYSLOG, 0, NULL, 's' },
 		{ CFG_SYSLOG_FACILITY, 1, NULL, CFG_PARAM_SYSLOG_FACILITY },
+		{ CFG_SEND_BUFSIZE, 1, NULL, CFG_PARAM_SEND_BUFSIZE },
+		{ CFG_RECV_BUFSIZE, 1, NULL, CFG_PARAM_RECV_BUFSIZE },
 		{ CFG_DAEMON, 0, &cfg->DAEMONIZE, 1 },
 		{ CFG_WRITE_IP, 0, &cfg->WRITE_IP_OCTET, 1 },
 		{ CFG_WRITE_PROXY_V1, 0, &cfg->WRITE_PROXY_LINE_V1, 1 },
@@ -1213,7 +1226,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		{ "help", 0, NULL, 'h' },
 		{ 0, 0, 0, 0 }
 	};
-#define SHORT_OPTS "c:e:Ob:f:n:B:C:U:p:P:M:k:r:u:g:qstVho:"
+#define SHORT_OPTS "c:e:Ob:f:n:B:l:C:U:p:P:M:k:r:u:g:qstVho:"
 
 	if (argc == 1) {
 		config_print_usage(argv[0]);
@@ -1273,6 +1286,8 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 			    NULL, 0);						\
 			break;
 CFG_ARG(CFG_PARAM_SYSLOG_FACILITY, CFG_SYSLOG_FACILITY);
+CFG_ARG(CFG_PARAM_SEND_BUFSIZE, CFG_SEND_BUFSIZE);
+CFG_ARG(CFG_PARAM_RECV_BUFSIZE, CFG_RECV_BUFSIZE);
 CFG_ARG(CFG_PARAM_ALPN_PROTOS, CFG_ALPN_PROTOS);
 CFG_ARG('c', CFG_CIPHERS);
 CFG_ARG('e', CFG_SSL_ENGINE);
@@ -1295,6 +1310,7 @@ CFG_ARG('g', CFG_GROUP);
 CFG_ARG('o', CFG_OCSP_DIR);
 CFG_ON('O', CFG_PREFER_SERVER_CIPHERS);
 CFG_ON('q', CFG_QUIET);
+CFG_ARG('l', CFG_LOG_FILENAME);
 CFG_ON('s', CFG_SYSLOG);
 #undef CFG_ARG
 #undef CFG_ON
@@ -1360,7 +1376,6 @@ CFG_ON('s', CFG_SYSLOG);
 
 
 	if (cfg->DAEMONIZE) {
-		cfg->SYSLOG = 1;
 		cfg->QUIET = 1;
 	}
 

@@ -103,6 +103,9 @@ CFG_RECORD
 	| SHARED_CACHE_LISTEN_REC
 	| SHARED_CACHE_PEER_REC
 	| SHARED_CACHE_IF_REC
+	| LOG_FILENAME_REC
+	| SEND_BUFSIZE_REC
+	| RECV_BUFSIZE_REC
 	;
 
 FRONTEND_REC
@@ -450,7 +453,19 @@ ALPN_PROTOS_REC: TOK_ALPN_PROTOS '=' STRING
 SYSLOG_FACILITY_REC: TOK_SYSLOG_FACILITY '=' STRING
 {
 	if ($3 &&
-	    config_param_validate("syslog-facility", $3, cfg, /* XXX: */ "",
+	    config_param_validate("syslog-fac2ility", $3, cfg, /* XXX: */ "",
+	    yyget_lineno()) != 0)
+		YYABORT;
+};
+
+SEND_BUFSIZE_REC: TOK_SEND_BUFSIZE '=' UINT { cfg->SEND_BUFSIZE = $3; };
+
+RECV_BUFSIZE_REC: TOK_RECV_BUFSIZE '=' UINT { cfg->RECV_BUFSIZE = $3; };
+
+LOG_FILENAME_REC: TOK_LOG_FILENAME '=' STRING
+{
+	if ($3 &&
+	    config_param_validate("log-filename", $3, cfg, /* XXX: */ "",
 	    yyget_lineno()) != 0)
 		YYABORT;
 };
