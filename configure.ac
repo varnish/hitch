@@ -63,6 +63,7 @@ if test x"$use_shctx" != xno; then
   if test ! -e 'src/ebtree/ebtree.h'; then
     AC_MSG_ERROR([Must clone https://github.com/haproxy/ebtree to src/ebtree/])
   fi
+  AC_DEFINE([USE_SHARED_CACHE], [1], [sessioncache is enabled])
 fi
 AM_CONDITIONAL(USE_SHCTX, test xno != x"$use_shctx")
 
