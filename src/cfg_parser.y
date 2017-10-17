@@ -1,6 +1,9 @@
 %{
+#include "config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
+
 #include "configuration.h"
 #include "foreign/vas.h"
 #include "foreign/miniobj.h"
@@ -50,6 +53,8 @@ extern char input_line[512];
 %token TOK_MATCH_GLOBAL TOK_PB_CERT TOK_PB_OCSP_FILE TOK_OCSP_VERIFY
 %token TOK_OCSP_DIR TOK_OCSP_RESP_TMO TOK_OCSP_CONN_TMO TOK_ALPN_PROTOS
 %token TOK_TLS_PROTOS TOK_SSLv3 TOK_TLSv1_0 TOK_TLSv1_1 TOK_TLSv1_2
+%token TOK_SESSION_CACHE TOK_SHARED_CACHE_LISTEN TOK_SHARED_CACHE_PEER
+%token TOK_SHARED_CACHE_IF
 
 %parse-param { hitch_config *cfg }
 
@@ -94,6 +99,10 @@ CFG_RECORD
 	| OCSP_RESP_TMO
 	| OCSP_CONN_TMO
 	| OCSP_DIR
+	| SESSION_CACHE_REC
+	| SHARED_CACHE_LISTEN_REC
+	| SHARED_CACHE_PEER_REC
+	| SHARED_CACHE_IF_REC
 	;
 
 FRONTEND_REC
@@ -444,6 +453,56 @@ SYSLOG_FACILITY_REC: TOK_SYSLOG_FACILITY '=' STRING
 	    config_param_validate("syslog-facility", $3, cfg, /* XXX: */ "",
 	    yyget_lineno()) != 0)
 		YYABORT;
+};
+
+SESSION_CACHE_REC: TOK_SESSION_CACHE '=' UINT
+{
+#ifdef USE_SHARED_CACHE
+	cfg->SHARED_CACHE = $3;
+#else
+	fprintf(stderr, "Hitch needs to be compiled with --enable-sessioncache "
+			"for '%s'", input_line);
+	YYABORT;
+#endif
+};
+
+SHARED_CACHE_LISTEN_REC: TOK_SHARED_CACHE_LISTEN '=' STRING
+{
+#ifdef USE_SHARED_CACHE
+	if ($3 && config_param_validate("shared-cache-listen", $3, cfg,
+		/* XXX: */ "", yyget_lineno()) != 0)
+		YYABORT;
+#else
+	fprintf(stderr, "Hitch needs to be compiled with --enable-sessioncache "
+			"for '%s'", input_line);
+	YYABORT;
+#endif
+};
+
+SHARED_CACHE_PEER_REC: TOK_SHARED_CACHE_PEER  '=' STRING
+{
+#ifdef USE_SHARED_CACHE
+	if ($3 && config_param_validate("shared-cache-peer", $3, cfg,
+		/* XXX: */ "", yyget_lineno()) != 0)
+		YYABORT;
+#else
+	fprintf(stderr, "Hitch needs to be compiled with --enable-sessioncache "
+			"for '%s'", input_line);
+	YYABORT;
+#endif
+};
+
+SHARED_CACHE_IF_REC: TOK_SHARED_CACHE_IF '=' STRING
+{
+#ifdef USE_SHARED_CACHE
+	if ($3 && config_param_validate("shared-cache-if", $3, cfg,
+		/* XXX: */ "", yyget_lineno()) != 0)
+		YYABORT;
+#else
+	fprintf(stderr, "Hitch needs to be compiled with --enable-sessioncache "
+			"for '%s'", input_line);
+	YYABORT;
+#endif
 };
 
 %%

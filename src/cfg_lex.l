@@ -80,6 +80,10 @@ char input_line[512];
 "ocsp-resp-tmo"		{ return (TOK_OCSP_RESP_TMO); }
 "ocsp-connect-tmo"	{ return (TOK_OCSP_CONN_TMO); }
 "ocsp-dir"		{ return (TOK_OCSP_DIR); }
+"session-cache"	 	{ return (TOK_SESSION_CACHE); }
+"shared-cache-listen"	{ return (TOK_SHARED_CACHE_LISTEN); }
+"shared-cache-peer"  	{ return (TOK_SHARED_CACHE_PEER); }
+"shared-cache-if"    	{ return (TOK_SHARED_CACHE_IF); }
 
 (?i:"yes"|"y"|"on"|"true"|"t"|\"yes\"|\"y\"|\"on\"|\"true\"|\"t\") {
 	yylval.i = 1;
