@@ -54,7 +54,7 @@ extern char input_line[512];
 %token TOK_OCSP_DIR TOK_OCSP_RESP_TMO TOK_OCSP_CONN_TMO TOK_ALPN_PROTOS
 %token TOK_TLS_PROTOS TOK_SSLv3 TOK_TLSv1_0 TOK_TLSv1_1 TOK_TLSv1_2
 %token TOK_SESSION_CACHE TOK_SHARED_CACHE_LISTEN TOK_SHARED_CACHE_PEER
-%token TOK_SHARED_CACHE_IF
+%token TOK_SHARED_CACHE_IF TOK_PRIVATE_KEY
 
 %parse-param { hitch_config *cfg }
 
@@ -170,6 +170,7 @@ PB_REC
 	: PB_CERT
 	| PB_OCSP_RESP_FILE;
 	| OCSP_VERIFY
+	| PRIVATE_KEY
 	;
 
 PB_CERT: TOK_PB_CERT '=' STRING { if ($3) cur_pem->filename = strdup($3); };
@@ -186,6 +187,11 @@ OCSP_VERIFY: TOK_OCSP_VERIFY '=' BOOL
 		cur_pem->ocsp_vfy = $3;
 	else
 		cfg->OCSP_VFY = $3;
+};
+
+PRIVATE_KEY: TOK_PRIVATE_KEY '=' STRING
+{
+	if ($3) cur_pem->priv_key_filename = strdup($3);
 };
 
 OCSP_DIR: TOK_OCSP_DIR '=' STRING

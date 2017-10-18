@@ -719,6 +719,11 @@ load_privatekey(SSL_CTX *ctx, const char *file)
 	    SSL_CTX_get_default_passwd_cb_userdata(ctx));
 	BIO_free(bio);
 
+	if (!pkey) {
+		log_ssl_error(NULL, "{core} PEM_read_bio_PrivateKey");
+		return NULL;
+	}
+
 	return (pkey);
 }
 
@@ -944,11 +949,23 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 		return (NULL);
 	}
 
-	pkey = load_privatekey(ctx, cf->filename);
+	pkey = 0;
+	if (cf->priv_key_filename != 0) {
+		pkey = load_privatekey(ctx, cf->priv_key_filename);
+		if (!pkey) {
+			ERR("Error loading private key (%s)\n",
+			    cf->priv_key_filename);
+			sctx_free(sc, NULL);
+			return (NULL);
+		}
+	}
 	if (!pkey) {
-		ERR("Error loading private key (%s)\n", cf->filename);
-		sctx_free(sc, NULL);
-		return (NULL);
+		pkey = load_privatekey(ctx, cf->filename);
+		if (!pkey) {
+			ERR("Error loading private key (%s)\n", cf->filename);
+			sctx_free(sc, NULL);
+			return (NULL);
+		}
 	}
 
 	if (SSL_CTX_use_PrivateKey(ctx, pkey) <= 0) {

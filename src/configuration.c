@@ -491,6 +491,7 @@ int
 cfg_cert_vfy(struct cfg_cert_file *cf)
 {
 	struct stat st;
+	double d;
 
 	CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
 	AN(cf->filename);
@@ -526,6 +527,24 @@ cfg_cert_vfy(struct cfg_cert_file *cf)
 		cf->ocsp_mtim = mtim2double(&st);
 	}
 
+	if (cf->priv_key_filename != NULL &&
+	    strlen(cf->priv_key_filename) > 0) {
+
+		if (stat(cf->priv_key_filename, &st) != 0) {
+			config_error_set("Unable to stat private keyfile "
+			    "'%s': %s", cf->priv_key_filename,
+			    strerror(errno));
+			return (0);
+		}
+		if (!S_ISREG(st.st_mode)) {
+			config_error_set("Invalid private keyfile "
+			    "'%s': Not a file.", cf->priv_key_filename);
+			return (0);
+		}
+
+		d = mtim2double(&st);
+		cf->mtim = cf->mtim > d ? cf->mtim : d;
+	}
 	return (1);
 }
 

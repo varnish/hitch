@@ -196,6 +196,18 @@ supplied on the command line.
 This option is also available in a frontend declaration, to make a
 certificate only available for a specific listen endpoint.
 
+private-key = <string>
+----------------------
+
+If set, the private key is read from specified location, not from the cert file.
+
+::
+
+   pem-file = {
+       cert = "mycert.pem"
+       private-key = "myprivate.key"
+   }
+
 prefer-server-ciphers = on|off
 ------------------------------
 
