@@ -3,7 +3,7 @@ sbin_PROGRAMS = hitch
 noinst_LIBRARIES = libcfg.a libforeign.a
 
 EXTRA_DIST = \
-	$(top_srcdir)/src/tests/common.sh \
+	$(top_srcdir)/src/tests/hitch_test.sh \
 	$(top_srcdir)/src/tests/test*.sh \
 	$(top_srcdir)/src/tests/certs/* \
 	$(top_srcdir)/src/tests/configs/default.cfg
