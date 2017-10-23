@@ -3479,7 +3479,7 @@ notify_workers(struct worker_update *wu)
 		     (wu->type == BACKEND_REFRESH)) {
 			errno = 0;
 			do {
-				i = write(c->pfd, (void*)wu, sizeof(wu));
+				i = write(c->pfd, (void*)wu, sizeof(struct worker_update));
 				if (i == -1 && errno != EINTR) {
 					if (wu->type == WORKER_GEN)
 						ERR("WARNING: {core} Unable to "
