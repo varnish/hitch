@@ -662,6 +662,22 @@ config_param_shcupd_peer(char *str, hitch_config *cfg)
 
 #endif /* USE_SHARED_CACHE */
 
+static int
+check_frontend_uniqueness(struct front_arg *cur_fa, hitch_config *cfg)
+{
+	struct front_arg *fa, *fatmp;
+	HASH_ITER(hh, cfg->LISTEN_ARGS, fa, fatmp) {
+		if ((cur_fa->ip == NULL || strcmp(cur_fa->ip, fa->ip) == 0) &&
+		    strcmp(cur_fa->port, fa->port) == 0) {
+			config_error_set("Redundant frontend "
+			"(matching IP and port) definition: '%s:%s'.",
+			    fa->ip, fa->port);
+			return (0);
+		}
+	}
+	return(1);
+}
+
 int
 front_arg_add(hitch_config *cfg, struct front_arg *fa)
 {
@@ -691,6 +707,9 @@ front_arg_add(hitch_config *cfg, struct front_arg *fa)
 		    "for frontend '%s'", fa->pspec);
 		return (0);
 	}
+
+	if (check_frontend_uniqueness(fa, cfg) == 0)
+		return (0);
 
 	HASH_ADD_KEYPTR(hh, cfg->LISTEN_ARGS, fa->pspec,
 	    strlen(fa->pspec), fa);
