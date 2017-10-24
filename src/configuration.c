@@ -280,7 +280,7 @@ config_destroy(hitch_config *cfg)
 	free(cfg->SHCUPD_IP);
 	free(cfg->SHCUPD_PORT);
 
-	for (i = 0; i < MAX_SHCUPD_PEERS; i++) {
+	for (i = 0; i < MAX_SHCUPD_PEERS && cfg->SHCUPD_PEERS[i].ip != NULL; i++) {
 		free(cfg->SHCUPD_PEERS[i].ip);
 		free(cfg->SHCUPD_PEERS[i].port);
 	}
