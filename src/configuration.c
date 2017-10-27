@@ -1264,7 +1264,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		{ "help", 0, NULL, 'h' },
 		{ 0, 0, 0, 0 }
 	};
-#define SHORT_OPTS "c:e:Ob:f:n:B:l:C:U:p:P:M:k:r:u:g:qstVho:"
+#define SHORT_OPTS "c:e:Ob:f:n:B:l:C:U:p:P:M:k:r:u:g:qstVho:R:"
 
 	if (argc == 1) {
 		config_print_usage(argv[0]);
