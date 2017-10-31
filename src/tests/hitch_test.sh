@@ -102,6 +102,7 @@ start_hitch() {
 
 	run_cmd hitch \
 		--pidfile="$TEST_TMPDIR/hitch.pid" \
+		--log-filename=hitch.log \
 		--daemon \
 		$HITCH_USER \
 		"$@"
