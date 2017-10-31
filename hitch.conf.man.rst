@@ -129,6 +129,12 @@ keepalive = <number>
 
 Number of seconds a TCP socket is kept alive
 
+backendrefresh = <number>
+-------------------------
+
+Number of seconds between periodic backend IP lookups, 0 to disable.
+Default is 0.
+
 ocsp-dir = <string>
 -------------------
 
