@@ -20,6 +20,14 @@ CONFDIR="${TESTDIR}/configs"
 # end old setup
 
 dump() {
+	for LOG in *.log
+	do
+		test -f "$LOG" || continue
+
+		printf '\nFound log file %s:\n\n' "$LOG"
+		cat -v "$LOG" | sed -e 's/^/> /'
+	done >&2
+
 	for DUMP in *.dump
 	do
 		test -f "$DUMP" || continue
@@ -95,7 +103,6 @@ start_hitch() {
 	run_cmd hitch \
 		--pidfile="$TEST_TMPDIR/hitch.pid" \
 		--daemon \
-		--quiet \
 		$HITCH_USER \
 		"$@"
 }
