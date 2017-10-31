@@ -34,7 +34,8 @@ nobase_noinst_HEADERS = \
 	foreign/vas.h \
 	foreign/vpf.h \
 	foreign/vqueue.h \
-	foreign/vsb.h
+	foreign/vsb.h \
+	foreign/vsa.h
 
 BUILT_SOURCES = \
 	cfg_lex.c \
@@ -55,7 +56,9 @@ libforeign_a_SOURCES = \
 	foreign/flopen.c \
 	foreign/vas.c \
 	foreign/vpf.c \
-	foreign/vsb.c
+	foreign/vsb.c \
+	foreign/vsa.c
+
 
 hitch_SOURCES = \
 	asn_gentm.c \
