@@ -222,7 +222,7 @@ config_new(void)
 	r->SYSLOG             = 0;
 	r->SYSLOG_FACILITY    = LOG_DAEMON;
 	r->TCP_KEEPALIVE_TIME = 3600;
-	r->BACKEND_REFRESH_TIME = 1;
+	r->BACKEND_REFRESH_TIME = 0;
 	r->DAEMONIZE          = 0;
 	r->PREFER_SERVER_CIPHERS = 0;
 	r->TEST	              = 0;
@@ -1122,7 +1122,7 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "  -n  --workers=NUM          Number of worker processes (Default: %ld)\n", cfg->NCORES);
 	fprintf(out, "  -B  --backlog=NUM          Set listen backlog size (Default: %d)\n", cfg->BACKLOG);
 	fprintf(out, "  -k  --keepalive=SECS       TCP keepalive on client socket (Default: %d)\n", cfg->TCP_KEEPALIVE_TIME);
-	fprintf(out, "  -R  --backendrefresh=SECS  Periodic backend IP lookup (Default: %d, 0 to disable)\n", cfg->BACKEND_REFRESH_TIME);
+	fprintf(out, "  -R  --backendrefresh=SECS  Periodic backend IP lookup, 0 to disable (Default: %d)\n", cfg->BACKEND_REFRESH_TIME);
 
 
 #ifdef USE_SHARED_CACHE
@@ -1288,7 +1288,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		{ "help", 0, NULL, 'h' },
 		{ 0, 0, 0, 0 }
 	};
-#define SHORT_OPTS "c:e:Ob:f:n:B:l:C:U:p:P:M:k:r:u:g:qstVho:"
+#define SHORT_OPTS "c:e:Ob:f:n:B:l:C:U:p:P:M:k:r:u:g:qstVho:R:"
 
 	if (argc == 1) {
 		config_print_usage(argv[0]);
