@@ -420,34 +420,57 @@ config_param_host_port(char *str, char **addr, char **port)
 static int
 config_param_val_int(char *str, int *dst, int positive_only)
 {
-	int num;
+	long  lval;
+	char *ep;
 
 	assert(str != NULL);
-	num = atoi(str);
 
-	if (positive_only && num < 0) {
-		config_error_set("Not a positive number.");
+	errno = 0;
+	lval = strtol(str, &ep, 10);
+
+	if (*str == '\0' || *ep != '\0') {
+		config_error_set("Not a number.");
+		return (0);
+	}
+	if ((errno == ERANGE && (lval == LONG_MIN || lval == LONG_MAX)) ||
+	    lval < INT_MIN || lval > INT_MAX) {
+		config_error_set("Number out of range.");
+		return (0);
+	}
+	if (positive_only && lval < 0) {
+		config_error_set("Negative number.");
 		return (0);
 	}
 
-	*dst = num;
-	return 1;
+	*dst = (int)lval;
+	return (1);
 }
 
 static int
 config_param_val_long(char *str, long *dst, int positive_only)
 {
-	long num;
+	long  lval;
+	char *ep;
+
 	assert(str != NULL);
 
-	num = atol(str);
+	errno = 0;
+	lval = strtol(str, &ep, 10);
 
-	if (positive_only && num <= 0) {
-		config_error_set("Not a positive number.");
+	if (*str == '\0' || *ep != '\0') {
+		config_error_set("Not a number.");
+		return (0);
+	}
+	if (errno == ERANGE && (lval == LONG_MIN || lval == LONG_MAX)) {
+		config_error_set("Number out of range.");
+		return (0);
+	}
+	if (positive_only && lval < 0) {
+		config_error_set("Negative number.");
 		return (0);
 	}
 
-	*dst = num;
+	*dst = lval;
 	return (1);
 }
 
