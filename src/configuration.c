@@ -418,7 +418,7 @@ config_param_host_port(char *str, char **addr, char **port)
 
 
 static int
-config_param_val_int(char *str, int *dst, int positive_only)
+config_param_val_int(char *str, int *dst, int non_negative)
 {
 	long  lval;
 	char *ep;
@@ -437,7 +437,7 @@ config_param_val_int(char *str, int *dst, int positive_only)
 		config_error_set("Number out of range.");
 		return (0);
 	}
-	if (positive_only && lval < 0) {
+	if (non_negative && lval < 0) {
 		config_error_set("Negative number.");
 		return (0);
 	}
@@ -447,7 +447,7 @@ config_param_val_int(char *str, int *dst, int positive_only)
 }
 
 static int
-config_param_val_long(char *str, long *dst, int positive_only)
+config_param_val_long(char *str, long *dst, int non_negative)
 {
 	long  lval;
 	char *ep;
@@ -465,7 +465,7 @@ config_param_val_long(char *str, long *dst, int positive_only)
 		config_error_set("Number out of range.");
 		return (0);
 	}
-	if (positive_only && lval < 0) {
+	if (non_negative && lval < 0) {
 		config_error_set("Negative number.");
 		return (0);
 	}
