@@ -100,11 +100,11 @@ void cfg_cert_file_free(struct cfg_cert_file **cfptr);
 static char error_buf[CONFIG_BUF_SIZE];
 static char tmp_buf[150];
 
-/* declare static printf like functions: */
-static void config_error_set(char *fmt, ...)
+/* declare printf like functions: */
+void config_error_set(char *fmt, ...)
 	__attribute__((format(printf, 1, 2)));
 
-static void
+void
 config_error_set(char *fmt, ...)
 {
 	int len;
