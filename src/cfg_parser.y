@@ -14,6 +14,7 @@ extern int yyparse(hitch_config *);
 extern FILE *yyin;
 int yyget_lineno(void);
 
+void config_error_set(char *, ...);
 int config_param_validate(char *k, char *v, hitch_config *cfg,
     char *file, int line);
 int front_arg_add(hitch_config *cfg, struct front_arg *fa);
@@ -537,7 +538,6 @@ yyerror(hitch_config *cfg, const char *s)
 	if (cur_fa != NULL)
 		FREE_OBJ(cur_fa);
 
-	fprintf(stderr, "Parsing error in line %d: %s\n", yyget_lineno(), s);
-	if (strlen(input_line) > 0)
-		fprintf(stderr, "'%s'", input_line);
+	config_error_set("Parsing error in line %d: %s: '%s'",
+	    yyget_lineno(), s, strlen(input_line) > 0 ? input_line : "");
 }
