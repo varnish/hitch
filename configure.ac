@@ -40,6 +40,7 @@ AM_CONDITIONAL([FOUND_RST2MAN], [test "x$RST2MAN" != xno])
 AM_MAINTAINER_MODE([disable])
 
 # Checks for libraries.
+m4_include([hitch.m4])
 PKG_CHECK_EXISTS([libev], [
 	PKG_CHECK_MODULES([EV], [libev])], [
 	HITCH_SEARCH_LIBS([EV], [ev], [ev_default_loop],
