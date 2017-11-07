@@ -14,7 +14,8 @@ char input_line[512];
 %option noyywrap
 %%
 \n.* {
-	strncpy(input_line, yytext + 1, sizeof (input_line));
+	strncpy(input_line, yytext + 1, sizeof (input_line) - 1);
+	input_line[sizeof(input_line) - 1] = '\0';
 	yyless(1);
 }
 [ \t\n\r]         ;
