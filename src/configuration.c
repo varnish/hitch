@@ -1098,7 +1098,7 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "  -n  --workers=NUM          Number of worker processes (Default: %ld)\n", cfg->NCORES);
 	fprintf(out, "  -B  --backlog=NUM          Set listen backlog size (Default: %d)\n", cfg->BACKLOG);
 	fprintf(out, "  -k  --keepalive=SECS       TCP keepalive on client socket (Default: %d)\n", cfg->TCP_KEEPALIVE_TIME);
-	fprintf(out, "  -R  --backendrefresh=SECS  Periodic backend IP lookup, 0 to disable (Default: %d)\n", cfg->BACKEND_REFRESH_TIME);
+	fprintf(out, "  -R  --backend-refresh=SECS Periodic backend IP lookup, 0 to disable (Default: %d)\n", cfg->BACKEND_REFRESH_TIME);
 
 
 #ifdef USE_SHARED_CACHE

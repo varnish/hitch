@@ -129,8 +129,8 @@ keepalive = <number>
 
 Number of seconds a TCP socket is kept alive
 
-backendrefresh = <number>
--------------------------
+backend-refresh = <number>
+--------------------------
 
 Number of seconds between periodic backend IP lookups, 0 to disable.
 Default is 0.
