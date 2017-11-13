@@ -112,6 +112,5 @@ run_cmd hitch --config=${CONFDIR}/default.cfg --help
 run_cmd -s 1 hitch --test --config=${CONFDIR}/default.cfg
 
 # Test that our example configuration is in fact usable.
-TMPFILE=$(mktemp -u)
 sed -e "s|nogroup|$GRP|" ${TESTDIR}/../../hitch.conf.example |
 test_cfg example
