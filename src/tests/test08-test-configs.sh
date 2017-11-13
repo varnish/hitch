@@ -108,10 +108,8 @@ EOF
 # Issue #52.
 run_cmd hitch --config=${CONFDIR}/default.cfg --help
 
-# XXX: unclear check
-# Works as expected.
-#hitch --test --config=${CONFDIR}/default.cfg
-#test $? -eq 1 || fail "--help with --config does not work as expected."
+# Issue #22.
+run_cmd -s 1 hitch --test --config=${CONFDIR}/default.cfg
 
 # Test that our example configuration is in fact usable.
 TMPFILE=$(mktemp -u)
