@@ -179,10 +179,25 @@ hitch_pid() {
 # a loop.
 
 hitch_hosts() {
-	# XXX: check lsof presence with autoconf
-	lsof -F -P -n -a -p "$(hitch_pid)" -i 4 -i TCP |
-	sed 's/*/localhost/' |
-	awk '/^n/ { print substr($1,2) }'
+	if command -v lsof >/dev/null
+	then
+		lsof -F -P -n -a -p "$(hitch_pid)" -i 4 -i TCP |
+		sed 's/*/localhost/' |
+		awk '/^n/ { print substr($1,2) }'
+		return
+	fi
+
+	if command -v sockstat >/dev/null
+	then
+		sockstat -P tcp |
+		awk '$3 == '"$(hitch_pid)"' {print $6}' |
+		sort |
+		uniq |
+		sed 's:\*:localhost:'
+		return
+	fi
+
+	fail "neither lsof nor sockstat available"
 }
 
 #-
