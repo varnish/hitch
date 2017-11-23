@@ -1,15 +1,14 @@
 #!/bin/sh
-
+#
 # gh issue #82, per-frontend wildcard certificates
 
 . hitch_test.sh
-set +o errexit
 
-PORT1=`expr $LISTENPORT + 1301`
-PORT2=`expr $LISTENPORT + 1302`
-PORT3=`expr $LISTENPORT + 1303`
+PORT1=$(expr $LISTENPORT + 1301)
+PORT2=$(expr $LISTENPORT + 1302)
+PORT3=$(expr $LISTENPORT + 1303)
 
-mk_cfg <<EOF
+cat >hitch.cfg <<EOF
 backend = "[hitch-tls.org]:80"
 
 tls = on
@@ -35,55 +34,55 @@ write-proxy-v1 = off
 proxy-proxy = off
 
 frontend = {
-  host = "$LISTENADDR"
+  host = "localhost"
   port = "$PORT1"
   pem-file = "$CERTSDIR/wildcard.example.com"
   sni-nomatch-abort = off
 }
 
 frontend = {
-  host = "$LISTENADDR"
+  host = "localhost"
   port = "$PORT2"
   pem-file = "$CERTSDIR/wildcard.example.com"
   pem-file = "$CERTSDIR/site1.example.com"
 }
 
 frontend = {
-  host = "$LISTENADDR"
+  host = "localhost"
   port = "$PORT3"
   pem-file = "$CERTSDIR/site2.example.com"
 }
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 0 || die "Hitch did not start."
+start_hitch --config=hitch.cfg
 
 # Wildcard cert on frontend #1
-echo | openssl s_client -servername foo.example.com -prexit -connect $LISTENADDR:$PORT1 >$DUMPFILE 2>&1
-test $? -eq 0 || die "s_client failed"
-grep -q -c "/CN=\*.example.com" $DUMPFILE
-test $? -eq 0 || die "s_client got wrong certificate in listen port #1"
+s_client -servername foo.example.com \
+	-connect localhost:$PORT1 \
+	>wildcard1.dump
+run_cmd grep -q '/CN=\*.example.com' wildcard1.dump
 
 # Wildcard cert on frontend #2
-echo | openssl s_client -servername bar.example.com -prexit -connect $LISTENADDR:$PORT2 >$DUMPFILE 2>&1
-test $? -eq 0 || die "s_client failed"
-grep -q -c "/CN=\*.example.com" $DUMPFILE
-test $? -eq 0 || die "s_client got wrong certificate in listen port #2"
+s_client -servername bar.example.com \
+	-connect localhost:$PORT2 \
+	>wildcard2.dump
+run_cmd grep -q '/CN=\*.example.com' wildcard2.dump
 
 # Exact match on frontend #2
-echo | openssl s_client -servername site1.example.com -prexit -connect $LISTENADDR:$PORT2 >$DUMPFILE 2>&1
-test $? -eq 0 || die "s_client failed"
-grep -q -c "/CN=site1.example.com" $DUMPFILE
-test $? -eq 0 || die "s_client got wrong certificate in listen port #2"
+s_client -servername site1.example.com \
+	-connect localhost:$PORT2 \
+	>exact2.dump
+run_cmd grep -q '/CN=site1.example.com' exact2.dump
 
 # Verify that sni-nomatch-abort = off is respected for frontend #1
-echo | openssl s_client -servername "asdf" -prexit -connect $LISTENADDR:$PORT1 >$DUMPFILE 2>&1
-test $? -eq 0 || die "s_client failed"
-grep -q -c "/CN=\*.example.com" $DUMPFILE
-test $? -eq 0 || die "s_client got wrong certificate in listen port #1"
+s_client -servername "asdf" \
+	-connect localhost:$PORT1 \
+	>abort1.dump
+run_cmd grep -q '/CN=\*.example.com' abort1.dump
 
-# And also verify that global setting sni-nomatch-abort = on is respected for other frontend
-echo | openssl s_client -servername "asdf" -prexit -connect $LISTENADDR:$PORT3 >$DUMPFILE 2>&1
-test $? -ne 0 || die "s_client did NOT fail when it should have. "
-grep -q -c "unrecognized name" $DUMPFILE
-test $? -eq 0 || die "Expected 'unrecognized name' error."
+# And also verify that global setting sni-nomatch-abort = on is respected
+# for other frontend
+! s_client -servername "asdf" \
+	-connect localhost:$PORT3 \
+	>abort3.dump
+run_cmd grep -q 'unrecognize' abort3.dump

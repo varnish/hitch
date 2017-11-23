@@ -37,21 +37,30 @@
 
 #include "config.h"
 
-#include <netdb.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>  /* TCP_NODELAY */
-#include <net/if.h>
-
-#include <libgen.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <sys/wait.h>  /* WAIT_PID */
+
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
+
+#ifdef __sun
+#include <sys/filio.h>
+#endif
+
+#include <net/if.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>  /* TCP_NODELAY */
 
 #include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
 #include <grp.h>
+#include <libgen.h>
 #include <limits.h>
+#include <netdb.h>
 #include <pwd.h>
 #include <sched.h>
 #include <signal.h>
@@ -61,14 +70,6 @@
 #include <strings.h>
 #include <time.h>
 #include <unistd.h>
-
-#ifdef __linux__
-#include <sys/prctl.h>
-#endif
-
-#ifdef __sun
-#include <sys/filio.h>
-#endif
 
 #include "configuration.h"
 #include "hitch.h"

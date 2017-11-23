@@ -34,13 +34,14 @@
 
 #include "config.h"
 
+#include <sys/types.h>
+#include <sys/ioctl.h>
+
 #include <arpa/inet.h>
 
 #include <ev.h>
 #include <stdio.h>
 #include <syslog.h>
-#include <sys/types.h>
-#include <sys/ioctl.h>
 
 // #include "asn_gentm.h"
 #include "configuration.h"

@@ -1,10 +1,16 @@
 #!/bin/sh
 
 . hitch_test.sh
-set +o errexit
+
+test_cfg() {
+	cfg=$1.cfg
+	pathchk "$cfg"
+	cat >"$cfg"
+	run_cmd hitch --test --config="$cfg"
+}
 
 # stud config
-mk_cfg <<EOF
+test_cfg stud <<EOF
 #
 # stud(8), The Scalable TLS Unwrapping Daemon's configuration
 #
@@ -124,14 +130,10 @@ write-proxy = off
 #
 # type: boolean
 proxy-proxy = off
-
 EOF
 
-hitch --test --config=$CONFFILE > $DUMPFILE
-test $? -eq 0 || die "Hitch did not start. (config #1)"
-
 # hitch 1.0.0
-mk_cfg <<EOF
+test_cfg 1_0_0 <<EOF
 #
 # Example configuration file for hitch(8).
 #
@@ -264,15 +266,11 @@ proxy-proxy = off
 #
 # type: boolean
 sni-nomatch-abort = off
-
 EOF
-
-hitch --test --config=$CONFFILE > $DUMPFILE
-test $? -eq 0 || die "Hitch did not start. (config #2)"
 
 # 1.1.0 didn't see any config file changes
 # hitch 1.2.0
-mk_cfg <<EOF
+test_cfg 1_2_0 <<EOF
 #
 # Example configuration file for hitch(8).
 #
@@ -450,11 +448,8 @@ sni-nomatch-abort = off
 # }
 EOF
 
-hitch --test --config=$CONFFILE > $DUMPFILE
-test $? -eq 0 || die "Hitch did not start. (config #3)"
-
 # hitch 1.3.0
-mk_cfg <<EOF
+test_cfg 1_3_0 <<EOF
 #
 # Example configuration file for hitch(8).
 #
@@ -657,13 +652,9 @@ sni-nomatch-abort = off
 #
 # }
 EOF
-
-hitch --test --config=$CONFFILE > $DUMPFILE
-test $? -eq 0 || die "Hitch did not start. (config #4)"
-
 
 # hitch 1.4.0
-mk_cfg <<EOF
+test_cfg 1_4_0 <<EOF
 #
 # Example configuration file for hitch(8).
 #
@@ -865,8 +856,4 @@ sni-nomatch-abort = off
 #     pem-file = "/etc/hitch/certs/mycert.pem"
 #
 # }
-
 EOF
-
-hitch --test --config=$CONFFILE > $DUMPFILE
-test $? -eq 0 || die "Hitch did not start (config #5 return code: $?)"

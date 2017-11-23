@@ -1,23 +1,21 @@
 #!/bin/sh
 #
 # Test multiple certificates (SNI) on a listening socket.
-#
+
 . hitch_test.sh
-set +o errexit
 
-hitch $HITCH_ARGS --backend=[hitch-tls.org]:80 "--frontend=[${LISTENADDR}]:$LISTENPORT" \
-	${CERTSDIR}/site1.example.com ${CERTSDIR}/site2.example.com ${CERTSDIR}/default.example.com
-test $? -eq 0 || die "Hitch did not start."
+start_hitch \
+	--backend='[hitch-tls.org]:80' \
+	--frontend="[localhost]:$LISTENPORT" \
+	"${CERTSDIR}/site1.example.com" \
+	"${CERTSDIR}/site2.example.com" \
+	"${CERTSDIR}/default.example.com"
 
-echo -e "\n" | openssl s_client -prexit -connect $LISTENADDR:$LISTENPORT >$DUMPFILE 2>&1
-test $? -eq 0 || die "s_client failed"
-grep -q -c "subject=/CN=default.example.com" $DUMPFILE
-test $? -eq 0 || die "s_client got wrong certificate on listen port #1"
+s_client >no-sni.dump
+run_cmd grep -q 'subject=/CN=default.example.com' no-sni.dump
 
 # send a SNI request
-echo -e "\n" | openssl s_client -servername site1.example.com -prexit -connect $LISTENADDR:$LISTENPORT >$DUMPFILE 2>&1
-test $? -eq 0 || die "s_client failed"
-grep -q -c "subject=/CN=site1.example.com" $DUMPFILE
-test $? -eq 0 || die "s_client got wrong certificate in listen port #2"
+s_client -servername site1.example.com >sni.dump
+run_cmd grep -q 'subject=/CN=site1.example.com' sni.dump
 
-runcurl $LISTENADDR $LISTENPORT
+curl_hitch

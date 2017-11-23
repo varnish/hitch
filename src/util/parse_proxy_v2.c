@@ -35,14 +35,16 @@
  * correct thing to do.
  */
 
+#include <sys/types.h>
+#include <sys/socket.h>
+
+#include <arpa/inet.h>
+
+#include <netdb.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <arpa/inet.h>
 #include <openssl/opensslv.h>
 
 unsigned char PROXY_V2_HEADER[12] = { 0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D,

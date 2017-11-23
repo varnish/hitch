@@ -1,36 +1,27 @@
 #!/bin/sh
 
-# restart hitch after having a more recent cert file
-
 . hitch_test.sh
-set +o errexit
 
-CERTFILE=$(mktemp -u)
-cp ${CERTSDIR}/default.example.com $CERTFILE
+cp ${CERTSDIR}/default.example.com cert.pem
 
-mk_cfg <<EOF
-pem-file = "$CERTFILE"
-frontend = "[$LISTENADDR]:$LISTENPORT"
+# XXX: reload doesn't work with a relative pem file
+cat >hitch.cfg <<EOF
+pem-file = "$PWD/cert.pem"
+frontend = "[localhost]:$LISTENPORT"
 backend = "[hitch-tls.org]:80"
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 0 || die "Hitch did not start."
+# XXX: reload doesn't work with a relative config file
+start_hitch --config=$PWD/hitch.cfg
 
-openssl s_client -connect $LISTENADDR:$LISTENPORT >$DUMPFILE 2>&1
-grep -q -c "CN=default.example.com" $DUMPFILE
-test $? -eq 0 || die "Incorrect certificate"
+s_client >s_client1.dump
+grep -q "CN=default.example.com" s_client1.dump
 
-cp ${CERTSDIR}/ecc.example.com.pem $CERTFILE
-touch $CERTFILE
+# restart hitch after having a more recent cert file
+cp ${CERTSDIR}/ecc.example.com.pem cert.pem
+echo "kill -HUP $(hitch_pid)"
+kill -HUP $(hitch_pid)
+sleep 2
 
-kill -HUP $(cat $PIDFILE)
-sleep 1
-
-# curl --max-time 5  --insecure https://$LISTENADDR:$LISTENPORT/ >$DUMPFILE 2>&1
-openssl s_client -connect $LISTENADDR:$LISTENPORT >$DUMPFILE 2>&1
-grep -q -c "CN=ecc.example.com" $DUMPFILE
-test $? -eq 0 || die "Incorrect certificate"
-
-
-rm $CERTFILE
+s_client | tee s_client2.dump
+grep -q "CN=ecc.example.com" s_client2.dump

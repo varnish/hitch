@@ -1,18 +1,37 @@
 #!/bin/sh
 # Test specifying combinations of ssl, tls and tls-protos in different ways.
 # All of these invocations of hitch shall fail, or something is wrong
+
 . hitch_test.sh
-set +o errexit
 
-##########
-# In frontend blocks
+test_bad_cfg() {
+	run_cmd -s 1 hitch --test --config="$1"
+}
 
-# "tls-protos = " then "ssl = on" in frontend block
-mk_cfg <<EOF
+test_both_cfg() {
+	frontend_cfg="$1.frontend.cfg"
+	global_cfg="$1.global.cfg"
+	pathchk "$frontend_cfg" "$global_cfg"
+
+	printf 'backend = "[hitch-tls.org]:80"\n\n' |
+	tee "$frontend_cfg" "$global_cfg"
+
+	printf 'frontend = {\n' >>"$frontend_cfg"
+
+	tee -a "$frontend_cfg" "$global_cfg"
+
+	printf '}\n' >>"$frontend_cfg"
+
+	test_bad_cfg "$frontend_cfg"
+	test_bad_cfg "$global_cfg"
+}
+
+# "tls-protos = " then "ssl = on"
+test_both_cfg tls-protos-then-ssl-on <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
-	host = "$LISTENADDR"
+	host = "localhost"
 	port = "$LISTENPORT"
 	pem-file = "${CERTSDIR}/default.example.com"
 	tls-protos = SSLv3 TLSv1.0 TLSv1.1 TLSv1.2
@@ -20,15 +39,12 @@ frontend = {
 }
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 1 || die "Wrong exit code."
-
-# "ssl = on" then "tls-protos = " in frontend block
-mk_cfg <<EOF
+# "ssl = on" then "tls-protos = "
+test_both_cfg ssl-on-then-tls-protos <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
-	host = "$LISTENADDR"
+	host = "localhost"
 	port = "$LISTENPORT"
 	pem-file = "${CERTSDIR}/default.example.com"
 	ssl = on
@@ -36,15 +52,12 @@ frontend = {
 }
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 1 || die "Wrong exit code."
-
-# "tls-protos = " then "tls = on" in frontend block
-mk_cfg <<EOF
+# "tls-protos = " then "tls = on"
+test_both_cfg tls-protos-then-tls-on <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
-	host = "$LISTENADDR"
+	host = "localhost"
 	port = "$LISTENPORT"
 	pem-file = "${CERTSDIR}/default.example.com"
 	tls-protos = SSLv3 TLSv1.0 TLSv1.1 TLSv1.2
@@ -52,15 +65,12 @@ frontend = {
 }
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 1 || die "Wrong exit code."
-
-# "tls = on" then "tls-protos = " in frontend block
-mk_cfg <<EOF
+# "tls = on" then "tls-protos = "
+test_both_cfg tls-on-then-tls-protos <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
-	host = "$LISTENADDR"
+	host = "localhost"
 	port = "$LISTENPORT"
 	pem-file = "${CERTSDIR}/default.example.com"
 	tls = on
@@ -68,15 +78,12 @@ frontend = {
 }
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 1 || die "Wrong exit code."
-
-# "ssl = on" then "tls = off" in frontend block
-mk_cfg <<EOF
+# "ssl = on" then "tls = off"
+test_both_cfg ssl-on-then-tls-off <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
-	host = "$LISTENADDR"
+	host = "localhost"
 	port = "$LISTENPORT"
 	pem-file = "${CERTSDIR}/default.example.com"
 	ssl = on
@@ -84,132 +91,15 @@ frontend = {
 }
 EOF
 
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 1 || die "Wrong exit code."
-
-# "tls = on" then "ssl = off" in frontend block
-mk_cfg <<EOF
+# "tls = on" then "ssl = off"
+test_both_cfg tls-on-then-ssl-off <<EOF
 backend = "[hitch-tls.org]:80"
 
 frontend = {
-	host = "$LISTENADDR"
+	host = "localhost"
 	port = "$LISTENPORT"
 	pem-file = "${CERTSDIR}/default.example.com"
 	tls = on
 	ssl = off
 }
 EOF
-
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 1 || die "Wrong exit code."
-
-##########################
-# global scope specs
-
-# "tls-protos = " then "ssl = on" in global scope
-mk_cfg <<EOF
-backend = "[hitch-tls.org]:80"
-frontend = "[*]:$LISTENPORT"
-pem-file = "${CERTSDIR}/default.example.com"
-tls-protos = SSLv3 TLSv1.0 TLSv1.1 TLSv1.2
-ssl = on
-EOF
-
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 1 || die "Wrong exit code."
-
-# "ssl = on" then "tls-protos = " in global scope
-mk_cfg <<EOF
-backend = "[hitch-tls.org]:80"
-frontend = "[*]:$LISTENPORT"
-pem-file = "${CERTSDIR}/default.example.com"
-ssl = on
-tls-protos = SSLv3 TLSv1.0 TLSv1.1 TLSv1.2
-EOF
-
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 1 || die "Wrong exit code."
-
-# "tls-protos = " then "tls = on" in global scope
-mk_cfg <<EOF
-backend = "[hitch-tls.org]:80"
-frontend = "[*]:$LISTENPORT"
-pem-file = "${CERTSDIR}/default.example.com"
-tls-protos = SSLv3 TLSv1.0 TLSv1.1 TLSv1.2
-tls = on
-EOF
-
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 1 || die "Wrong exit code."
-
-# "tls = on" then "tls-protos = " in global scope
-mk_cfg <<EOF
-backend = "[hitch-tls.org]:80"
-frontend = "[*]:$LISTENPORT"
-pem-file = "${CERTSDIR}/default.example.com"
-tls = on
-tls-protos = SSLv3 TLSv1.0 TLSv1.1 TLSv1.2
-EOF
-
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 1 || die "Wrong exit code."
-
-# "ssl = on" then "tls = off" in global scope
-mk_cfg <<EOF
-backend = "[hitch-tls.org]:80"
-frontend = "[*]:$LISTENPORT"
-pem-file = "${CERTSDIR}/default.example.com"
-ssl = on
-tls = off
-EOF
-
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 1 || die "Wrong exit code."
-
-# "tls = on" then "ssl = off" in global scope
-mk_cfg <<EOF
-backend = "[hitch-tls.org]:80"
-frontend = "[*]:$LISTENPORT"
-pem-file = "${CERTSDIR}/default.example.com"
-tls = on
-ssl = off
-EOF
-
-hitch $HITCH_ARGS --config=$CONFFILE
-test $? -eq 1 || die "Wrong exit code."
-
-
-##########################
-# specifying --ssl or --tls in the command line
-
-# both --tls and --ssl in the command line
-mk_cfg <<EOF
-backend = "[hitch-tls.org]:80"
-frontend = "[*]:$LISTENPORT"
-pem-file = "${CERTSDIR}/default.example.com"
-EOF
-
-hitch $HITCH_ARGS --config=$CONFFILE --ssl --tls
-test $? -eq 1 || die "Wrong exit code."
-
-# tls-protos, then --tls in the command line
-mk_cfg <<EOF
-backend = "[hitch-tls.org]:80"
-frontend = "[*]:$LISTENPORT"
-pem-file = "${CERTSDIR}/default.example.com"
-tls-protos = SSLv3 TLSv1.0 TLSv1.1 TLSv1.2
-EOF
-
-hitch $HITCH_ARGS --config=$CONFFILE --tls
-test $? -eq 1 || die "Wrong exit code."
-
-# tls-protos, then --ssl in the command line
-mk_cfg <<EOF
-backend = "[hitch-tls.org]:80"
-frontend = "[*]:$LISTENPORT"
-pem-file = "${CERTSDIR}/default.example.com"
-tls-protos = SSLv3 TLSv1.0 TLSv1.1 TLSv1.2
-EOF
-
-hitch $HITCH_ARGS --config=$CONFFILE --ssl
-test $? -eq 1 || die "Wrong exit code."

@@ -6,6 +6,9 @@
 
 #include "config.h"
 
+#include <sys/types.h>
+#include <sys/stat.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -15,10 +18,8 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <getopt.h>
-#include <sys/types.h>
 #include <pwd.h>
 #include <grp.h>
-#include <sys/stat.h>
 #include <syslog.h>
 #include <libgen.h>
 
@@ -100,11 +101,11 @@ void cfg_cert_file_free(struct cfg_cert_file **cfptr);
 static char error_buf[CONFIG_BUF_SIZE];
 static char tmp_buf[150];
 
-/* declare static printf like functions: */
-static void config_error_set(char *fmt, ...)
+/* declare printf like functions: */
+void config_error_set(char *fmt, ...)
 	__attribute__((format(printf, 1, 2)));
 
-static void
+void
 config_error_set(char *fmt, ...)
 {
 	int len;
@@ -418,36 +419,59 @@ config_param_host_port(char *str, char **addr, char **port)
 
 
 static int
-config_param_val_int(char *str, int *dst, int positive_only)
+config_param_val_int(char *str, int *dst, int non_negative)
 {
-	int num;
+	long  lval;
+	char *ep;
 
 	assert(str != NULL);
-	num = atoi(str);
 
-	if (positive_only && num < 0) {
-		config_error_set("Not a positive number.");
+	errno = 0;
+	lval = strtol(str, &ep, 10);
+
+	if (*str == '\0' || *ep != '\0') {
+		config_error_set("Not a number.");
+		return (0);
+	}
+	if ((errno == ERANGE && (lval == LONG_MIN || lval == LONG_MAX)) ||
+	    lval < INT_MIN || lval > INT_MAX) {
+		config_error_set("Number out of range.");
+		return (0);
+	}
+	if (non_negative && lval < 0) {
+		config_error_set("Negative number.");
 		return (0);
 	}
 
-	*dst = num;
-	return 1;
+	*dst = (int)lval;
+	return (1);
 }
 
 static int
-config_param_val_long(char *str, long *dst, int positive_only)
+config_param_val_long(char *str, long *dst, int non_negative)
 {
-	long num;
+	long  lval;
+	char *ep;
+
 	assert(str != NULL);
 
-	num = atol(str);
+	errno = 0;
+	lval = strtol(str, &ep, 10);
 
-	if (positive_only && num <= 0) {
-		config_error_set("Not a positive number.");
+	if (*str == '\0' || *ep != '\0') {
+		config_error_set("Not a number.");
+		return (0);
+	}
+	if (errno == ERANGE && (lval == LONG_MIN || lval == LONG_MAX)) {
+		config_error_set("Number out of range.");
+		return (0);
+	}
+	if (non_negative && lval < 0) {
+		config_error_set("Negative number.");
 		return (0);
 	}
 
-	*dst = num;
+	*dst = lval;
 	return (1);
 }
 
