@@ -4,8 +4,8 @@
 
 . hitch_test.sh
 
-head ${CERTSDIR}/default.example.com -n 28 > priv.key
-tail ${CERTSDIR}/default.example.com -n 22 | head -n 17 >cert.crt
+head -n 28 ${CERTSDIR}/default.example.com > priv.key
+tail -n 22 ${CERTSDIR}/default.example.com | head -n 17 >cert.crt
 
 cat >hitch.cfg <<EOF
 pem-file = {
