@@ -79,6 +79,7 @@
 #include "shctx.h"
 #include "foreign/vpf.h"
 #include "foreign/uthash.h"
+#include "foreign/vsa.h"
 
 #ifndef MSG_NOSIGNAL
 # define MSG_NOSIGNAL 0
@@ -117,7 +118,7 @@ hitch_config *CONFIG;
 /* Worker proc's read side of mgt->worker pipe(2) */
 static ev_io mgt_rd;
 
-static struct addrinfo *backaddr;
+static struct suckaddr *backaddr;
 static pid_t master_pid;
 static pid_t ocsp_proc_pid;
 static int core_id;
@@ -139,12 +140,6 @@ enum worker_state_e {
 };
 
 static enum worker_state_e worker_state;
-
-struct simple_addrinfo {
-	int family;
-	int len;
-	struct sockaddr_storage addr;
-};
 
 struct worker_proc {
 	unsigned			magic;
@@ -263,8 +258,8 @@ enum worker_update_type {
 };
 
 union worker_update_payload {
-	unsigned 		gen;
-	struct simple_addrinfo	addr;
+	unsigned		gen;
+	struct sockaddr_storage	addr;
 };
 
 struct worker_update {
@@ -1457,7 +1452,12 @@ create_frontend(const struct front_arg *fa)
 static int
 create_back_socket()
 {
-	int s = socket(backaddr->ai_family, SOCK_STREAM, IPPROTO_TCP);
+	socklen_t len;
+	const void *addr = VSA_Get_Sockaddr(backaddr, &len);
+        AN(addr);
+
+	int s = socket(((const struct sockaddr *)addr)->sa_family,
+		       SOCK_STREAM, IPPROTO_TCP);
 
 	if (s == -1)
 		return -1;
@@ -1561,7 +1561,10 @@ start_connect(proxystate *ps)
 {
 	int t = 1;
 	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
-	t = connect(ps->fd_down, backaddr->ai_addr, backaddr->ai_addrlen);
+	socklen_t len;
+	const void *addr = VSA_Get_Sockaddr(backaddr, &len);
+
+	t = connect(ps->fd_down, addr, len);
 	if (t == 0 || errno == EINPROGRESS || errno == EINTR) {
 		ev_io_start(loop, &ps->ev_w_connect);
 		ev_timer_start(loop, &ps->ev_t_connect);
@@ -1660,7 +1663,11 @@ handle_connect(struct ev_loop *loop, ev_io *w, int revents)
 	(void)revents;
 	CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
 
-	t = connect(ps->fd_down, backaddr->ai_addr, backaddr->ai_addrlen);
+	socklen_t len;
+	const void *addr = VSA_Get_Sockaddr(backaddr, &len);
+
+	t = connect(ps->fd_down, addr, len);
+
 	if (!t || errno == EISCONN || !errno) {
 		ev_io_stop(loop, &ps->ev_w_connect);
 		ev_timer_stop(loop, &ps->ev_t_connect);
@@ -1976,8 +1983,12 @@ static void end_handshake(proxystate *ps) {
 		}
 		ps->fd_down = back;
 		ev_io_init(&ps->ev_w_connect, handle_connect, back, EV_WRITE);
+		ev_timer_init(&ps->ev_t_connect, connect_timeout,
+			CONFIG->BACKEND_CONNECT_TIMEOUT, 0.);
+
 		ev_io_init(&ps->ev_w_clear, clear_write, back, EV_WRITE);
 		ev_io_init(&ps->ev_r_clear, clear_read, back, EV_READ);
+
 
 		/* start connect now */
 		if (0 != start_connect(ps))
@@ -2376,9 +2387,6 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 
 	ev_io_init(&ps->ev_proxy, client_proxy_proxy, client, EV_READ);
 
-	ev_timer_init(&ps->ev_t_connect, connect_timeout,
-	    CONFIG->BACKEND_CONNECT_TIMEOUT, 0.);
-
 	ps->ev_r_ssl.data = ps;
 	ps->ev_w_ssl.data = ps;
 	ps->ev_r_clear.data = ps;
@@ -2427,6 +2435,26 @@ check_ppid(struct ev_loop *loop, ev_timer *w, int revents)
 	}
 }
 
+static const void *
+Get_Sockaddr(const struct sockaddr_storage *ss, socklen_t *sl)
+{
+	AN(ss);
+	AN(sl);
+	const struct sockaddr * sa = (const struct sockaddr *)(ss);
+	switch (sa->sa_family) {
+	case PF_INET:
+		*sl = sizeof(struct sockaddr_in);
+		break;
+	case PF_INET6:
+		*sl = sizeof(struct sockaddr_in6);
+		break;
+	default:
+		*sl = 0;
+		return (NULL);
+	}
+	return sa;
+}
+
 static void
 handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 {
@@ -2472,10 +2500,12 @@ handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 		(worker_state == WORKER_EXITING) ? "EXITING" : "ACTIVE");
 	}
 	else if (wu.type == BACKEND_REFRESH) {
-		backaddr->ai_family = wu.payload.addr.family;
-		backaddr->ai_addrlen = wu.payload.addr.len;
-		memcpy(backaddr->ai_addr, &wu.payload.addr.addr,
-		       sizeof(struct sockaddr_storage));
+		free(backaddr);
+
+		socklen_t len;
+		const void *addr = Get_Sockaddr(&(wu.payload.addr), &len);
+		backaddr = VSA_Malloc(addr, len);
+                AN(VSA_Sane(backaddr));
 	}
 }
 
@@ -2767,27 +2797,38 @@ drop_privileges(void)
 #endif
 }
 
-int
-get_backend_addrinfo() {
-	static struct addrinfo *addrinfo;
+static int
+get_backend_addrinfo(void) {
+	struct addrinfo *result;
 	struct addrinfo hints;
+	struct suckaddr *tmp;
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = 0;
 	const int gai_err = getaddrinfo(CONFIG->BACK_IP, CONFIG->BACK_PORT,
-	    &hints, &addrinfo);
+	    &hints, &result);
 	if (gai_err != 0) {
 		ERR("{getaddrinfo-backend}: %s\n", gai_strerror(gai_err));
 		exit(1);
 	}
-	if (backaddr == 0 ||
-	    memcmp(addrinfo->ai_addr, backaddr->ai_addr,
-		   sizeof(struct sockaddr_storage)) != 0) {
-		backaddr = addrinfo;
+
+	tmp = VSA_Malloc(result->ai_addr, result->ai_addrlen);
+	freeaddrinfo(result);
+
+	if (backaddr == NULL) {
+		backaddr = tmp;
 		return 1;
 	}
+
+	if (VSA_Compare(backaddr, tmp) != 0) {
+		free(backaddr);
+		backaddr = tmp;
+		return 1;
+	}
+
+	free(tmp);
 	return 0;
 }
 
@@ -3589,11 +3630,9 @@ sleep_and_refresh(hitch_config *CONFIG)
 		else if(get_backend_addrinfo()) {
 			struct worker_update wu;
 			wu.type = BACKEND_REFRESH;
-			wu.payload.addr.len = backaddr->ai_addrlen;
-			wu.payload.addr.family = backaddr->ai_family;
-			memcpy(&wu.payload.addr.addr,
-				backaddr->ai_addr,
-				sizeof(struct sockaddr_storage));
+			socklen_t len;
+			const void *addr = VSA_Get_Sockaddr(backaddr, &len);
+			memcpy(&(wu.payload.addr), addr, len);
 			notify_workers(&wu);
 		}
 	}
