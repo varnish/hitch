@@ -460,7 +460,7 @@ ALPN_PROTOS_REC: TOK_ALPN_PROTOS '=' STRING
 SYSLOG_FACILITY_REC: TOK_SYSLOG_FACILITY '=' STRING
 {
 	if ($3 &&
-	    config_param_validate("syslog-fac2ility", $3, cfg, /* XXX: */ "",
+	    config_param_validate("syslog-facility", $3, cfg, /* XXX: */ "",
 	    yyget_lineno()) != 0)
 		YYABORT;
 };
