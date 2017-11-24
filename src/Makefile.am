@@ -16,8 +16,6 @@ TESTS_ENVIRONMENT = \
 	PATH=$$TESTDIR:$(abs_builddir):$(abs_builddir)/util:$$PATH; export PATH;
 TESTS = @SH_TESTS@
 TEST_EXTENSIONS = .sh
-$(top_srcdir)/src/tests/test15-proxy-v2-npn.sh: $(top_builddir)/src/util/parse_proxy_v2
-$(top_srcdir)/src/tests/test16-proxy-v2-alpn.sh:  $(top_builddir)/src/util/parse_proxy_v2
 
 nobase_noinst_HEADERS = \
 	asn_gentm.h \
@@ -90,7 +88,3 @@ hitch_CFLAGS += -DUSE_SYSCALL_FUTEX -Iebtree
 hitch_SOURCES += shctx.c
 hitch_LDADD += ebtree/libebtree.a
 endif
-
-check: check-hook
-
-check-hook: $(top_builddir)/src/util/parse_proxy_v2
