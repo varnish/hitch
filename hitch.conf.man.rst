@@ -174,6 +174,15 @@ This does normally not need to be changed.
 
 Default is 10 seconds.
 
+ocsp-refresh-interval = <number>
+--------------------------------
+
+OCSP refresh interval.
+
+If the OCSP response does not carry any refresh information, use this as the
+interval for refreshing.
+
+Default is 1800 seconds.
 
 ocsp-verify-staple = on|off
 ---------------------------

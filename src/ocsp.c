@@ -505,7 +505,7 @@ HOCSP_mktask(sslctx *sc, ocspquery *oq, double refresh_hint)
 			if (refresh < 0)
 				refresh = 0.0;
 		} else
-			refresh = 1800;
+			refresh = CONFIG->OCSP_REFRESH_INTERVAL;
 	} else {
 		AN(sc->x509);
 		sk_uri = X509_get1_ocsp(sc->x509);
