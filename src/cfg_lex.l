@@ -80,6 +80,7 @@ char input_line[512];
 "ocsp-verify-staple"	{ return (TOK_OCSP_VERIFY); }
 "ocsp-resp-tmo"		{ return (TOK_OCSP_RESP_TMO); }
 "ocsp-connect-tmo"	{ return (TOK_OCSP_CONN_TMO); }
+"ocsp-refresh-interval"	{ return (TOK_OCSP_REFRESH_INTERVAL); }
 "ocsp-dir"		{ return (TOK_OCSP_DIR); }
 "session-cache"	 	{ return (TOK_SESSION_CACHE); }
 "shared-cache-listen"	{ return (TOK_SHARED_CACHE_LISTEN); }

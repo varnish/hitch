@@ -146,6 +146,7 @@ struct __hitch_config {
     char *OCSP_DIR;
     double OCSP_RESP_TMO;
     double OCSP_CONN_TMO;
+    int OCSP_REFRESH_INTERVAL;
 };
 
 typedef struct __hitch_config hitch_config;
