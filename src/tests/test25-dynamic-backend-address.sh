@@ -1,6 +1,9 @@
 #!/bin/sh
-#
-# Fragile test, double-check the logs on failures.
+
+# NOTE: This test does not achieve as much as it was originally (see commentet out lines), as
+# - curl_hitch does not allow to parse the body. As Dridi is againts it.
+# - relying on the availability of hitch-tls.org and varnish-cache.org is not the best practice
+
 
 . hitch_test.sh
 
@@ -20,20 +23,17 @@ EOF
 
 start_hitch --config=hitch.cfg
 
+curl_hitch
 # TODO curl_hitch - cannot grep in output
-curl --max-time 5  --insecure https://localhost:$LISTENPORT/ >backend_refresh1.dump 2>&1
-run_cmd grep -q "<title>Hitch TLS proxy" backend_refresh1.dump
+# curl --max-time 5  --insecure https://localhost:$LISTENPORT/ >backend_refresh1.dump 2>&1
+# run_cmd grep -q "<title>Hitch TLS proxy" backend_refresh1.dump
 
 echo "hitch_test varnish-cache.org" >hosts
 sleep 2
 
+CURL_STATUS=404
+curl_hitch
 # TODO curl_hitch - cannot grep in output
-curl --max-time 5  --insecure https://localhost:$LISTENPORT/ >backend_refresh2.dump 2>&1
-run_cmd grep -q "We moved the Varnish Project to a new server" backend_refresh2.dump
-
-# unset HOSTALIASES
-# rm hosts
-
-# rm backend_refresh1.dump
-# rm backend_refresh2.dump
+# curl --max-time 5  --insecure https://localhost:$LISTENPORT/ >backend_refresh2.dump 2>&1
+# run_cmd grep -q "We moved the Varnish Project to a new server" backend_refresh2.dump
 
