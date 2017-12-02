@@ -22,6 +22,7 @@
 #include <grp.h>
 #include <syslog.h>
 #include <libgen.h>
+#include <limits.h>
 
 #include "configuration.h"
 #include "foreign/miniobj.h"
