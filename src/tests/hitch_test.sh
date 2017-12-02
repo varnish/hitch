@@ -197,7 +197,14 @@ hitch_hosts() {
 		return
 	fi
 
-	fail "neither lsof nor sockstat available"
+	if command -v fstat >/dev/null
+	then
+		fstat -p "$(hitch_pid)" |
+		awk '$7 == "tcp" { gsub("\\*", "localhost", $9); print $9 }'
+		return
+	fi
+
+	fail "none of lsof, sockstat or fstat available"
 }
 
 #-
