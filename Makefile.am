@@ -17,7 +17,7 @@ hitch.conf.example: hitch.conf.man.rst
 	sed -e '1,/^.. example-start/d' \
 		-e '/.. example-end/,$$d' \
 		-e '/^[^ ]/d' \
-		-e 's/^    //' hitch.conf.man.rst >> $@.tmp
+		-e 's/^    //' $(srcdir)/hitch.conf.man.rst >> $@.tmp
 	mv $@.tmp $@
 
 dist_doc_DATA = hitch.conf.example CHANGES.rst README.md
