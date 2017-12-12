@@ -28,6 +28,13 @@ AC_PROG_MAKE_SET
 AC_PROG_YACC
 AC_PROG_LEX
 
+AC_CHECK_PROGS(SOCKSTAT,
+	[lsof sockstat fstat],
+	[no])
+if test "x$SOCKSTAT" = "xno"; then
+	AC_MSG_WARN([No tool for socket inspection found, tests will fail.  To fix this, please install lsof, sockstat or fstat.])
+fi
+
 AC_ARG_WITH([rst2man],
   AS_HELP_STRING([--with-rst2man=PATH], [Location of rst2man (auto)]),
   [RST2MAN="$withval"],
