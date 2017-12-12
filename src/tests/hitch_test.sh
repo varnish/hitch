@@ -181,26 +181,22 @@ hitch_pid() {
 hitch_hosts() {
 	if command -v lsof >/dev/null
 	then
-		lsof -F -P -n -a -p "$(hitch_pid)" -i 4 -i TCP |
-		sed 's/*/localhost/' |
-		awk '/^n/ { print substr($1,2) }'
+		lsof -P -n -i 4 -a -p "$(hitch_pid)" |
+		awk '$8 == "TCP" { gsub("\\*", "localhost", $9); print $9 }'
 		return
 	fi
 
 	if command -v sockstat >/dev/null
 	then
-		sockstat -P tcp |
-		awk '$3 == '"$(hitch_pid)"' {print $6}' |
-		sort |
-		uniq |
-		sed 's:\*:localhost:'
+		sockstat -P "$(hitch_pid)" |
+		awk '$4 == "tcp4" { gsub("\\*", "localhost", $5); print $5 }'
 		return
 	fi
 
 	if command -v fstat >/dev/null
 	then
 		fstat -p "$(hitch_pid)" |
-		awk '$7 == "tcp" { gsub("\\*", "localhost", $9); print $9 }'
+		awk '$5 == "internet" && $7 == "tcp" { gsub("\\*", "localhost", $9); print $9 }'
 		return
 	fi
 
