@@ -11,7 +11,6 @@ test_bad_cfg() {
 test_both_cfg() {
 	frontend_cfg="$1.frontend.cfg"
 	global_cfg="$1.global.cfg"
-	pathchk "$frontend_cfg" "$global_cfg"
 
 	printf 'backend = "[hitch-tls.org]:80"\n\n' |
 	tee "$frontend_cfg" "$global_cfg"

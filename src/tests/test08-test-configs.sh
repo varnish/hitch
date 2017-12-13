@@ -11,7 +11,6 @@ skip 'no usable group found for user nobody'
 test_cfg() {
 	cfg=$1.cfg
 	shift
-	pathchk "$cfg"
 	cat >"$cfg"
 	run_cmd "$@" hitch \
 		--test \
