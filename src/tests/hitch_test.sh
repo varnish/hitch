@@ -101,6 +101,15 @@ error() {
 }
 
 #-
+# Usage: cmd arg
+#
+# Short-hand for `command -v arg >/dev/null`.
+
+cmd() {
+	command -v "$1" >/dev/null
+}
+
+#-
 # Usage: run_cmd [-s status] command [args...]
 #
 # By default expect a zero exit status, takes care of explicitly failing if
@@ -179,7 +188,7 @@ hitch_pid() {
 # a loop. Only IPv4 listen addresses are listed.
 
 hitch_hosts() {
-	if command -v lsof >/dev/null
+	if cmd lsof
 	then
 		lsof -F -P -n -a -p "$(hitch_pid)" -i 4 -i TCP -s TCP:LISTEN |
 		awk '/^n/ {
@@ -189,7 +198,7 @@ hitch_hosts() {
 		return
 	fi
 
-	if command -v fstat >/dev/null
+	if cmd fstat
 	then
 		fstat -p "$(hitch_pid)" |
 		awk '$5 == "internet" && $7 == "tcp" && NF == 9 {
