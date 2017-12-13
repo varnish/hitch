@@ -181,9 +181,11 @@ hitch_pid() {
 hitch_hosts() {
 	if command -v lsof >/dev/null
 	then
-		lsof -F -P -n -a -p "$(hitch_pid)" -i 4 -i TCP |
-		sed 's/*/localhost/' |
-		awk '/^n/ { print substr($1,2) }'
+		lsof -F -P -n -a -p "$(hitch_pid)" -i 4 -i TCP -s TCP:LISTEN |
+		awk '/^n/ {
+			sub("\\*", "127.0.0.1", $1)
+			print substr($1,2)
+		}'
 		return
 	fi
 
