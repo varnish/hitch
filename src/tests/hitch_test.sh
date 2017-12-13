@@ -176,7 +176,7 @@ hitch_pid() {
 # Usage: hitch_hosts
 #
 # Print a list of hosts for the daemon started with `start_hitch`, usually in
-# a loop.
+# a loop. Only IPv4 listen addresses are listed.
 
 hitch_hosts() {
 	if command -v lsof >/dev/null
@@ -189,17 +189,20 @@ hitch_hosts() {
 		return
 	fi
 
-	if command -v sockstat >/dev/null
+	if command -v fstat >/dev/null
 	then
-		sockstat -P tcp |
-		awk '$3 == '"$(hitch_pid)"' {print $6}' |
-		sort |
-		uniq |
-		sed 's:\*:localhost:'
+		fstat -p "$(hitch_pid)" |
+		awk '$5 == "internet" && $7 == "tcp" && NF == 9 {
+			sub("\\*", "127.0.0.1", $9)
+			print $9
+		}'
 		return
 	fi
 
-	fail "neither lsof nor sockstat available"
+	# NB: we don't want to use sockstat(1) because the Linux port of the
+	# command forgot a crucial point: "port"ability.
+
+	fail "neither lsof nor fstat available"
 }
 
 #-
