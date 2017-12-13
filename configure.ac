@@ -28,7 +28,7 @@ AC_PROG_MAKE_SET
 AC_PROG_YACC
 AC_PROG_LEX
 
-AC_CHECK_PROGS(SOCKSTAT, [lsof fstat], [no])
+AC_CHECK_PROGS(SOCKSTAT, [lsof sockstat fstat], [no])
 if test "x$SOCKSTAT" = xno; then
 	AC_MSG_WARN([No tool found for socket inspection, tests will fail.])
 fi

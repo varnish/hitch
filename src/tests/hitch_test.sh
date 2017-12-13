@@ -198,6 +198,16 @@ hitch_hosts() {
 		return
 	fi
 
+	if cmd sockstat && test "$(uname)" = FreeBSD
+	then
+		sockstat -P tcp -4 |
+		awk '$3 == '"$(hitch_pid)"' {
+			sub("\\*", "127.0.0.1", $6)
+			print $6
+		}'
+		return
+	fi
+
 	if cmd fstat
 	then
 		fstat -p "$(hitch_pid)" |
@@ -208,10 +218,7 @@ hitch_hosts() {
 		return
 	fi
 
-	# NB: we don't want to use sockstat(1) because the Linux port of the
-	# command forgot a crucial point: "port"ability.
-
-	fail "neither lsof nor fstat available"
+	fail "none of lsof, sockstat or fstat available"
 }
 
 #-
