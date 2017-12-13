@@ -208,7 +208,7 @@ hitch_hosts() {
 		return
 	fi
 
-	if cmd fstat
+	if cmd fstat && test "$(uname)" = OpenBSD
 	then
 		fstat -p "$(hitch_pid)" |
 		awk '$5 == "internet" && $7 == "tcp" && NF == 9 {
@@ -218,7 +218,7 @@ hitch_hosts() {
 		return
 	fi
 
-	fail "none of lsof, sockstat or fstat available"
+	fail "none of supported lsof, sockstat or fstat available"
 }
 
 #-
