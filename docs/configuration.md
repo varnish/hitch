@@ -34,6 +34,13 @@ set of ciphers that suits your needs.
 
 Normally you do not have to change this.
 
+## Using multiple certificates
+
+To add multiple certificates to the hitch config, simply specify multiple ``pem-file``
+lines like so:
+
+    pem-file = "/etc/tls/first-combined.pem"
+    pem-file = "/etc/tls/second-combined.pem"
 
 ## Run environment
 
