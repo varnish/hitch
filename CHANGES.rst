@@ -7,23 +7,23 @@ version.
 hitch-1.4.7 (2018-01-11)
 ------------------------
 
- * Massive test suite refactor and update.
- * Fix OpenBSD/FreeBSD/POSIX portability issues: restrict fstat(1) to OpenBSD,
-   bring sockstat(1) support back, drop pathchk(1) usage in the test suite,
-   switch from sockstat(1) to fstat(1) (Issue: 234_)
- * Add an OCSP refresh timeout parameter (Issue: 229_)
- * Autotools polish (Issue: 231_)
- * Random usage of config section if reduntant (Issue: 192_)
- * Support for separate key files (Issue: 65_)
- * Fix logging to syslog even when set to syslog = off (Issue: 187_)
- * Making log-filename, recv-bufsize and send-bufsize parameters available
-   though command line and config file.
- * Fix: global backaddr is assumed to be static (Issue: 84_)
- * Add support for session-cache in config file and as cmdline option
-   (Issue: 166_)
- * Plug file descriptor leak: killing worker processes would leave the pipe's
-   write end open, leaking one file descriptor per worker upon reload
-   (Issue: 193_)
+* Massive test suite refactor and update.
+* Fix OpenBSD/FreeBSD/POSIX portability issues: restrict fstat(1) to OpenBSD,
+  bring sockstat(1) support back, drop pathchk(1) usage in the test suite,
+  switch from sockstat(1) to fstat(1) (Issue: 234_)
+* Add an OCSP refresh timeout parameter (Issue: 229_)
+* Autotools polish (Issue: 231_)
+* Random usage of config section if reduntant (Issue: 192_)
+* Support for separate key files (Issue: 65_)
+* Fix logging to syslog even when set to syslog = off (Issue: 187_)
+* Making log-filename, recv-bufsize and send-bufsize parameters available
+  though command line and config file.
+* Fix: global backaddr is assumed to be static (Issue: 84_)
+* Add support for session-cache in config file and as cmdline option
+  (Issue: 166_)
+* Plug file descriptor leak: killing worker processes would leave the pipe's
+  write end open, leaking one file descriptor per worker upon reload
+  (Issue: 193_)
 
 .. _234: https://github.com/varnish/hitch/issues/234
 .. _229: https://github.com/varnish/hitch/issues/229
