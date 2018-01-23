@@ -204,8 +204,8 @@ config_new(void)
 	r->LISTEN_DEFAULT = fa;
 	r->OCSP_DIR           = strdup("/var/lib/hitch/");
 	r->OCSP_VFY = 0;
-	r->OCSP_RESP_TMO = 10.0;
-	r->OCSP_CONN_TMO = 4.0;
+	r->OCSP_RESP_TIMEOUT = 10.0;
+	r->OCSP_CONN_TIMEOUT = 4.0;
 	r->OCSP_REFRESH_INTERVAL = 1800;
 
 #ifdef USE_SHARED_CACHE

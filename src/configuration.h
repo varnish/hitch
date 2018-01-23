@@ -144,8 +144,8 @@ struct __hitch_config {
     int TEST;
     int OCSP_VFY;
     char *OCSP_DIR;
-    double OCSP_RESP_TMO;
-    double OCSP_CONN_TMO;
+    double OCSP_RESP_TIMEOUT;
+    double OCSP_CONN_TIMEOUT;
     int OCSP_REFRESH_INTERVAL;
 };
 

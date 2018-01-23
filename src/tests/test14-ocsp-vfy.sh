@@ -58,8 +58,8 @@ pem-file = {
 	 cert = "$CERTSDIR/valid.example.com"
 }
 
-ocsp-connect-tmo = 10
-ocsp-resp-tmo = 10
+ocsp-connect-timeout = 10
+ocsp-resp-timeout = 10
 EOF
 
 run_cmd hitch --test --config=hitch3.cfg

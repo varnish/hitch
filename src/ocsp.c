@@ -627,15 +627,15 @@ hocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 	if (n <= 0) {
 		FD_ZERO(&fds);
 		FD_SET(fd, &fds);
-		tv.tv_sec = CONFIG->OCSP_CONN_TMO;
-		tv.tv_usec = (CONFIG->OCSP_CONN_TMO - tv.tv_sec) * 1e6;
+		tv.tv_sec = CONFIG->OCSP_CONN_TIMEOUT;
+		tv.tv_usec = (CONFIG->OCSP_CONN_TIMEOUT - tv.tv_sec) * 1e6;
 		n = select(fd + 1, NULL, (void *) &fds, NULL, &tv);
 		if (n == 0) {
 			/* connect timeout */
 			ERR("{ocsp} Error: Connection to %s:%s timed out. "
-			    "Hit parameter 'ocsp-connect-tmo"
+			    "Hit parameter 'ocsp-connect-timeout"
 			    " [current value: %.3fs]\n",
-			    host, port, CONFIG->OCSP_CONN_TMO);
+			    host, port, CONFIG->OCSP_CONN_TIMEOUT);
 			refresh_hint = 300;
 			goto retry;
 		} else if (n < 0) {
@@ -664,7 +664,7 @@ hocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 		goto retry;
 	}
 
-	resp_tmo = Time_now() + CONFIG->OCSP_RESP_TMO;
+	resp_tmo = Time_now() + CONFIG->OCSP_RESP_TIMEOUT;
 	while (1) {
 		double tnow;
 		n = OCSP_sendreq_nbio(&resp, rctx);
@@ -708,9 +708,9 @@ hocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
 		if (n == 0) {
 			/* timeout */
 			ERR("{ocsp} Error: Transmission timeout for %s:%s. "
-			    "Consider increasing parameter 'ocsp-resp-tmo'"
+			    "Consider increasing parameter 'ocsp-resp-timeout'"
 			    " [current value: %.3fs]\n",
-			    host, port, CONFIG->OCSP_RESP_TMO);
+			    host, port, CONFIG->OCSP_RESP_TIMEOUT);
 			refresh_hint = 300;
 			goto retry;
 		}

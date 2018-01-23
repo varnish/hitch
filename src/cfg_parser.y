@@ -56,7 +56,7 @@ extern char input_line[512];
 %token TOK_TLS_PROTOS TOK_SSLv3 TOK_TLSv1_0 TOK_TLSv1_1 TOK_TLSv1_2
 %token TOK_SESSION_CACHE TOK_SHARED_CACHE_LISTEN TOK_SHARED_CACHE_PEER
 %token TOK_SHARED_CACHE_IF TOK_PRIVATE_KEY TOK_BACKEND_REFRESH
-%token TOK_OCSP_REFRESH_INTERVAL
+%token TOK_OCSP_REFRESH_INTERVAL TOK_OCSP_RESP_TIMEOUT TOK_OCSP_CONN_TIMEOUT
 
 %parse-param { hitch_config *cfg }
 
@@ -100,6 +100,8 @@ CFG_RECORD
 	| OCSP_VERIFY
 	| OCSP_RESP_TMO
 	| OCSP_CONN_TMO
+	| OCSP_RESP_TIMEOUT
+	| OCSP_CONN_TIMEOUT
 	| OCSP_REFRESH_INTERVAL
 	| OCSP_DIR
 	| SESSION_CACHE_REC
@@ -210,12 +212,26 @@ OCSP_DIR: TOK_OCSP_DIR '=' STRING
 
 OCSP_RESP_TMO: TOK_OCSP_RESP_TMO '=' UINT
 {
-	cfg->OCSP_RESP_TMO = $3;
+	fprintf(stderr, "Warning: ocsp-resp-tmo is deprecated, "
+		"use ocsp-resp-timeout instead.\n");
+	cfg->OCSP_RESP_TIMEOUT = $3;
 };
 
 OCSP_CONN_TMO: TOK_OCSP_CONN_TMO '=' UINT
 {
-	cfg->OCSP_CONN_TMO = $3;
+	fprintf(stderr, "Warning: ocsp-connect-tmo is deprecated, "
+		"use ocsp-connect-timeout instead.\n");
+	cfg->OCSP_CONN_TIMEOUT = $3;
+};
+
+OCSP_RESP_TIMEOUT: TOK_OCSP_RESP_TIMEOUT '=' UINT
+{
+	cfg->OCSP_RESP_TIMEOUT = $3;
+};
+
+OCSP_CONN_TIMEOUT: TOK_OCSP_CONN_TIMEOUT '=' UINT
+{
+	cfg->OCSP_CONN_TIMEOUT = $3;
 };
 
 OCSP_REFRESH_INTERVAL: TOK_OCSP_REFRESH_INTERVAL '=' UINT

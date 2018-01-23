@@ -169,8 +169,8 @@ pem-file syntax can be used for stapling:
    }
 
 
-ocsp-connect-tmo = <number>
----------------------------
+ocsp-connect-timeout = <number>
+-------------------------------
 
 OCSP fetch connect timeout.
 
@@ -179,8 +179,8 @@ This does normally not need to be changed.
 Default is 4.0 seconds.
 
 
-ocsp-resp-tmo = <number>
-------------------------
+ocsp-resp-timeout = <number>
+----------------------------
 
 OCSP fetch response timeout.
 

@@ -506,10 +506,10 @@ pem-file = "${CERTSDIR}/default.example.com"
 # ocsp-dir = "/var/lib/hitch-ocsp"
 
 # Timeout for fetching an OCSP response from a responder (in seconds)
-# ocsp-resp-tmo = 10;
+# ocsp-resp-timeout = 10;
 
 # Timeout for connecting to an OCSP responder (in seconds)
-# ocsp-connect-tmo = 4;
+# ocsp-connect-timeout = 4;
 
 # Verification of OCSP responses
 # ocsp-verify-staple = off
@@ -711,10 +711,10 @@ pem-file = "${CERTSDIR}/default.example.com"
 # ocsp-dir = "/var/lib/hitch-ocsp"
 
 # Timeout for fetching an OCSP response from a responder (in seconds)
-# ocsp-resp-tmo = 10;
+# ocsp-resp-timeout = 10;
 
 # Timeout for connecting to an OCSP responder (in seconds)
-# ocsp-connect-tmo = 4;
+# ocsp-connect-timeout = 4;
 
 # Verification of OCSP responses
 # ocsp-verify-staple = off

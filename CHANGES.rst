@@ -9,6 +9,9 @@ hitch-1.4.8 (unreleased)
 
 * Added backend-connect-timeout and ssl-handshake-timeout to the config file
   options.
+* ocsp-resp-tmo and ocsp-connect-tmo are deprecated, use ocsp-resp-timeout
+  and ocsp-connect-timeout instead. These options are now available in the
+  configuration file too.
 
 hitch-1.4.7 (2018-01-11)
 ------------------------
