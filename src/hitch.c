@@ -914,7 +914,6 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	if (CONFIG->ALPN_PROTOS != NULL)
 		SSL_CTX_set_next_protos_advertised_cb(ctx, npn_select_cb, NULL);
 #endif
-	AN(SSL_CTX_set_default_verify_paths(ctx));
 
 	if (ciphers != NULL) {
 		if (SSL_CTX_set_cipher_list(ctx, ciphers) != 1) {
@@ -933,6 +932,10 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	sc->ctx = ctx;
 	sc->staple_vfy = cf->ocsp_vfy;
 	VTAILQ_INIT(&sc->sni_list);
+
+	if (sc->staple_vfy > 0 ||
+	    (sc-> staple_vfy < 0 && CONFIG->OCSP_VFY))
+		AN(SSL_CTX_set_default_verify_paths(ctx));
 
 	if (CONFIG->PMODE == SSL_CLIENT)
 		return (sc);
