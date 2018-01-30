@@ -23,6 +23,7 @@
 #include <syslog.h>
 #include <libgen.h>
 #include <limits.h>
+#include <float.h>
 
 #include "configuration.h"
 #include "foreign/miniobj.h"
@@ -65,7 +66,9 @@
 #define CFG_ALPN_PROTOS "alpn-protos"
 #define CFG_PARAM_ALPN_PROTOS 48173
 #define CFG_BACKEND_CONNECT_TIMEOUT "backend-connect-timeout"
+#define CFG_PARAM_BACKEND_CONNECT_TIMEOUT 11018
 #define CFG_SSL_HANDSHAKE_TIMEOUT "ssl-handshake-timeout"
+#define CFG_PARAM_SSL_HANDSHAKE_TIMEOUT 11019
 #define CFG_RECV_BUFSIZE "recv-bufsize"
 #define CFG_SEND_BUFSIZE "send-bufsize"
 #define CFG_LOG_FILENAME "log-filename"
@@ -74,6 +77,15 @@
 #define CFG_PIDFILE "pidfile"
 #define CFG_SNI_NOMATCH_ABORT "sni-nomatch-abort"
 #define CFG_OCSP_DIR "ocsp-dir"
+#define CFG_OCSP_VERIFY_STAPLE "ocsp-verify-staple"
+#define CFG_PARAM_OCSP_VERIFY_STAPLE 11020
+#define CFG_OCSP_RESP_TIMEOUT "ocsp-resp-timeout"
+#define CFG_PARAM_OCSP_RESP_TIMEOUT 11021
+#define CFG_OCSP_CONNECT_TIMEOUT "ocsp-connect-timeout"
+#define CFG_PARAM_OCSP_CONNECT_TIMEOUT 11022
+#define CFG_OCSP_REFRESH_TIMEOUT "ocsp-refresh-interval"
+#define CFG_PARAM_OCSP_REFRESH_TIMEOUT 11023
+
 #define CFG_TLS_PROTOS "tls-protos"
 
 #ifdef USE_SHARED_CACHE
@@ -446,6 +458,34 @@ config_param_val_int(char *str, int *dst, int non_negative)
 	}
 
 	*dst = (int)lval;
+	return (1);
+}
+
+static int
+config_param_val_double(char *str, double *dst, int non_negative)
+{
+	double  lval;
+	char *ep;
+
+	assert(str != NULL);
+
+	errno = 0;
+	lval = strtod(str, &ep);
+
+	if (*str == '\0' || *ep != '\0') {
+		config_error_set("Not a number.");
+		return (0);
+	}
+	if (errno == ERANGE && (lval == DBL_MIN || lval == DBL_MAX)) {
+		config_error_set("Number out of range.");
+		return (0);
+	}
+	if (non_negative && lval < 0) {
+		config_error_set("Negative number.");
+		return (0);
+	}
+
+	*dst = lval;
 	return (1);
 }
 
@@ -948,6 +988,14 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		r = config_param_val_bool(v, &cfg->SNI_NOMATCH_ABORT);
 	} else if (strcmp(k, CFG_OCSP_DIR) == 0) {
 		config_assign_str(&cfg->OCSP_DIR, v);
+	} else if (strcmp(k, CFG_OCSP_VERIFY_STAPLE) == 0) {
+		r = config_param_val_bool(v, &cfg->OCSP_VFY);
+	} else if (strcmp(k, CFG_OCSP_RESP_TIMEOUT) == 0) {
+		r = config_param_val_double(v, &cfg->OCSP_RESP_TIMEOUT, 1);
+	} else if (strcmp(k, CFG_OCSP_CONNECT_TIMEOUT) == 0) {
+		r = config_param_val_double(v, &cfg->OCSP_CONN_TIMEOUT, 1);
+	} else if (strcmp(k, CFG_OCSP_REFRESH_TIMEOUT) == 0) {
+		r = config_param_val_int(v, &cfg->OCSP_REFRESH_INTERVAL, 1);
 	} else {
 		fprintf(
 			stderr,
@@ -1126,6 +1174,8 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "  -k  --keepalive=SECS       TCP keepalive on client socket (Default: %d)\n", cfg->TCP_KEEPALIVE_TIME);
 	fprintf(out, "  -R  --backend-refresh=SECS Periodic backend IP lookup, 0 to disable (Default: %d)\n", cfg->BACKEND_REFRESH_TIME);
 
+	fprintf(out, "      --backend-connect-timeout=SECS Backend connection timeout (Default: %d)\n", cfg->BACKEND_CONNECT_TIMEOUT);
+	fprintf(out, "      --ssl-handshake-timeout=SECS SSL handshake timeout (Default: %d)\n", cfg->SSL_HANDSHAKE_TIMEOUT);
 
 #ifdef USE_SHARED_CACHE
 	fprintf(out, "  -C  --session-cache=NUM    Enable and set SSL session cache to specified number\n");
@@ -1138,6 +1188,10 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "  -r  --chroot=DIR           Sets chroot directory (Default: \"%s\")\n", config_disp_str(cfg->CHROOT));
 	fprintf(out, "  -u  --user=USER            Set uid/gid after binding the socket (Default: \"%s\")\n", config_disp_uid(cfg->UID));
 	fprintf(out, "  -g  --group=GROUP          Set gid after binding the socket (Default: \"%s\")\n", config_disp_gid(cfg->GID));
+	fprintf(out, "      --alpn-protos=LIST     Sets the protocols for ALPN/NPN negotiation, given by a comma\n");
+	fprintf(out, "                             separated list. If this is not set explicitly, ALPN/NPN will\n");
+	fprintf(out, "                             not be used. Requires OpenSSL 1.0.1 for NPN and OpenSSL 1.0.2\n");
+	fprintf(out, "                             for ALPN.\n");
 	fprintf(out, "\n");
 	fprintf(out, "LOGGING:\n");
 	fprintf(out, "  -q  --quiet                Be quiet; emit only error messages\n");
@@ -1169,6 +1223,12 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "      --ocsp-dir=DIR         Set OCSP staple cache directory\n");
 	fprintf(out, "                             This enables automated retrieval and stapling of OCSP responses\n");
 	fprintf(out, "                             (Default: \"%s\")\n", config_disp_str(cfg->OCSP_DIR));
+
+	fprintf(out, "      --ocsp-verify-staple         Verify OCSP responses against the certificate (Default: %s)\n", config_disp_bool(cfg->OCSP_VFY));
+	fprintf(out, "      --ocsp-resp-timeout=SECS     OCSP fetch response timeout (Default: %.1f)\n", cfg->OCSP_RESP_TIMEOUT);
+	fprintf(out, "      --ocsp-connect-timeout=SECS  OCSP fetch connect timeout (Default: %.1f)\n", cfg->OCSP_CONN_TIMEOUT);
+	fprintf(out, "      --ocsp-refresh-interval=SECS OCSP refresh interval (Default: %d)\n", cfg->OCSP_REFRESH_INTERVAL);
+
 	fprintf(out, "\n");
 	fprintf(out, "  -t  --test                 Test configuration and exit\n");
 	fprintf(out, "  -p  --pidfile=FILE         PID file\n");
@@ -1267,6 +1327,8 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		{ CFG_PIDFILE, 1, NULL, 'p' },
 		{ CFG_KEEPALIVE, 1, NULL, 'k' },
 		{ CFG_BACKEND_REFRESH, 1, NULL, 'R' },
+		{ CFG_BACKEND_CONNECT_TIMEOUT, 1, NULL, CFG_PARAM_BACKEND_CONNECT_TIMEOUT },
+		{ CFG_SSL_HANDSHAKE_TIMEOUT, 1, NULL, CFG_PARAM_SSL_HANDSHAKE_TIMEOUT },
 		{ CFG_CHROOT, 1, NULL, 'r' },
 		{ CFG_USER, 1, NULL, 'u' },
 		{ CFG_GROUP, 1, NULL, 'g' },
@@ -1285,6 +1347,10 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 		{ CFG_ALPN_PROTOS, 1, NULL, CFG_PARAM_ALPN_PROTOS },
 		{ CFG_SNI_NOMATCH_ABORT, 0, &cfg->SNI_NOMATCH_ABORT, 1 },
 		{ CFG_OCSP_DIR, 1, NULL, 'o' },
+		{ CFG_OCSP_VERIFY_STAPLE, 1, NULL, CFG_PARAM_OCSP_VERIFY_STAPLE },
+		{ CFG_OCSP_RESP_TIMEOUT, 1, NULL, CFG_PARAM_OCSP_RESP_TIMEOUT },
+		{ CFG_OCSP_CONNECT_TIMEOUT, 1, NULL, CFG_PARAM_OCSP_CONNECT_TIMEOUT },
+		{ CFG_OCSP_REFRESH_TIMEOUT, 1, NULL, CFG_PARAM_OCSP_REFRESH_TIMEOUT },
 		{ "test", 0, NULL, 't' },
 		{ "version", 0, NULL, 'V' },
 		{ "help", 0, NULL, 'h' },
@@ -1353,6 +1419,12 @@ CFG_ARG(CFG_PARAM_SYSLOG_FACILITY, CFG_SYSLOG_FACILITY);
 CFG_ARG(CFG_PARAM_SEND_BUFSIZE, CFG_SEND_BUFSIZE);
 CFG_ARG(CFG_PARAM_RECV_BUFSIZE, CFG_RECV_BUFSIZE);
 CFG_ARG(CFG_PARAM_ALPN_PROTOS, CFG_ALPN_PROTOS);
+CFG_ARG(CFG_PARAM_BACKEND_CONNECT_TIMEOUT, CFG_BACKEND_CONNECT_TIMEOUT);
+CFG_ARG(CFG_PARAM_SSL_HANDSHAKE_TIMEOUT, CFG_SSL_HANDSHAKE_TIMEOUT);
+CFG_ARG(CFG_PARAM_OCSP_VERIFY_STAPLE, CFG_OCSP_VERIFY_STAPLE);
+CFG_ARG(CFG_PARAM_OCSP_RESP_TIMEOUT, CFG_OCSP_RESP_TIMEOUT);
+CFG_ARG(CFG_PARAM_OCSP_CONNECT_TIMEOUT, CFG_OCSP_CONNECT_TIMEOUT);
+CFG_ARG(CFG_PARAM_OCSP_REFRESH_TIMEOUT, CFG_OCSP_REFRESH_TIMEOUT);
 CFG_ARG('c', CFG_CIPHERS);
 CFG_ARG('e', CFG_SSL_ENGINE);
 CFG_ARG('b', CFG_BACKEND);

@@ -7,11 +7,10 @@ version.
 hitch-1.4.8 (unreleased)
 ------------------------
 
-* Added backend-connect-timeout and ssl-handshake-timeout to the config file
-  options.
+* All options are now in sync and available via command line, config file and
+  documented in: hitch.man, hitch.conf.man and hitch --help.
 * ocsp-resp-tmo and ocsp-connect-tmo are deprecated, use ocsp-resp-timeout
-  and ocsp-connect-timeout instead. These options are now available in the
-  configuration file too.
+  and ocsp-connect-timeout instead.
 
 hitch-1.4.7 (2018-01-11)
 ------------------------
@@ -22,7 +21,7 @@ hitch-1.4.7 (2018-01-11)
   switch from sockstat(1) to fstat(1) (Issue: 234_)
 * Add an OCSP refresh timeout parameter (Issue: 229_)
 * Autotools polish (Issue: 231_)
-* Random usage of config section if reduntant (Issue: 192_)
+* Random usage of config section if redundant (Issue: 192_)
 * Support for separate key files (Issue: 65_)
 * Fix logging to syslog even when set to syslog = off (Issue: 187_)
 * Making log-filename, recv-bufsize and send-bufsize parameters available

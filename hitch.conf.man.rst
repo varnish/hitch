@@ -176,7 +176,7 @@ OCSP fetch connect timeout.
 
 This does normally not need to be changed.
 
-Default is 4.0 seconds.
+Default is 4 seconds.
 
 
 ocsp-resp-timeout = <number>
@@ -341,6 +341,17 @@ Report client address using PROXY v2 protocol.
 
 This option is mutually exclusive with option write-ip, write-proxy-v1
 and proxy-proxy.
+
+Default is off.
+
+alpn-protos = ...
+-----------------
+
+Sets the protocols for ALPN/NPN negotiation. If this is not set explicitly,
+ALPN/NPN will not be used.
+Requires OpenSSL 1.0.1 for NPN and OpenSSL 1.0.2. for ALPN.
+
+This is an unquoted list of tokens. Available tokens are h2 and http/1.1
 
 Default is off.
 

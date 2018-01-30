@@ -51,6 +51,8 @@ Command line arguments
   -B  --backlog=NUM          Set listen backlog size (Default: 100)
   -k  --keepalive=SECS       TCP keepalive on client socket (Default: 3600)
   -R  --backendrefresh=SECS  Periodic backend IP lookup, 0 to disable (Default: 0)
+  --backend-connect-timeout=SECS  Backend connection timeout (Default: 30)
+  --ssl-handshake-timeout=SECS    SSL handshake timeout (Default: 30)
   -r  --chroot=DIR           Sets chroot directory (Default: "")
   -u  --user=USER            Set uid/gid after binding the socket (Default: "")
   -g  --group=GROUP          Set gid after binding the socket (Default: "")
@@ -74,15 +76,16 @@ Command line arguments
   --proxy-proxy          Proxy HaProxy's PROXY (IPv4 or IPv6) protocol line
                          before actual data (PROXY v1 only)
                          (Default: off)
-  --alpn-protos=LIST     Sets the protocols for ALPN/NPN negotiation, given by a comma
-                         separated list. If this is not set explicitly, ALPN/NPN will
-                         not be used. Requires OpenSSL 1.0.1 for NPN and OpenSSL 1.0.2
-                         for ALPN.
+  --alpn-protos=LIST     Sets the protocols for ALPN/NPN negotiation. See config file setting ``alpn-protos``.
   --sni-nomatch-abort    Abort handshake when client submits an unrecognized SNI server name
                          (Default: off)
   --ocsp-dir=DIR         Set OCSP staple cache directory
                          This enables automated retrieval and stapling of OCSP responses
                          (Default: "")
+  --ocsp-verify-staple          Verify OCSP responses against the certificate (Default: off)
+  --ocsp-resp-timeout=SECS      OCSP fetch response timeout (Default: 10s)
+  --ocsp-connect-timeout=SECS   OCSP fetch connect timeout (Default: 4s)
+  --ocsp-refresh-interval=SECS  OCSP refresh interval (Default: 1800s)
   -t  --test                 Test configuration and exit
   -p  --pidfile=FILE         PID file
   -V  --version              Print program version and exit
