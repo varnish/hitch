@@ -901,6 +901,10 @@ make_ctx_fr(const struct cfg_cert_file *cf, struct frontend *fr,
 		ssloptions |= SSL_OP_NO_TLSv1_1;
 	if (!(selected_protos & TLSv1_2_PROTO))
 		ssloptions |= SSL_OP_NO_TLSv1_2;
+#ifdef SSL_OP_NO_TLSv1_3
+	if (!(selected_protos & TLSv1_3_PROTO))
+		ssloptions |= SSL_OP_NO_TLSv1_3;
+#endif
 	ctx = SSL_CTX_new((CONFIG->PMODE == SSL_CLIENT) ?
 	    SSLv23_client_method() : SSLv23_server_method());
 
