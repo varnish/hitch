@@ -861,7 +861,7 @@ Find_issuer(X509 *subj, STACK_OF(X509) *chain)
 
 /* Initialize an SSL context */
 static sslctx *
-make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
+make_ctx_fr(const struct cfg_cert_file *cf, struct frontend *fr,
     const struct front_arg *fa)
 {
 	SSL_CTX *ctx;
@@ -1079,7 +1079,7 @@ insert_sni_names(sslctx *sc, sni_name **sn_tab)
 }
 
 static sslctx *
-make_ctx(const struct cfg_cert_file *cf)
+make_ctx(struct cfg_cert_file *cf)
 {
 	return (make_ctx_fr(cf, NULL, NULL));
 }
