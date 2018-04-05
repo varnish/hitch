@@ -50,7 +50,6 @@ Command line arguments
   -n  --workers=NUM          Number of worker processes (Default: 1)
   -B  --backlog=NUM          Set listen backlog size (Default: 100)
   -k  --keepalive=SECS       TCP keepalive on client socket (Default: 3600)
-  -R  --backendrefresh=SECS  Periodic backend IP lookup, 0 to disable (Default: 0)
   -r  --chroot=DIR           Sets chroot directory (Default: "")
   -u  --user=USER            Set uid/gid after binding the socket (Default: "")
   -g  --group=GROUP          Set gid after binding the socket (Default: "")

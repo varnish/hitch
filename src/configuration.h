@@ -129,7 +129,6 @@ struct __hitch_config {
     int SYSLOG;
     int SYSLOG_FACILITY;
     int TCP_KEEPALIVE_TIME;
-    int BACKEND_REFRESH_TIME;
     int DAEMONIZE;
     int PREFER_SERVER_CIPHERS;
     int BACKEND_CONNECT_TIMEOUT;
