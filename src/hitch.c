@@ -79,7 +79,6 @@
 #include "shctx.h"
 #include "foreign/vpf.h"
 #include "foreign/uthash.h"
-#include "foreign/vsa.h"
 
 #ifndef MSG_NOSIGNAL
 # define MSG_NOSIGNAL 0
@@ -118,7 +117,7 @@ hitch_config *CONFIG;
 /* Worker proc's read side of mgt->worker pipe(2) */
 static ev_io mgt_rd;
 
-static struct suckaddr *backaddr;
+static struct addrinfo *backaddr;
 static pid_t master_pid;
 static pid_t ocsp_proc_pid;
 static int core_id;
@@ -252,20 +251,6 @@ struct ha_proxy_v2_hdr {
 	union ha_proxy_v2_addr	addr;
 };
 
-enum worker_update_type {
-	WORKER_GEN,
-	BACKEND_REFRESH
-};
-
-union worker_update_payload {
-	unsigned		gen;
-	struct sockaddr_storage	addr;
-};
-
-struct worker_update {
-	enum worker_update_type		type;
-	union worker_update_payload 	payload;
-};
 
 /* set a file descriptor (socket) to non-blocking mode */
 static int
@@ -1455,12 +1440,7 @@ create_frontend(const struct front_arg *fa)
 static int
 create_back_socket()
 {
-	socklen_t len;
-	const void *addr = VSA_Get_Sockaddr(backaddr, &len);
-        AN(addr);
-
-	int s = socket(((const struct sockaddr *)addr)->sa_family,
-		       SOCK_STREAM, IPPROTO_TCP);
+	int s = socket(backaddr->ai_family, SOCK_STREAM, IPPROTO_TCP);
 
 	if (s == -1)
 		return -1;
@@ -1564,10 +1544,7 @@ start_connect(proxystate *ps)
 {
 	int t = 1;
 	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
-	socklen_t len;
-	const void *addr = VSA_Get_Sockaddr(backaddr, &len);
-
-	t = connect(ps->fd_down, addr, len);
+	t = connect(ps->fd_down, backaddr->ai_addr, backaddr->ai_addrlen);
 	if (t == 0 || errno == EINPROGRESS || errno == EINTR) {
 		ev_io_start(loop, &ps->ev_w_connect);
 		ev_timer_start(loop, &ps->ev_t_connect);
@@ -1666,11 +1643,7 @@ handle_connect(struct ev_loop *loop, ev_io *w, int revents)
 	(void)revents;
 	CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
 
-	socklen_t len;
-	const void *addr = VSA_Get_Sockaddr(backaddr, &len);
-
-	t = connect(ps->fd_down, addr, len);
-
+	t = connect(ps->fd_down, backaddr->ai_addr, backaddr->ai_addrlen);
 	if (!t || errno == EISCONN || !errno) {
 		ev_io_stop(loop, &ps->ev_w_connect);
 		ev_timer_stop(loop, &ps->ev_t_connect);
@@ -1978,21 +1951,6 @@ static void end_handshake(proxystate *ps) {
 		} else if (CONFIG->WRITE_IP_OCTET) {
 			write_ip_octet(ps);
 		}
-
-		int back = create_back_socket();
-		if (back == -1) {
-			ERR("{backend-socket}: %s\n", strerror(errno));
-			return;
-		}
-		ps->fd_down = back;
-		ev_io_init(&ps->ev_w_connect, handle_connect, back, EV_WRITE);
-		ev_timer_init(&ps->ev_t_connect, connect_timeout,
-			CONFIG->BACKEND_CONNECT_TIMEOUT, 0.);
-
-		ev_io_init(&ps->ev_w_clear, clear_write, back, EV_WRITE);
-		ev_io_init(&ps->ev_r_clear, clear_read, back, EV_READ);
-
-
 		/* start connect now */
 		if (0 != start_connect(ps))
 			return;
@@ -2335,6 +2293,13 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 
 	settcpkeepalive(client);
 
+	int back = create_back_socket();
+	if (back == -1) {
+		(void) close(client);
+		ERR("{backend-socket}: %s\n", strerror(errno));
+		return;
+	}
+
 	CAST_OBJ_NOTNULL(fr, w->data, FRONTEND_MAGIC);
 	if (fr->ssl_ctxs != NULL)
 		CAST_OBJ_NOTNULL(so, fr->ssl_ctxs, SSLCTX_MAGIC);
@@ -2343,6 +2308,7 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 
 	SSL *ssl = SSL_new(so->ctx);
 	if (ssl == NULL) {
+		(void)close(back);
 		(void)close(client);
 		ERR("{SSL_new}: %s\n", strerror(errno));
 		return;
@@ -2351,6 +2317,7 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 	ALLOC_OBJ(ps, PROXYSTATE_MAGIC);
 	if (ps == NULL) {
 		SSL_free(ssl);
+		(void)close(back);
 		(void)close(client);
 		ERR("{malloc-err}: %s\n", strerror(errno));
 		return;
@@ -2365,7 +2332,7 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 	SSL_set_fd(ssl, client);
 
 	ps->fd_up = client;
-	ps->fd_down = 0;
+	ps->fd_down = back;
 	ps->ssl = ssl;
 	ps->want_shutdown = 0;
 	ps->clear_connected = 0;
@@ -2389,6 +2356,13 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 	    CONFIG->SSL_HANDSHAKE_TIMEOUT, 0.);
 
 	ev_io_init(&ps->ev_proxy, client_proxy_proxy, client, EV_READ);
+
+	ev_io_init(&ps->ev_w_connect, handle_connect, back, EV_WRITE);
+	ev_timer_init(&ps->ev_t_connect, connect_timeout,
+	    CONFIG->BACKEND_CONNECT_TIMEOUT, 0.);
+
+	ev_io_init(&ps->ev_w_clear, clear_write, back, EV_WRITE);
+	ev_io_init(&ps->ev_r_clear, clear_read, back, EV_READ);
 
 	ps->ev_r_ssl.data = ps;
 	ps->ev_w_ssl.data = ps;
@@ -2438,36 +2412,16 @@ check_ppid(struct ev_loop *loop, ev_timer *w, int revents)
 	}
 }
 
-static const void *
-Get_Sockaddr(const struct sockaddr_storage *ss, socklen_t *sl)
-{
-	AN(ss);
-	AN(sl);
-	const struct sockaddr * sa = (const struct sockaddr *)(ss);
-	switch (sa->sa_family) {
-	case PF_INET:
-		*sl = sizeof(struct sockaddr_in);
-		break;
-	case PF_INET6:
-		*sl = sizeof(struct sockaddr_in6);
-		break;
-	default:
-		*sl = 0;
-		return (NULL);
-	}
-	return sa;
-}
-
 static void
 handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 {
+	unsigned cg;
 	ssize_t r;
 	struct frontend *fr;
 	struct listen_sock *ls;
-	struct worker_update wu;
 
 	(void) revents;
-	r = read(w->fd, &wu, sizeof(wu));
+	r = read(w->fd, &cg, sizeof(cg));
 	if (r  == -1) {
 		if (errno == EWOULDBLOCK || errno == EAGAIN)
 			return;
@@ -2483,7 +2437,7 @@ handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 		_exit(1);
 	}
 
-	if (wu.type == WORKER_GEN && wu.payload.gen != worker_gen) {
+	if (cg != worker_gen) {
 		/* This means this process has reached its retirement age. */
 		worker_state = WORKER_EXITING;
 
@@ -2498,18 +2452,10 @@ handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 		}
 
 		check_exit_state();
-
-		LOGL("Worker %d (gen: %d): State %s\n", core_id, worker_gen,
-		(worker_state == WORKER_EXITING) ? "EXITING" : "ACTIVE");
 	}
-	else if (wu.type == BACKEND_REFRESH) {
-		free(backaddr);
 
-		socklen_t len;
-		const void *addr = Get_Sockaddr(&(wu.payload.addr), &len);
-		backaddr = VSA_Malloc(addr, len);
-                AN(VSA_Sane(backaddr));
-	}
+	LOGL("Worker %d (gen: %d): State %s\n", core_id, worker_gen,
+	    (worker_state == WORKER_EXITING) ? "EXITING" : "ACTIVE");
 }
 
 static void
@@ -2800,52 +2746,25 @@ drop_privileges(void)
 #endif
 }
 
-static int
-get_backend_addrinfo(void) {
-	struct addrinfo *result;
+void
+init_globals(void)
+{
+	/* backaddr */
 	struct addrinfo hints;
-	struct suckaddr *tmp;
+
+	VTAILQ_INIT(&frontends);
+	VTAILQ_INIT(&worker_procs);
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = 0;
 	const int gai_err = getaddrinfo(CONFIG->BACK_IP, CONFIG->BACK_PORT,
-	    &hints, &result);
+	    &hints, &backaddr);
 	if (gai_err != 0) {
 		ERR("{getaddrinfo-backend}: %s\n", gai_strerror(gai_err));
 		exit(1);
 	}
-
-	tmp = VSA_Malloc(result->ai_addr, result->ai_addrlen);
-	freeaddrinfo(result);
-
-	if (backaddr == NULL) {
-		backaddr = tmp;
-		return 1;
-	}
-
-	if (VSA_Compare(backaddr, tmp) != 0) {
-		free(backaddr);
-		backaddr = tmp;
-		return 1;
-	}
-
-	free(tmp);
-	return 0;
-}
-
-void
-init_globals(void)
-{
-	struct addrinfo hints;
-
-	VTAILQ_INIT(&frontends);
-	VTAILQ_INIT(&worker_procs);
-
-	get_backend_addrinfo();
-
-	(void)hints;
 
 #ifdef USE_SHARED_CACHE
 	if (CONFIG->SHARED_CACHE) {
@@ -3515,47 +3434,15 @@ cert_query(hitch_config *cfg, struct cfg_tpc_obj_head *cfg_objs)
 }
 
 static void
-notify_workers(struct worker_update *wu)
-{
-	struct worker_proc *c;
-	int i;
-	VTAILQ_FOREACH(c, &worker_procs, list) {
-		if ((wu->type == WORKER_GEN && wu->payload.gen != c->gen) ||
-		     (wu->type == BACKEND_REFRESH)) {
-			errno = 0;
-			do {
-				i = write(c->pfd, (void*)wu, sizeof(*wu));
-				if (i == -1 && errno != EINTR) {
-					if (wu->type == WORKER_GEN)
-						ERR("WARNING: {core} Unable to "
-						"gracefully reload worker %d"
-						" (%s).\n",
-						c->pid, strerror(errno));
-					else
-						ERR("WARNING: {core} Unable to "
-						"notify worker %d "
-						"with changed backend address (%s).\n",
-						c->pid, strerror(errno));
-
-					(void)kill(c->pid, SIGTERM);
-					break;
-				}
-			} while (i == -1 && errno == EINTR);
-			(void)close(c->pfd);
-		}
-	}
-}
-
-static void
 reconfigure(int argc, char **argv)
 {
+	struct worker_proc *c;
 	hitch_config *cfg_new;
-	int rv;
+	int i, rv;
 	struct cfg_tpc_obj_head cfg_objs;
 	struct cfg_tpc_obj *cto, *cto_tmp;
 	struct timeval tv;
 	double t0, t1;
-	struct worker_update wu;
 
 	LOGL("Received SIGHUP: Initiating configuration reload.\n");
 	AZ(gettimeofday(&tv, NULL));
@@ -3599,10 +3486,24 @@ reconfigure(int argc, char **argv)
 
 	worker_gen++;
 	start_workers(0, CONFIG->NCORES);
-
-	wu.type = WORKER_GEN;
-	wu.payload.gen = worker_gen;
-	notify_workers(&wu);
+	VTAILQ_FOREACH(c, &worker_procs, list) {
+		if (c->gen != worker_gen) {
+			errno = 0;
+			do {
+				i = write(c->pfd, &worker_gen,
+				    sizeof(worker_gen));
+				if (i == -1 && errno != EINTR) {
+					ERR("WARNING: {core} Unable to "
+					    "gracefully reload worker %d"
+					    " (%s).\n",
+					    c->pid, strerror(errno));
+					(void)kill(c->pid, SIGTERM);
+					break;
+				}
+			} while (i == -1 && errno == EINTR);
+			(void)close(c->pfd);
+		}
+	}
 
 	if (CONFIG->OCSP_DIR != NULL) {
 		(void) kill(ocsp_proc_pid, SIGTERM);
@@ -3614,31 +3515,6 @@ reconfigure(int argc, char **argv)
 
 	config_destroy(CONFIG);
 	CONFIG = cfg_new;
-}
-
-void
-sleep_and_refresh(hitch_config *CONFIG)
-{
-	/* static backend address */
-	if (!CONFIG->BACKEND_REFRESH_TIME) {
-		pause();
-		return;
-	}
-
-	int rv = 0;
-	while (1) {
-		rv = usleep(CONFIG->BACKEND_REFRESH_TIME*1000000);
-		if (rv == -1 && errno == EINTR)
-			break;
-		else if(get_backend_addrinfo()) {
-			struct worker_update wu;
-			wu.type = BACKEND_REFRESH;
-			socklen_t len;
-			const void *addr = VSA_Get_Sockaddr(backaddr, &len);
-			memcpy(&(wu.payload.addr), addr, len);
-			notify_workers(&wu);
-		}
-	}
 }
 
 /* Process command line args, create the bound socket,
@@ -3773,10 +3649,9 @@ main(int argc, char **argv)
 				ev_loop(loop, EVRUN_ONCE);
 			}
 		} else
-			sleep_and_refresh(CONFIG);
+			pause();
 #else
-
-		sleep_and_refresh(CONFIG);
+		pause();
 		/* Sleep and let the children work.
 		 * Parent will be woken up if a signal arrives */
 #endif /* USE_SHARED_CACHE */
