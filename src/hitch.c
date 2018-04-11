@@ -2574,10 +2574,9 @@ handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 		b = backend_create((struct sockaddr *)&wu.payload.addr);
 		backend_deref(&backaddr);
 		backaddr = b;
-                AN(VSA_Sane(backaddr->backaddr));
-	} else {
+		AN(VSA_Sane(backaddr->backaddr));
+	} else
 		WRONG("Invalid worker update state");
-	}
 }
 
 static void
