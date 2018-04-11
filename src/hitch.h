@@ -106,6 +106,8 @@ sni_name *sni_names;
 
 #endif /* OPENSSL_NO_TLSEXT */
 
+struct backend;
+
 /*
  * Proxied State
  *
@@ -137,6 +139,7 @@ typedef struct proxystate {
 	int			fd_up;		/* Upstream (client) socket */
 	int			fd_down;	/* Downstream (backend)
 						 * socket */
+	struct backend		*backend;
 
 	int			want_shutdown:1; /* Connection is
 						  * half-shutdown */

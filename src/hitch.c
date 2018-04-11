@@ -118,7 +118,14 @@ hitch_config *CONFIG;
 /* Worker proc's read side of mgt->worker pipe(2) */
 static ev_io mgt_rd;
 
-static struct suckaddr *backaddr;
+struct backend {
+	unsigned		magic;
+#define BACKEND_MAGIC 0x41c09397
+	struct suckaddr		*backaddr;
+	int 			ref;
+};
+
+static struct backend *backaddr;
 static pid_t master_pid;
 static pid_t ocsp_proc_pid;
 static int core_id;
@@ -1450,15 +1457,62 @@ create_frontend(const struct front_arg *fa)
 	return (fr);
 }
 
+static const void *
+Get_Sockaddr(const struct sockaddr *sa, socklen_t *sl);
+
+static struct backend *
+backend_create(struct sockaddr *sa)
+{
+	socklen_t len;
+	const void *addr;
+	struct backend *b;
+	struct suckaddr *su;
+
+	addr = Get_Sockaddr(sa, &len);
+	su = VSA_Malloc(addr, len);
+	ALLOC_OBJ(b, BACKEND_MAGIC);
+	b->backaddr = su;
+	b->ref = 1;
+	return (b);
+}
+
+static struct backend *
+backend_ref(void)
+{
+	CHECK_OBJ_NOTNULL(backaddr, BACKEND_MAGIC);
+	AN(backaddr->ref);
+	backaddr->ref++;
+	return (backaddr);
+}
+
+
+void
+backend_deref(struct backend **be)
+{
+	struct backend *b;
+	b = *be;
+
+	CHECK_OBJ_NOTNULL(b, BACKEND_MAGIC);
+	AN(b->ref);
+	b->ref--;
+
+	if (b->ref == 0) {
+		free(b->backaddr);
+		FREE_OBJ(*be);
+	}
+}
+
 /* Initiate a clear-text nonblocking connect() to the backend IP on behalf
  * of a newly connected upstream (encrypted) client */
 static int
-create_back_socket()
+create_back_socket(struct backend *b)
 {
 	socklen_t len;
-	const void *addr = VSA_Get_Sockaddr(backaddr, &len);
-        AN(addr);
+	const void *addr;
 
+	CHECK_OBJ_NOTNULL(b, BACKEND_MAGIC);
+	addr = VSA_Get_Sockaddr(b->backaddr, &len);
+	AN(addr);
 	int s = socket(((const struct sockaddr *)addr)->sa_family,
 		       SOCK_STREAM, IPPROTO_TCP);
 
@@ -1524,6 +1578,7 @@ shutdown_proxy(proxystate *ps, SHUTDOWN_REQUESTOR req)
 
 		close(ps->fd_up);
 		close(ps->fd_down);
+		backend_deref(&ps->backend);
 
 		ringbuffer_cleanup(&ps->ring_clear2ssl);
 		ringbuffer_cleanup(&ps->ring_ssl2clear);
@@ -1563,19 +1618,25 @@ static int
 start_connect(proxystate *ps)
 {
 	int t = 1;
-	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
 	socklen_t len;
-	const void *addr = VSA_Get_Sockaddr(backaddr, &len);
+	const void *addr;
+
+	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
+	CHECK_OBJ_NOTNULL(ps->backend, BACKEND_MAGIC);
+	addr = VSA_Get_Sockaddr(ps->backend->backaddr, &len);
+	AN(addr);
 
 	t = connect(ps->fd_down, addr, len);
 	if (t == 0 || errno == EINPROGRESS || errno == EINTR) {
 		ev_io_start(loop, &ps->ev_w_connect);
 		ev_timer_start(loop, &ps->ev_t_connect);
-		return 0;
+		return (0);
 	}
+
 	ERR("{backend-connect}: %s\n", strerror(errno));
 	shutdown_proxy(ps, SHUTDOWN_HARD);
-	return -1;
+
+	return (-1);
 }
 
 /* Read some data from the backend when libev says data is available--
@@ -1662,12 +1723,14 @@ handle_connect(struct ev_loop *loop, ev_io *w, int revents)
 {
 	int t, r;
 	proxystate *ps;
+	socklen_t len;
+	const void *addr;
 
 	(void)revents;
 	CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
-
-	socklen_t len;
-	const void *addr = VSA_Get_Sockaddr(backaddr, &len);
+	CHECK_OBJ_NOTNULL(ps->backend, BACKEND_MAGIC);
+	addr = VSA_Get_Sockaddr(ps->backend->backaddr, &len);
+	AN(addr);
 
 	t = connect(ps->fd_down, addr, len);
 
@@ -1978,20 +2041,6 @@ static void end_handshake(proxystate *ps) {
 		} else if (CONFIG->WRITE_IP_OCTET) {
 			write_ip_octet(ps);
 		}
-
-		int back = create_back_socket();
-		if (back == -1) {
-			ERR("{backend-socket}: %s\n", strerror(errno));
-			return;
-		}
-		ps->fd_down = back;
-		ev_io_init(&ps->ev_w_connect, handle_connect, back, EV_WRITE);
-		ev_timer_init(&ps->ev_t_connect, connect_timeout,
-			CONFIG->BACKEND_CONNECT_TIMEOUT, 0.);
-
-		ev_io_init(&ps->ev_w_clear, clear_write, back, EV_WRITE);
-		ev_io_init(&ps->ev_r_clear, clear_read, back, EV_READ);
-
 
 		/* start connect now */
 		if (0 != start_connect(ps))
@@ -2335,6 +2384,24 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 
 	settcpkeepalive(client);
 
+	ALLOC_OBJ(ps, PROXYSTATE_MAGIC);
+	if (ps == NULL) {
+		(void)close(client);
+		ERR("{malloc-err}: %s\n", strerror(errno));
+		return;
+	}
+
+	ps->backend = backend_ref();
+	ps->fd_down = create_back_socket(ps->backend);
+	if (ps->fd_down == -1) {
+		(void) close(client);
+		backend_deref(&ps->backend);
+		free(ps);
+		ERR("{backend-socket}: %s\n", strerror(errno));
+		return;
+	}
+
+
 	CAST_OBJ_NOTNULL(fr, w->data, FRONTEND_MAGIC);
 	if (fr->ssl_ctxs != NULL)
 		CAST_OBJ_NOTNULL(so, fr->ssl_ctxs, SSLCTX_MAGIC);
@@ -2343,16 +2410,11 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 
 	SSL *ssl = SSL_new(so->ctx);
 	if (ssl == NULL) {
+		(void)close(ps->fd_down);
 		(void)close(client);
+		backend_deref(&ps->backend);
+		free(ps);
 		ERR("{SSL_new}: %s\n", strerror(errno));
-		return;
-	}
-
-	ALLOC_OBJ(ps, PROXYSTATE_MAGIC);
-	if (ps == NULL) {
-		SSL_free(ssl);
-		(void)close(client);
-		ERR("{malloc-err}: %s\n", strerror(errno));
 		return;
 	}
 
@@ -2365,7 +2427,6 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 	SSL_set_fd(ssl, client);
 
 	ps->fd_up = client;
-	ps->fd_down = 0;
 	ps->ssl = ssl;
 	ps->want_shutdown = 0;
 	ps->clear_connected = 0;
@@ -2389,6 +2450,12 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 	    CONFIG->SSL_HANDSHAKE_TIMEOUT, 0.);
 
 	ev_io_init(&ps->ev_proxy, client_proxy_proxy, client, EV_READ);
+	ev_io_init(&ps->ev_w_connect, handle_connect, ps->fd_down, EV_WRITE);
+	ev_timer_init(&ps->ev_t_connect, connect_timeout,
+	    CONFIG->BACKEND_CONNECT_TIMEOUT, 0.);
+
+	ev_io_init(&ps->ev_w_clear, clear_write, ps->fd_down, EV_WRITE);
+	ev_io_init(&ps->ev_r_clear, clear_read, ps->fd_down, EV_READ);
 
 	ps->ev_r_ssl.data = ps;
 	ps->ev_w_ssl.data = ps;
@@ -2439,11 +2506,11 @@ check_ppid(struct ev_loop *loop, ev_timer *w, int revents)
 }
 
 static const void *
-Get_Sockaddr(const struct sockaddr_storage *ss, socklen_t *sl)
+Get_Sockaddr(const struct sockaddr *sa, socklen_t *sl)
 {
-	AN(ss);
+	AN(sa);
 	AN(sl);
-	const struct sockaddr * sa = (const struct sockaddr *)(ss);
+
 	switch (sa->sa_family) {
 	case PF_INET:
 		*sl = sizeof(struct sockaddr_in);
@@ -2503,12 +2570,13 @@ handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 		(worker_state == WORKER_EXITING) ? "EXITING" : "ACTIVE");
 	}
 	else if (wu.type == BACKEND_REFRESH) {
-		free(backaddr);
-
-		socklen_t len;
-		const void *addr = Get_Sockaddr(&(wu.payload.addr), &len);
-		backaddr = VSA_Malloc(addr, len);
-                AN(VSA_Sane(backaddr));
+		struct backend *b;
+		b = backend_create((struct sockaddr *)&wu.payload.addr);
+		backend_deref(&backaddr);
+		backaddr = b;
+                AN(VSA_Sane(backaddr->backaddr));
+	} else {
+		WRONG("Invalid worker update state");
 	}
 }
 
@@ -2569,9 +2637,13 @@ handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents)
 
 	settcpkeepalive(client);
 
-	int back = create_back_socket();
-	if (back == -1) {
+	ALLOC_OBJ(ps, PROXYSTATE_MAGIC);
+	ps->backend = backend_ref();
+	ps->fd_down = create_back_socket(ps->backend);
+	if (ps->fd_down == -1) {
+		backend_deref(&ps->backend);
 		close(client);
+		free(ps);
 		ERR("{backend-socket}: %s\n", strerror(errno));
 		return;
 	}
@@ -2588,14 +2660,11 @@ handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents)
 #endif
 	SSL_set_mode(ssl, mode);
 	SSL_set_connect_state(ssl);
-	SSL_set_fd(ssl, back);
+	SSL_set_fd(ssl, ps->fd_down);
 	if (client_session)
 		SSL_set_session(ssl, client_session);
 
-	ALLOC_OBJ(ps, PROXYSTATE_MAGIC);
-
 	ps->fd_up = client;
-	ps->fd_down = back;
 	ps->ssl = ssl;
 	ps->want_shutdown = 0;
 	ps->clear_connected = 1;
@@ -2611,17 +2680,19 @@ handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents)
 	ev_io_init(&ps->ev_r_clear, clear_read, client, EV_READ);
 	ev_io_init(&ps->ev_w_clear, clear_write, client, EV_WRITE);
 
-	ev_io_init(&ps->ev_w_connect, handle_connect, back, EV_WRITE);
+	ev_io_init(&ps->ev_w_connect, handle_connect, ps->fd_down, EV_WRITE);
 	ev_timer_init(&ps->ev_t_connect, connect_timeout,
 	    CONFIG->BACKEND_CONNECT_TIMEOUT, 0.);
 
-	ev_io_init(&ps->ev_r_handshake, client_handshake, back, EV_READ);
-	ev_io_init(&ps->ev_w_handshake, client_handshake, back, EV_WRITE);
+	ev_io_init(&ps->ev_r_handshake, client_handshake,
+	    ps->fd_down, EV_READ);
+	ev_io_init(&ps->ev_w_handshake, client_handshake,
+	    ps->fd_down, EV_WRITE);
 	ev_timer_init(&ps->ev_t_handshake, handshake_timeout,
 	    CONFIG->SSL_HANDSHAKE_TIMEOUT, 0.);
 
-	ev_io_init(&ps->ev_w_ssl, ssl_write, back, EV_WRITE);
-	ev_io_init(&ps->ev_r_ssl, ssl_read, back, EV_READ);
+	ev_io_init(&ps->ev_w_ssl, ssl_write, ps->fd_down, EV_WRITE);
+	ev_io_init(&ps->ev_r_ssl, ssl_read, ps->fd_down, EV_READ);
 
 	ps->ev_r_ssl.data = ps;
 	ps->ev_w_ssl.data = ps;
@@ -2804,7 +2875,7 @@ static int
 get_backend_addrinfo(void) {
 	struct addrinfo *result;
 	struct addrinfo hints;
-	struct suckaddr *tmp;
+	struct backend *b;
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
@@ -2817,22 +2888,24 @@ get_backend_addrinfo(void) {
 		exit(1);
 	}
 
-	tmp = VSA_Malloc(result->ai_addr, result->ai_addrlen);
+	b = backend_create(result->ai_addr);
 	freeaddrinfo(result);
 
 	if (backaddr == NULL) {
-		backaddr = tmp;
-		return 1;
+		backaddr = b;
+		return (1);
 	}
 
-	if (VSA_Compare(backaddr, tmp) != 0) {
+	if (VSA_Compare(backaddr->backaddr, b->backaddr) != 0) {
 		free(backaddr);
-		backaddr = tmp;
-		return 1;
+		backaddr = b;
+		return (1);
 	}
 
-	free(tmp);
-	return 0;
+	backend_deref(&b);
+	AZ(b);
+
+	return (0);
 }
 
 void
@@ -3634,7 +3707,9 @@ sleep_and_refresh(hitch_config *CONFIG)
 			struct worker_update wu;
 			wu.type = BACKEND_REFRESH;
 			socklen_t len;
-			const void *addr = VSA_Get_Sockaddr(backaddr, &len);
+			const void *addr =
+			    VSA_Get_Sockaddr(backaddr->backaddr, &len);
+			AN(addr);
 			memcpy(&(wu.payload.addr), addr, len);
 			notify_workers(&wu);
 		}
