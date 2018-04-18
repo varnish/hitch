@@ -345,8 +345,11 @@ The following file shows the syntax needed to get started with::
     workers = 4                     # number of CPU cores
 
     daemon = on
-    user = "nobody"
-    group = "nogroup"
+
+    # We strongly recommend you create a separate non-privileged hitch
+    # user and group
+    user = "hitch"
+    group = "hitch"
 
     # Enable to let clients negotiate HTTP/2 with ALPN. (default off)
     # alpn-protos = "h2, http/1.1"
