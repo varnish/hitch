@@ -4,6 +4,13 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.4.8 (2018-04-19)
+------------------------
+
+* Reworked the dynamic backend bits.
+* Update docs to recommend running Hitch as a separate non-privileged
+  user.
+
 hitch-1.4.7 (2018-01-11)
 ------------------------
 
