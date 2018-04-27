@@ -3680,7 +3680,8 @@ reconfigure(int argc, char **argv)
 	notify_workers(&wu);
 
 	if (CONFIG->OCSP_DIR != NULL) {
-		(void) kill(ocsp_proc_pid, SIGTERM);
+		if (ocsp_proc_pid != 0)
+			kill(ocsp_proc_pid, SIGTERM);
 		/*
 		 * Restarting the OCSP process is taken
 		 * care of in do_wait
