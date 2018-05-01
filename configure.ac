@@ -62,7 +62,7 @@ AC_CHECK_MEMBERS([struct stat.st_mtim, struct stat.st_mtimespec])
 AC_ARG_ENABLE(sessioncache,
     AC_HELP_STRING([--enable-sessioncache],
 		   [Enable TLS session cache. (default is off)]),
-    [use_shctx="$withval"],
+    [use_shctx="$enableval"],
     [use_shctx=no])
 if test x"$use_shctx" != xno; then
   if test ! -e 'src/ebtree/ebtree.h'; then
