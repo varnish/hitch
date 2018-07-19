@@ -1208,7 +1208,6 @@ init_certs(void) {
 	sslctx *so;
 
 	if (CONFIG->CERT_DEFAULT != NULL) {
-		AN(CONFIG->CERT_DEFAULT);
 		default_ctx = make_ctx(CONFIG->CERT_DEFAULT);
 		if (default_ctx == NULL)
 			exit(1);
