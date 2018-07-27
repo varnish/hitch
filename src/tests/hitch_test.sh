@@ -168,6 +168,22 @@ start_hitch() {
 }
 
 #-
+# Usage: stop_hitch
+#
+# Kill a hitch daemon started with `start_hitch`, waiting for the
+# process to terminate.
+
+stop_hitch() {
+	HITCH_PID=$(hitch_pid)
+	kill -TERM "$HITCH_PID"
+
+	while kill -0 "$HITCH_PID"
+	do
+		sleep 1
+	done
+}
+
+#-
 # Usage: hitch_pid
 #
 # Print the PID of the daemon started with `start_hitch`, usually in a
