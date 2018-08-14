@@ -323,24 +323,56 @@ config_param_val_bool(char *val, int *res)
 }
 
 static int
+config_param_uds(const char *str, char **path)
+{
+	struct stat st;
+
+	AN(path);
+
+	if (strlen(str) > 104) {
+		config_error_set("UNIX domain socket path too long.");
+		return (0);
+	}
+
+	if (stat(str, &st)) {
+		config_error_set("Unable to stat path '%s': %s", str,
+		    strerror(errno));
+		return (0);
+	}
+
+	if (!S_ISSOCK(st.st_mode)) {
+		config_error_set("Invalid path '%s': Not a socket.", str);
+		return (0);
+	}
+
+	*path = strdup(str);
+	return (1);
+}
+
+static int
 config_param_host_port_wildcard(const char *str, char **addr,
-    char **port, char **cert, int wildcard_okay)
+    char **port, char **cert, int wildcard_okay, char **path)
 {
 	const char *cert_ptr = NULL;
+	char port_buf[PORT_LEN];
+	char addr_buf[ADDR_LEN];
 
 	if (str == NULL) {
 		config_error_set("Invalid/unset host/port string.");
 		return (0);
 	}
 
+	/* UDS addresses start with a '/' */
+	if (path != NULL && *str == '/') {
+		*addr = NULL;
+		*port = NULL;
+		return (config_param_uds(str, path));
+	}
+
 	if (strlen(str) > ADDR_LEN) {
 		config_error_set("Host address too long.");
 		return (0);
 	}
-
-	// address/port buffers
-	char port_buf[PORT_LEN];
-	char addr_buf[ADDR_LEN];
 
 	memset(port_buf, '\0', sizeof(port_buf));
 	memset(addr_buf, '\0', sizeof(addr_buf));
@@ -414,9 +446,10 @@ config_param_host_port_wildcard(const char *str, char **addr,
 }
 
 static int
-config_param_host_port(char *str, char **addr, char **port)
+config_param_host_port(char *str, char **addr, char **port, char **path)
 {
-	return (config_param_host_port_wildcard(str, addr, port, NULL, 0));
+	return (config_param_host_port_wildcard(str, addr, port,
+		NULL, 0, path));
 }
 
 
@@ -668,7 +701,7 @@ config_param_shcupd_peer(char *str, hitch_config *cfg)
 	memset(port, '\0', PORT_LEN);
 
 	// try to parse address
-	if (! config_param_host_port(str, &addr, &port)) {
+	if (! config_param_host_port(str, &addr, &port, NULL)) {
 		r = 0;
 		goto outta_parse_peer;
 	}
@@ -789,7 +822,7 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 
 		fa = front_arg_new();
 		r = config_param_host_port_wildcard(v,
-		    &fa->ip, &fa->port, &certfile, 1);
+		    &fa->ip, &fa->port, &certfile, 1, NULL);
 		if (r != 0) {
 			if (certfile != NULL) {
 				cert = cfg_cert_file_new();
@@ -809,7 +842,9 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 	} else if (strcmp(k, CFG_BACKEND) == 0) {
 		free(cfg->BACK_PORT);
 		free(cfg->BACK_IP);
-		r = config_param_host_port(v, &cfg->BACK_IP, &cfg->BACK_PORT);
+		free(cfg->BACK_PATH);
+		r = config_param_host_port(v, &cfg->BACK_IP, &cfg->BACK_PORT,
+		    &cfg->BACK_PATH);
 	} else if (strcmp(k, CFG_WORKERS) == 0) {
 		r = config_param_val_long(v, &cfg->NCORES, 1);
 	} else if (strcmp(k, CFG_BACKLOG) == 0) {
@@ -825,7 +860,7 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 	} else if (strcmp(k, CFG_SHARED_CACHE_LISTEN) == 0) {
 		if (strlen(v) > 0)
 			r = config_param_host_port_wildcard(v, &cfg->SHCUPD_IP,
-			    &cfg->SHCUPD_PORT, NULL, 1);
+			    &cfg->SHCUPD_PORT, NULL, 1, NULL);
 	} else if (strcmp(k, CFG_SHARED_CACHE_PEER) == 0) {
 		r = config_param_shcupd_peer(v, cfg);
 	} else if (strcmp(k, CFG_SHARED_CACHE_MCASTIF) == 0) {

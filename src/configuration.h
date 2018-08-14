@@ -111,6 +111,7 @@ struct __hitch_config {
     struct front_arg *LISTEN_DEFAULT;
     char *BACK_IP;
     char *BACK_PORT;
+    char *BACK_PATH;
     long NCORES;
     struct cfg_cert_file *CERT_FILES;
     struct cfg_cert_file *CERT_DEFAULT;
