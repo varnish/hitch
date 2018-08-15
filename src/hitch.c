@@ -40,6 +40,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/un.h>
 #include <sys/wait.h>  /* WAIT_PID */
 
 #ifdef __linux__
@@ -1471,6 +1472,7 @@ backend_create(struct sockaddr *sa)
 	struct suckaddr *su;
 
 	addr = Get_Sockaddr(sa, &len);
+	AN(addr);
 	su = VSA_Malloc(addr, len);
 	ALLOC_OBJ(b, BACKEND_MAGIC);
 	b->backaddr = su;
@@ -1510,23 +1512,24 @@ static int
 create_back_socket(struct backend *b)
 {
 	socklen_t len;
-	const void *addr;
+	const struct sockaddr *addr;
 
 	CHECK_OBJ_NOTNULL(b, BACKEND_MAGIC);
-	addr = VSA_Get_Sockaddr(b->backaddr, &len);
+	addr = (struct sockaddr *) VSA_Get_Sockaddr(b->backaddr, &len);
 	AN(addr);
-	int s = socket(((const struct sockaddr *)addr)->sa_family,
-		       SOCK_STREAM, IPPROTO_TCP);
+	int s = socket(addr->sa_family, SOCK_STREAM, 0);
 
 	if (s == -1)
 		return -1;
 
-	int flag = 1;
-	int ret = setsockopt(s, IPPROTO_TCP, TCP_NODELAY,
-	    (char *)&flag, sizeof(flag));
-	if (ret == -1)
-		ERR("Couldn't setsockopt to backend (TCP_NODELAY): %s\n",
-		    strerror(errno));
+	if (addr->sa_family != PF_UNIX) {
+		int flag = 1;
+		int ret = setsockopt(s, IPPROTO_TCP, TCP_NODELAY,
+		    (char *)&flag, sizeof(flag));
+		if (ret == -1)
+			ERR("Couldn't setsockopt to backend (TCP_NODELAY):"
+			    " %s\n", strerror(errno));
+	}
 	if (setnonblocking(s) < 0) {
 		(void)close(s);
 		return (-1);
@@ -1718,6 +1721,24 @@ clear_write(struct ev_loop *loop, ev_io *w, int revents)
 
 static void start_handshake(proxystate *ps, int err);
 
+static unsigned
+sockaddr_port(const struct sockaddr *sa)
+{
+	const struct sockaddr_in *sa4;
+	const struct sockaddr_in6 *sa6;
+
+	switch (sa->sa_family) {
+	case PF_INET:
+		sa4 = (struct sockaddr_in *) sa;
+		return (ntohs((sa4->sin_port)));
+	case PF_INET6:
+		sa6 = (struct sockaddr_in6 *) sa;
+		return (ntohs((sa6->sin6_port)));
+	default:
+		return (0);
+	}
+}
+
 /* Continue/complete the asynchronous connect() before starting data
  * transmission between front/backend */
 static void
@@ -1741,15 +1762,15 @@ handle_connect(struct ev_loop *loop, ev_io *w, int revents)
 		ev_timer_stop(loop, &ps->ev_t_connect);
 
 		if (!ps->clear_connected) {
-			struct sockaddr_storage addr;
+			struct sockaddr_storage ss;
 			socklen_t sl;
 
 			sl = sizeof(addr);
 			r = getsockname(ps->fd_down,
-			    (struct sockaddr*) &addr, &sl);
+			    (struct sockaddr *) &ss, &sl);
 			AZ(r);
-			ps->connect_port =
-			    ntohs(((struct sockaddr_in*)&addr)->sin_port);
+			ps->connect_port = sockaddr_port(
+				(struct sockaddr *) &ss);
 			LOGPROXY(ps, "backend connected\n");
 
 			ps->clear_connected = 1;
@@ -2520,6 +2541,9 @@ Get_Sockaddr(const struct sockaddr *sa, socklen_t *sl)
 	case PF_INET6:
 		*sl = sizeof(struct sockaddr_in6);
 		break;
+	case PF_UNIX:
+		*sl = sizeof(struct sockaddr_un);
+		break;
 	default:
 		*sl = 0;
 		return (NULL);
@@ -2873,10 +2897,39 @@ drop_privileges(void)
 }
 
 static int
+backaddr_init_uds(void)
+{
+	struct sockaddr_un sun;
+	struct backend *b;
+	int l;
+
+	if (backaddr != NULL)
+		/* Already configured - we don't refresh UDS addresses. */
+		return (0);
+
+	AN(CONFIG->BACK_PATH);
+	memset(&sun, 0, sizeof sun);
+	sun.sun_family = PF_UNIX;
+	l = snprintf(sun.sun_path, sizeof(sun.sun_path), "%s",
+	    CONFIG->BACK_PATH);
+	/* the length of BACK_PATH is verified to fit into
+	 * sun.sun_path in configuration.c */
+	assert(l < (int)sizeof(sun.sun_path));
+
+	b = backend_create((struct sockaddr *)&sun);
+	backaddr = b;
+
+	return (0);
+}
+
+static int
 backaddr_init(void) {
 	struct addrinfo *result;
 	struct addrinfo hints;
 	struct backend *b;
+
+	if (CONFIG->BACK_PATH)
+		return (backaddr_init_uds());
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
