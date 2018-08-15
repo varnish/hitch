@@ -2873,7 +2873,7 @@ drop_privileges(void)
 }
 
 static int
-get_backend_addrinfo(void) {
+backaddr_init(void) {
 	struct addrinfo *result;
 	struct addrinfo hints;
 	struct backend *b;
@@ -2917,7 +2917,7 @@ init_globals(void)
 	VTAILQ_INIT(&frontends);
 	VTAILQ_INIT(&worker_procs);
 
-	get_backend_addrinfo();
+	backaddr_init();
 
 	(void)hints;
 
@@ -3730,7 +3730,7 @@ sleep_and_refresh(hitch_config *CONFIG)
 		rv = usleep(CONFIG->BACKEND_REFRESH_TIME*1000000);
 		if (rv == -1 && errno == EINTR)
 			break;
-		else if(get_backend_addrinfo()) {
+		else if(backaddr_init()) {
 			struct worker_update wu;
 			wu.type = BACKEND_REFRESH;
 			socklen_t len;
