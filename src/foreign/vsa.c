@@ -36,6 +36,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <netinet/in.h>
 
 #include "vas.h"
@@ -167,6 +168,7 @@ struct suckaddr {
 		struct sockaddr		sa;
 		struct sockaddr_in	sa4;
 		struct sockaddr_in6	sa6;
+		struct sockaddr_un	sun;
 	};
 };
 
@@ -195,6 +197,10 @@ VRT_VSA_GetPtr(const struct suckaddr *sua, const unsigned char ** dst)
 		assert(sua->sa.sa_family == sua->sa6.sin6_family);
 		*dst = (const unsigned char *)&sua->sa6.sin6_addr;
 		return (sua->sa6.sin6_family);
+	case PF_UNIX:
+		assert(sua->sa.sa_family == sua->sun.sun_family);
+		*dst = (const unsigned char *)&sua->sun.sun_path;
+		return (sua->sun.sun_family);
 	default:
 		*dst = NULL;
 		return (-1);
@@ -220,6 +226,10 @@ VSA_Malloc(const void *s, unsigned  sal)
 		break;
 	case PF_INET6:
 		if (sal == sizeof sua->sa6)
+			l = sal;
+		break;
+	case PF_UNIX:
+		if (sal == sizeof sua->sun)
 			l = sal;
 		break;
 	default:
@@ -252,6 +262,10 @@ VSA_Build(void *d, const void *s, unsigned sal)
 		if (sal == sizeof sua->sa6)
 			l = sal;
 		break;
+	case PF_UNIX:
+		if (sal == sizeof sua->sun)
+			l = sal;
+		break;
 	default:
 		break;
 	}
@@ -277,6 +291,9 @@ VSA_Get_Sockaddr(const struct suckaddr *sua, socklen_t *sl)
 	case PF_INET6:
 		*sl = sizeof sua->sa6;
 		break;
+	case PF_UNIX:
+		*sl = sizeof sua->sun;
+		break;
 	default:
 		return (NULL);
 	}
@@ -299,6 +316,7 @@ VSA_Sane(const struct suckaddr *sua)
 	switch (sua->sa.sa_family) {
 	case PF_INET:
 	case PF_INET6:
+	case PF_UNIX:
 		return (1);
 	default:
 		return (0);
