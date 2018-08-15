@@ -57,11 +57,20 @@ The result of the NPN/ALPN negotiation will be communicated to the
 backend if and only if write-proxy-v2 or proxy-proxy is used. For
 HTTP/2 to work with modern browsers, ALPN negotiation is required.
 
-backend = "[HOST]:PORT"
------------------------
+backend = ...
+-------------
 
-The host and port Hitch connects to when receiving a connection. Only
+The endpoint Hitch connects to when receiving a connection. Only
 a single backend is supported.
+
+This is either specified as "[HOST]:port" for IPv4/IPv6 endpoints::
+
+  backend = "[localhost]:8080"
+
+Or it can be specified as a path to a UNIX domain socket::
+
+  backend = "/path/to/sock"
+
 
 backlog = <number>
 ------------------

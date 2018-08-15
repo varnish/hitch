@@ -45,6 +45,8 @@ Command line arguments
   -O  --prefer-server-ciphers   Prefer server list order
   --client                      Enable client proxy mode
   -b  --backend=[HOST]:PORT     Backend [connect] (default is "[127.0.0.1]:8000")
+                                The -b argument can also take a UNIX domain socket path
+                                E.g. --backend="/path/to/sock"
   -f  --frontend=[HOST]:PORT[+CERT]     Frontend [bind] (default is "[*]:8443")
                                         (Note: brackets are mandatory in endpoint specifiers.)
   -n  --workers=NUM          Number of worker processes (Default: 1)

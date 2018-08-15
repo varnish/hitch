@@ -1136,6 +1136,8 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "\n");
 	fprintf(out, "      --client                Enable client proxy mode\n");
 	fprintf(out, "  -b  --backend=[HOST]:PORT   Backend [connect] (default is \"%s\")\n", config_disp_hostport(cfg->BACK_IP, cfg->BACK_PORT));
+	fprintf(out, "                              The -b argument can also take a UNIX domain socket path\n");
+	fprintf(out, "                              E.g. --backend=\"/path/to/sock\"\n");
 	fprintf(out, "  -f  --frontend=[HOST]:PORT[+CERT]    Frontend [bind] (default is \"%s\")\n", config_disp_hostport(cfg->LISTEN_DEFAULT->ip, cfg->LISTEN_DEFAULT->port));
 	fprintf(out, "                                (Note: brackets are mandatory in endpoint specifiers.)\n");
 	fprintf(out, "      --recv-bufsize=SIZE    Receive buffer size on client socket (Default: %d)\n", cfg->RECV_BUFSIZE);
