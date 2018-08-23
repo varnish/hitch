@@ -184,6 +184,7 @@ struct frontend {
 	int			sni_nomatch_abort;
 	struct sni_name_s	*sni_names;
 	struct sslctx_s		*ssl_ctxs;
+	struct sslctx_s		*default_ctx;
 	char			*pspec;
 	struct listen_sock_head	socks;
 	VTAILQ_ENTRY(frontend)	list;
@@ -1224,8 +1225,8 @@ init_certs(void) {
 			so = make_ctx(cf);
 			if (so == NULL)
 				exit(1);
-			HASH_ADD_KEYPTR(hh, ssl_ctxs, cf->filename,
-			    strlen(cf->filename), so);
+			HASH_ADD_KEYPTR(hh, ssl_ctxs, so->filename,
+			    strlen(so->filename), so);
 #ifndef OPENSSL_NO_TLSEXT
 			insert_sni_names(so, &sni_names);
 #endif
@@ -1422,7 +1423,7 @@ create_frontend(const struct front_arg *fa)
 	sslctx *so;
 	int count = 0;
 	struct frontend_head tmp_list;
-	struct cfg_cert_file *cf, *cftmp;
+	struct cfg_cert_file *cf;
 
 	CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
 	ALLOC_OBJ(fr, FRONTEND_MAGIC);
@@ -1440,17 +1441,19 @@ create_frontend(const struct front_arg *fa)
 		return (NULL);
 	}
 
-	HASH_ITER(hh, fa->certs, cf, cftmp) {
+	for (cf = fa->certs; cf != NULL; cf = cf->hh.next) {
 		so = make_ctx_fr(cf, fr, fa);
 		if (so == NULL) {
 			destroy_frontend(fr);
 			return (NULL);
 		}
 		HASH_ADD_KEYPTR(hh, fr->ssl_ctxs,
-		    cf->filename, strlen(cf->filename), so);
+		    so->filename, strlen(so->filename), so);
 #ifndef OPENSSL_NO_TLSEXT
 		insert_sni_names(so, &fr->sni_names);
 #endif
+		if (cf->hh.next == NULL)
+			fr->default_ctx = so;
 	}
 
 	return (fr);
@@ -2402,8 +2405,8 @@ handle_accept(struct ev_loop *loop, ev_io *w, int revents)
 
 
 	CAST_OBJ_NOTNULL(fr, w->data, FRONTEND_MAGIC);
-	if (fr->ssl_ctxs != NULL)
-		CAST_OBJ_NOTNULL(so, fr->ssl_ctxs, SSLCTX_MAGIC);
+	if (fr->default_ctx != NULL)
+		CAST_OBJ_NOTNULL(so, fr->default_ctx, SSLCTX_MAGIC);
 	else
 		CAST_OBJ_NOTNULL(so, default_ctx, SSLCTX_MAGIC);
 
@@ -2647,8 +2650,8 @@ handle_clear_accept(struct ev_loop *loop, ev_io *w, int revents)
 	}
 
 	CAST_OBJ_NOTNULL(fr, w->data, FRONTEND_MAGIC);
-	if (fr->ssl_ctxs != NULL)
-		CAST_OBJ_NOTNULL(so, fr->ssl_ctxs, SSLCTX_MAGIC);
+	if (fr->default_ctx != NULL)
+		CAST_OBJ_NOTNULL(so, fr->default_ctx, SSLCTX_MAGIC);
 	else
 		CAST_OBJ_NOTNULL(so, default_ctx, SSLCTX_MAGIC);
 	SSL *ssl = SSL_new(so->ctx);
@@ -3630,6 +3633,7 @@ reconfigure(int argc, char **argv)
 	struct timeval tv;
 	double t0, t1;
 	struct worker_update wu;
+	struct frontend *fr;
 
 	LOGL("Received SIGHUP: Initiating configuration reload.\n");
 	AZ(gettimeofday(&tv, NULL));
@@ -3663,6 +3667,28 @@ reconfigure(int argc, char **argv)
 			cto->commit(cto);
 			FREE_OBJ(cto);
 		}
+	}
+
+	/* Rewire default sslctx for each frontend after a reload */
+	VTAILQ_FOREACH(fr, &frontends, list) {
+		struct front_arg *fa;
+		struct cfg_cert_file *cf;
+		sslctx *sc;
+
+		if (HASH_COUNT(fr->ssl_ctxs) == 0) {
+			fr->default_ctx = NULL;
+			continue;
+		}
+
+		HASH_FIND_STR(cfg_new->LISTEN_ARGS, fr->pspec, fa);
+		AN(fa);
+		cf = fa->certs;
+		CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
+		while (cf->hh.next != NULL)
+			cf = cf->hh.next;
+		HASH_FIND_STR(fr->ssl_ctxs, cf->filename, sc);
+		CHECK_OBJ_NOTNULL(sc, SSLCTX_MAGIC);
+		fr->default_ctx = sc;
 	}
 
 	AZ(gettimeofday(&tv, NULL));
