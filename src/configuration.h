@@ -143,6 +143,7 @@ struct __hitch_config {
     char *PIDFILE;
     int SNI_NOMATCH_ABORT;
     int TEST;
+    char *PEM_DIR;
     int OCSP_VFY;
     char *OCSP_DIR;
     double OCSP_RESP_TMO;

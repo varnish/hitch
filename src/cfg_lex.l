@@ -82,6 +82,7 @@ char input_line[512];
 "ocsp-connect-tmo"	{ return (TOK_OCSP_CONN_TMO); }
 "ocsp-refresh-interval"	{ return (TOK_OCSP_REFRESH_INTERVAL); }
 "ocsp-dir"		{ return (TOK_OCSP_DIR); }
+"pem-dir"               { return (TOK_PEM_DIR); }
 "session-cache"	 	{ return (TOK_SESSION_CACHE); }
 "shared-cache-listen"	{ return (TOK_SHARED_CACHE_LISTEN); }
 "shared-cache-peer"  	{ return (TOK_SHARED_CACHE_PEER); }
