@@ -15,6 +15,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <dirent.h>
 #include <ctype.h>
 #include <unistd.h>
 #include <getopt.h>
@@ -197,6 +198,7 @@ config_new(void)
 	r->CERT_DEFAULT	      = NULL;
 	r->CERT_FILES         = NULL;
 	r->LISTEN_ARGS        = NULL;
+	r->PEM_DIR            = NULL;
 	fa = front_arg_new();
 	fa->port = strdup("8443");
 	fa->pspec = strdup("default");
@@ -277,7 +279,7 @@ config_destroy(hitch_config *cfg)
 	free(cfg->OCSP_DIR);
 	free(cfg->ALPN_PROTOS);
 	free(cfg->ALPN_PROTOS_LV);
-
+        free(cfg->PEM_DIR);
 #ifdef USE_SHARED_CACHE
 	int i;
 	free(cfg->SHCUPD_IP);
@@ -1109,6 +1111,38 @@ config_disp_log_facility (int facility)
 }
 
 void
+config_scan_pem_dir(char *pemdir, hitch_config *cfg)
+{
+	DIR *d;
+	struct dirent *dir;
+	d = opendir(pemdir);
+	if (d) {
+		while ((dir = readdir(d)) != NULL) {
+			if (dir->d_type == DT_REG) {
+				char fpath[PATH_MAX + NAME_MAX];
+				strncpy(fpath,pemdir, PATH_MAX + NAME_MAX -1);
+				strncat(fpath,dir->d_name, PATH_MAX + NAME_MAX - strlen(fpath) -1);
+
+				struct cfg_cert_file *cert;
+				cert = cfg_cert_file_new();
+				config_assign_str(&cert->filename, fpath);
+				int r = cfg_cert_vfy(cert);
+				if (r != 0) {
+					if (cfg->CERT_DEFAULT != NULL) {
+						struct cfg_cert_file *tmp = cfg->CERT_DEFAULT;
+						cfg_cert_add(tmp, &cfg->CERT_FILES);
+					}
+					cfg->CERT_DEFAULT = cert;
+				} else {
+					cfg_cert_file_free(&cert);
+				}
+			}
+		}
+		closedir(d);
+	}
+}
+
+void
 config_print_usage_fd(char *prog, FILE *out)
 {
 	hitch_config *cfg;
@@ -1590,6 +1624,10 @@ CFG_ON('s', CFG_SYSLOG);
 				cfg->OCSP_DIR = NULL;
 			}
 		}
+	}
+
+	if (cfg->PEM_DIR != NULL) {
+		config_scan_pem_dir(cfg->PEM_DIR,cfg); 
 	}
 
 	return (0);
