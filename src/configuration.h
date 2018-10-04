@@ -156,6 +156,6 @@ typedef struct __hitch_config hitch_config;
 const char * config_error_get (void);
 hitch_config * config_new (void);
 void config_destroy (hitch_config *cfg);
-int config_parse_cli(int argc, char **argv, hitch_config *cfg, int *rv);
+int config_parse_cli(int argc, char **argv, hitch_config *cfg);
 
 #endif  /* CONFIGURATION_H_INCLUDED */

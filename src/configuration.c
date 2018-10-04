@@ -1307,16 +1307,13 @@ create_alpn_callback_data(hitch_config *cfg, char **error)
 }
 
 int
-config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
+config_parse_cli(int argc, char **argv, hitch_config *cfg)
 {
 	static int tls = 0, ssl = 0;
 	static int client = 0;
 	int c, i;
 
 	optind = 1;
-
-	AN(retval);
-	*retval = 0;
 
 	struct option long_options[] = {
 		{ CFG_CONFIG, 1, NULL, CFG_PARAM_CFGFILE },
@@ -1365,7 +1362,6 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 
 	if (argc == 1) {
 		config_print_usage(argv[0]);
-		*retval = 0;
 		return (1);
 	}
 
@@ -1382,12 +1378,10 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg, int *retval)
 			config_error_set("Invalid command line parameters. "
 			    "Run %s --help for instructions.",
 			    basename(argv[0]));
-			*retval = 1;
 			return (1);
 		}
 		else if (c == CFG_PARAM_CFGFILE) {
 			if (config_file_parse(optarg, cfg) != 0) {
-				*retval = 1;
 				return (1);
 			}
 		}
@@ -1454,12 +1448,10 @@ CFG_ON('s', CFG_SYSLOG);
 			break;
 		case 'V':
 			printf("%s %s\n", basename(argv[0]), VERSION);
-			*retval = 0;
 			return (1);
 			break;
 		case 'h':
 			config_print_usage(argv[0]);
-			*retval = 0;
 			return (1);
 			break;
 
@@ -1467,12 +1459,10 @@ CFG_ON('s', CFG_SYSLOG);
 			config_error_set("Invalid command line parameters. "
 			    "Run %s --help for instructions.",
 			    basename(argv[0]));
-			*retval = 1;
 			return (1);
 		}
 
 		if (ret != 0) {
-			*retval = 1;
 			return (1);
 		}
 	}
@@ -1480,13 +1470,11 @@ CFG_ON('s', CFG_SYSLOG);
 	if ((tls || ssl) && tls_protos_config_file != 0) {
 		config_error_set("Deprecated options --tls and --ssl cannot be"
 		    " used to override tls-protos in a config file.");
-		*retval = 1;
 		return (1);
 	}
 	if (tls && ssl) {
 		config_error_set("Options --tls and --ssl are mutually"
 		    " exclusive.");
-		*retval = 1;
 		return (1);
 	} else {
 		if (ssl)
@@ -1505,7 +1493,6 @@ CFG_ON('s', CFG_SYSLOG);
 		config_error_set("Options --write-ip, --write-proxy-proxy,"
 		    " --write-proxy-v1 and --write-proxy-v2 are"
 		    " mutually exclusive.");
-		*retval = 1;
 		return (1);
 	}
 
@@ -1518,7 +1505,6 @@ CFG_ON('s', CFG_SYSLOG);
 	if (cfg->SHCUPD_IP != NULL && ! cfg->SHARED_CACHE) {
 		config_error_set("Shared cache update listener is defined,"
 		    " but shared cache is disabled.");
-		*retval = 1;
 		return (1);
 	}
 #endif
@@ -1537,7 +1523,6 @@ CFG_ON('s', CFG_SYSLOG);
 				    " \"%s\" is bad. See man page for more"
 				    " info.",
 				    cfg->ALPN_PROTOS);
-			*retval = 1;
 			return (1);
 		}
 		AN(cfg->ALPN_PROTOS_LV);
@@ -1548,7 +1533,6 @@ CFG_ON('s', CFG_SYSLOG);
 			    " more than one protocol while proxy-v2 is "
 			    " not selected. This is a configuration"
 			    " error.");
-			*retval = 1;
 			return (1);
 			/* Note that this test was carried out indepenently of
 			   the availability of ALPN / NPN */
@@ -1573,7 +1557,6 @@ CFG_ON('s', CFG_SYSLOG);
 			    " %lx, which does not have NPN or ALPN support,"
 			    " yet alpn-protos has been set to %s.",
 			    OPENSSL_VERSION_NUMBER, cfg->ALPN_PROTOS);
-			*retval = 1;
 			return (1);
 		}
 		else
@@ -1589,7 +1572,6 @@ CFG_ON('s', CFG_SYSLOG);
 	argv += optind;
 	for (i = 0; i < argc; i++) {
 		if (config_param_validate(CFG_PEM_FILE, argv[i], cfg, NULL, 0)) {
-			*retval = 1;
 			return (1);
 		}
 	}
@@ -1600,7 +1582,6 @@ CFG_ON('s', CFG_SYSLOG);
 			if (HASH_CNT(hh, fa->certs) == 0) {
 				config_error_set("No x509 certificate PEM file "
 				    "specified for frontend '%s'!", fa->pspec);
-				*retval = 1;
 				return (1);
 			}
 	}

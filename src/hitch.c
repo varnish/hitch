@@ -3680,7 +3680,6 @@ static void
 reconfigure(int argc, char **argv)
 {
 	hitch_config *cfg_new;
-	int rv;
 	struct cfg_tpc_obj_head cfg_objs;
 	struct cfg_tpc_obj *cto, *cto_tmp;
 	struct timeval tv;
@@ -3695,7 +3694,7 @@ reconfigure(int argc, char **argv)
 	VTAILQ_INIT(&cfg_objs);
 	cfg_new = config_new();
 	AN(cfg_new);
-	if (config_parse_cli(argc, argv, cfg_new, &rv) != 0) {
+	if (config_parse_cli(argc, argv, cfg_new) != 0) {
 		ERR("Config reload failed: %s\n", config_error_get());
 		config_destroy(cfg_new);
 		return;
@@ -3803,14 +3802,13 @@ main(int argc, char **argv)
 {
 	// initialize configuration
 	struct front_arg *fa, *ftmp;
-	int rv;
 
 	CONFIG = config_new();
 
 	// parse command line
-	if (config_parse_cli(argc, argv, CONFIG, &rv) != 0) {
+	if (config_parse_cli(argc, argv, CONFIG) != 0) {
 		fprintf(stderr, "%s\n", config_error_get());
-		return (rv);
+		return (1);
 	}
 
 	if (CONFIG->TEST) {
