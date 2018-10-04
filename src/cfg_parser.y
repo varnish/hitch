@@ -201,8 +201,14 @@ PRIVATE_KEY: TOK_PRIVATE_KEY '=' STRING
 
 PEM_DIR: TOK_PEM_DIR '=' STRING
 {
-	if ($3)
-		cfg->PEM_DIR = strdup($3);
+	if ($3) {
+		size_t l;
+		l = strlen($3);
+		cfg->PEM_DIR = malloc(l + 2);
+		strcpy(cfg->PEM_DIR, $3);
+		if (cfg->PEM_DIR[l-1] != '/')
+			strcat(cfg->PEM_DIR, "/");
+	}
 	else
 		cfg->PEM_DIR = NULL;
 };

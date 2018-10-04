@@ -1110,36 +1110,46 @@ config_disp_log_facility (int facility)
 	}
 }
 
-void
+int
 config_scan_pem_dir(char *pemdir, hitch_config *cfg)
 {
 	DIR *d;
 	struct dirent *dir;
-	d = opendir(pemdir);
-	if (d) {
-		while ((dir = readdir(d)) != NULL) {
-			if (dir->d_type == DT_REG) {
-				char fpath[PATH_MAX + NAME_MAX];
-				strncpy(fpath,pemdir, PATH_MAX + NAME_MAX -1);
-				strncat(fpath,dir->d_name, PATH_MAX + NAME_MAX - strlen(fpath) -1);
 
-				struct cfg_cert_file *cert;
-				cert = cfg_cert_file_new();
-				config_assign_str(&cert->filename, fpath);
-				int r = cfg_cert_vfy(cert);
-				if (r != 0) {
-					if (cfg->CERT_DEFAULT != NULL) {
-						struct cfg_cert_file *tmp = cfg->CERT_DEFAULT;
-						cfg_cert_add(tmp, &cfg->CERT_FILES);
-					}
-					cfg->CERT_DEFAULT = cert;
-				} else {
-					cfg_cert_file_free(&cert);
-				}
-			}
-		}
-		closedir(d);
+	d = opendir(pemdir);
+	if (d == NULL) {
+		config_error_set("Unable to open directory '%s': %s", pemdir,
+		    strerror(errno));
+		return (1);
 	}
+	while ((dir = readdir(d)) != NULL) {
+		struct cfg_cert_file *cert;
+		char fpath[PATH_MAX + NAME_MAX];
+
+		if (dir->d_type != DT_REG)
+			continue;
+
+		strncpy(fpath, pemdir, PATH_MAX + NAME_MAX - 1);
+		strncat(fpath, dir->d_name,
+		    PATH_MAX + NAME_MAX - strlen(fpath) - 1);
+
+		cert = cfg_cert_file_new();
+		config_assign_str(&cert->filename, fpath);
+		int r = cfg_cert_vfy(cert);
+		if (r != 0) {
+			/* If no default has been set, pick an
+			 * arbitrary one from readdir() */
+			if (cfg->CERT_DEFAULT == NULL)
+				cfg->CERT_DEFAULT = cert;
+			else
+				cfg_cert_add(cert, &cfg->CERT_FILES);
+		} else {
+			cfg_cert_file_free(&cert);
+		}
+	}
+	(void)closedir(d);
+
+	return (0);
 }
 
 void
@@ -1576,6 +1586,11 @@ CFG_ON('s', CFG_SYSLOG);
 		}
 	}
 
+	if (cfg->PEM_DIR != NULL) {
+		if (config_scan_pem_dir(cfg->PEM_DIR, cfg))
+			return (1);
+	}
+
 	if (cfg->PMODE == SSL_SERVER && cfg->CERT_DEFAULT == NULL) {
 		struct front_arg *fa, *fatmp;
 		HASH_ITER(hh, cfg->LISTEN_ARGS, fa, fatmp)
@@ -1605,10 +1620,6 @@ CFG_ON('s', CFG_SYSLOG);
 				cfg->OCSP_DIR = NULL;
 			}
 		}
-	}
-
-	if (cfg->PEM_DIR != NULL) {
-		config_scan_pem_dir(cfg->PEM_DIR,cfg); 
 	}
 
 	return (0);
