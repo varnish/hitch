@@ -232,6 +232,35 @@ If set, the private key is read from specified location, not from the cert file.
        private-key = "myprivate.key"
    }
 
+
+pem-dir = <string>
+------------------
+
+Specify a directory for loading x509 certificates.
+
+A fallback certificate for non-SNI clients may be specified by also
+including a separate ``pem-file`` definition.
+
+In the absence of any ``pem-file`` definitions, an arbitrary
+certificate from ``pem-dir`` will be used as the fallback default.
+
+::
+   
+   pem-dir = "/etc/hitch/cert.d"
+
+
+pem-dir-glob = <string>
+-----------------------
+
+Matching filter for filenames loaded from ``pem-dir``.
+
+Default is none (match any).
+
+::
+   
+  pem-dir-glob = "*.pem"
+
+
 prefer-server-ciphers = on|off
 ------------------------------
 
