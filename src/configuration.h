@@ -144,6 +144,7 @@ struct __hitch_config {
     int SNI_NOMATCH_ABORT;
     int TEST;
     char *PEM_DIR;
+    char *PEM_DIR_GLOB;
     int OCSP_VFY;
     char *OCSP_DIR;
     double OCSP_RESP_TMO;

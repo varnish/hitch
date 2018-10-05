@@ -13,6 +13,7 @@
 #include <string.h>
 #include <strings.h>
 #include <errno.h>
+#include <fnmatch.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <dirent.h>
@@ -279,7 +280,8 @@ config_destroy(hitch_config *cfg)
 	free(cfg->OCSP_DIR);
 	free(cfg->ALPN_PROTOS);
 	free(cfg->ALPN_PROTOS_LV);
-        free(cfg->PEM_DIR);
+	free(cfg->PEM_DIR);
+	free(cfg->PEM_DIR_GLOB);
 #ifdef USE_SHARED_CACHE
 	int i;
 	free(cfg->SHCUPD_IP);
@@ -1126,6 +1128,10 @@ config_scan_pem_dir(char *pemdir, hitch_config *cfg)
 		struct cfg_cert_file *cert;
 		char fpath[PATH_MAX + NAME_MAX];
 
+		if (cfg->PEM_DIR_GLOB != NULL) {
+			if (fnmatch(cfg->PEM_DIR_GLOB, dir->d_name, 0))
+				continue;
+		}
 		if (dir->d_type != DT_REG)
 			continue;
 
