@@ -42,26 +42,26 @@ start_hitch --config=hitch.cfg
 
 # :PORT1 without SNI
 s_client -connect localhost:$PORT1 >port1-no-sni.dump
-run_cmd grep -q 'subject=/CN=site1.example.com' port1-no-sni.dump
+subj_name_eq "site1.example.com" port1-no-sni.dump
 
 # :PORT1 w/ SNI
 s_client -servername site1.example.com \
 	-connect localhost:$PORT1 \
 	>port1-sni.dump
-run_cmd grep -q 'subject=/CN=site1.example.com' port1-sni.dump
+subj_name_eq "site1.example.com" port1-sni.dump
 
 # :PORT1 w/ different matching SNI name
 s_client -servername site3.example.com \
 	-connect localhost:$PORT2 \
 	>port1-sni2.dump
-run_cmd grep -q 'subject=/CN=site3.example.com' port1-sni2.dump
+subj_name_eq "site3.example.com" port1-sni2.dump
 
 # :PORT2 no SNI
 s_client -connect localhost:$PORT2 >port2-no-sni.dump
-run_cmd grep -q 'subject=/CN=site2.example.com' port2-no-sni.dump
+subj_name_eq "site2.example.com" port2-no-sni.dump
 
 # :PORT4 SNI w/ unknown servername
 s_client -servername invalid.example.com \
 	-connect localhost:$PORT4 \
 	>port4.dump
-run_cmd grep -q 'subject=/CN=default.example.com' port4.dump
+subj_name_eq "default.example.com" port4.dump

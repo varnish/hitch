@@ -341,3 +341,25 @@ s_client() {
 	printf '\n' |
 	openssl s_client -prexit "$@" 2>&1
 }
+
+s_client_parse() {
+
+    # input examples we need to support here:
+    #
+    # openssl < 1.1.1:
+    #   subject=/CN=site1.example.com
+    #   subject=/C=NO/ST=Oslo/O=Varnish Software/L=Oslo/CN=*.example.com/OU=Varnish Software/emailAddress=foobar@example.com
+    # openssl >= 1.1.1:
+    #   subject=CN = site1.example.com
+    #   subject=C = NO, ST = Oslo, O = Varnish Software, L = Oslo, CN = *.example.com, OU = Varnish Software, emailAddress = foobar@example.com
+    #
+    # subject=/C=NO/ST=Oslo/O=Varnish Software/L=Oslo/CN=*.example.com/OU=Varnish Software/emailAddress=foobar@example.com
+
+    SUBJECT_NAME=$(grep "subject=" $1 | head -1 | cut -d= -f2- | sed -e 's/[,/]/\n/g' |
+			  grep CN | cut -d'=' -f2 | tr -d '[:space:]')
+}
+
+subj_name_eq() {
+    s_client_parse "$2"
+    test "$SUBJECT_NAME" = "$1"
+}

@@ -60,25 +60,25 @@ start_hitch --config=hitch.cfg
 s_client -servername foo.example.com \
 	-connect localhost:$PORT1 \
 	>wildcard1.dump
-run_cmd grep -q '/CN=\*.example.com' wildcard1.dump
+subj_name_eq "*.example.com" wildcard1.dump
 
 # Wildcard cert on frontend #2
 s_client -servername bar.example.com \
 	-connect localhost:$PORT2 \
 	>wildcard2.dump
-run_cmd grep -q '/CN=\*.example.com' wildcard2.dump
+subj_name_eq "*.example.com" wildcard2.dump
 
 # Exact match on frontend #2
 s_client -servername site1.example.com \
 	-connect localhost:$PORT2 \
 	>exact2.dump
-run_cmd grep -q '/CN=site1.example.com' exact2.dump
+subj_name_eq "site1.example.com" exact2.dump
 
 # Verify that sni-nomatch-abort = off is respected for frontend #1
 s_client -servername "asdf" \
 	-connect localhost:$PORT1 \
 	>abort1.dump
-run_cmd grep -q '/CN=\*.example.com' abort1.dump
+subj_name_eq "*.example.com" abort1.dump
 
 # And also verify that global setting sni-nomatch-abort = on is respected
 # for other frontend

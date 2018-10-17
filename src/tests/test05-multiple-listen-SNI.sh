@@ -12,11 +12,11 @@ start_hitch \
 	"${CERTSDIR}/default.example.com"
 
 s_client >no-sni.dump
-run_cmd grep -q 'subject=/CN=default.example.com' no-sni.dump
+subj_name_eq "default.example.com" no-sni.dump
 
 # send a SNI request
 s_client -servername site1.example.com >sni.dump
-run_cmd grep -q 'subject=/CN=site1.example.com' sni.dump
+subj_name_eq "site1.example.com" sni.dump
 
 curl_hitch
 
@@ -38,7 +38,7 @@ EOF
 start_hitch --config=hitch.cfg
 
 s_client >cfg-no-sni.dump
-run_cmd grep -q 'subject=/CN=default.example.com' cfg-no-sni.dump
+subj_name_eq "default.example.com" cfg-no-sni.dump
 
 s_client -servername site1.example.com >cfg-sni.dump
-run_cmd grep -q 'subject=/CN=site1.example.com' cfg-sni.dump
+subj_name_eq "site1.example.com" cfg-sni.dump

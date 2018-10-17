@@ -1,7 +1,7 @@
 #!/bin/sh
 
 . hitch_test.sh
-
+set -x
 start_hitch \
 	--backend='[hitch-tls.org]:80' \
 	--frontend="[localhost]:$LISTENPORT" \
@@ -9,4 +9,4 @@ start_hitch \
 	"${CERTSDIR}/default.example.com"
 
 s_client -servername foo.example.com >s_client.dump
-run_cmd grep -q -c "/CN=\*.example.com" s_client.dump
+subj_name_eq "*.example.com" s_client.dump

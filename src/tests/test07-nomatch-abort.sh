@@ -32,12 +32,12 @@ start_hitch --config=hitch.cfg
 
 # No SNI - should not be affected.
 s_client -connect localhost:$LISTENPORT >no-sni.dump
-run_cmd grep -q 'subject=/CN=default.example.com' no-sni.dump
+subj_name_eq "default.example.com" no-sni.dump
 
 # SNI request w/ valid servername
 s_client -servername site1.example.com \
 	-connect localhost:$LISTENPORT >valid-sni.dump
-run_cmd grep -c 'subject=/CN=site1.example.com' valid-sni.dump
+subj_name_eq "site1.example.com" valid-sni.dump
 
 # SNI w/ unknown servername
 ! s_client -servername invalid.example.com \
@@ -47,13 +47,13 @@ run_cmd grep 'unrecognized name' unknown-sni.dump
 # SNI request w/ valid servername
 s_client -servername site1.example.com \
 	-connect localhost:$PORT2 >valid-sni-2.dump
-run_cmd grep -q 'subject=/CN=site3.example.com' valid-sni-2.dump
+subj_name_eq "site3.example.com" valid-sni-2.dump
 
 # SNI w/ unknown servername
 # XXX: why don't we expect 'unrecognized name' again?
 s_client -servername invalid.example.com \
 	-connect localhost:$PORT2 >unknown-sni-2.dump
-run_cmd grep 'subject=/CN=site3.example.com' unknown-sni-2.dump
+subj_name_eq "site3.example.com" unknown-sni-2.dump
 
 # Ancient curl versions may not support --resolve
 # This would skip this test, keep it last
