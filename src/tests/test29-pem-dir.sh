@@ -15,6 +15,14 @@ EOF
 
 start_hitch --config=hitch.cfg
 
+
+if openssl s_client -help 2>&1 | grep -q -e -noservername;
+then
+	NOSNI="-noservername"
+else
+	NOSNI=""
+fi
+
 s_client -servername site1.example.com -connect localhost:$LISTENPORT >site1.dump
 subj_name_eq "site1.example.com" site1.dump
 
@@ -52,6 +60,6 @@ subj_name_eq "site2.example.com" site2.dump
 ! s_client -servername default.example.com -connect localhost:$LISTENPORT >default.dump
 run_cmd grep 'unrecognized name' unknown.dump
 
-s_client >cfg-no-sni.dump
+s_client $NOSNI >cfg-no-sni.dump
 subj_name_eq "site3.example.com" cfg-no-sni.dump
 

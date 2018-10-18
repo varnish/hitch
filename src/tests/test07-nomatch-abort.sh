@@ -30,8 +30,15 @@ EOF
 
 start_hitch --config=hitch.cfg
 
+if openssl s_client -help 2>&1 | grep -q -e -noservername;
+then
+	NOSNI="-noservername"
+else
+	NOSNI=""
+fi
+
 # No SNI - should not be affected.
-s_client -connect localhost:$LISTENPORT >no-sni.dump
+s_client -connect localhost:$LISTENPORT $NOSNI >no-sni.dump
 subj_name_eq "default.example.com" no-sni.dump
 
 # SNI request w/ valid servername
@@ -50,7 +57,6 @@ s_client -servername site1.example.com \
 subj_name_eq "site3.example.com" valid-sni-2.dump
 
 # SNI w/ unknown servername
-# XXX: why don't we expect 'unrecognized name' again?
 s_client -servername invalid.example.com \
 	-connect localhost:$PORT2 >unknown-sni-2.dump
 subj_name_eq "site3.example.com" unknown-sni-2.dump
