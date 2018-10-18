@@ -18,7 +18,7 @@ sleep 0.1
 # If you have nghttp installed, you can try it instead of openssl s_client:
 # nghttp -v "https://localhost:$LISTENPORT"
 
-s_client -nextprotoneg 'h2-14' >s_client.dump
+s_client -tls1_2 -nextprotoneg 'h2-14' >s_client.dump
 
 ! grep ERROR proxy.dump
 
