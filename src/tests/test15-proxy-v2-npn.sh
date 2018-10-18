@@ -24,5 +24,3 @@ s_client -tls1_2 -nextprotoneg 'h2-14' >s_client.dump
 
 run_cmd grep -q h2-14 proxy.dump
 run_cmd grep -q "ALPN extension" proxy.dump
-
-# XXX: why do we expect ALPN and not NPN here?
