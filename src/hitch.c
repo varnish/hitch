@@ -994,7 +994,7 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 		ERR("Error setting up SNI support.\n");
 	}
 	CHECK_OBJ_ORNULL(fr, FRONTEND_MAGIC);
-	if (!SSL_CTX_set_tlsext_servername_arg(ctx, fr)) {
+	if (!SSL_CTX_set_tlsext_servername_arg(ctx, (void *)fr)) {
 		ERR("Error setting SNI servername arg.\n");
 	}
 
