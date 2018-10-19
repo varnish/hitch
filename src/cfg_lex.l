@@ -44,6 +44,7 @@ char input_line[512];
 "TLSv1.0"       { return (TOK_TLSv1_0); }
 "TLSv1.1"       { return (TOK_TLSv1_1); }
 "TLSv1.2"       { return (TOK_TLSv1_2); }
+"TLSv1.3"       { return (TOK_TLSv1_3); }
 "ciphers"		{ return (TOK_CIPHERS); }
 "ssl-engine"		{ return (TOK_SSL_ENGINE); }
 "prefer-server-ciphers"	{ return (TOK_PREFER_SERVER_CIPHERS); }
