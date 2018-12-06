@@ -56,7 +56,8 @@ Command line arguments
   -r  --chroot=DIR           Sets chroot directory (Default: "")
   -u  --user=USER            Set uid/gid after binding the socket (Default: "")
   -g  --group=GROUP          Set gid after binding the socket (Default: "")
-  -q  --quiet                Be quiet; emit only error messages
+  -q  --quiet                Be quiet; emit only error messages (deprecated in favor of ``log-level``)
+  -L  --log-level=NUM        Log level. 0=silence, 1=err, 2=info/debug
   -s  --syslog               Send log message to syslog in addition to stderr/stdout
   --syslog-facility=FACILITY    Syslog facility to use (Default: "daemon")
   --daemon               Fork into background and become a daemon;

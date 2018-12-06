@@ -2568,7 +2568,7 @@ handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 	if (r  == -1) {
 		if (errno == EWOULDBLOCK || errno == EAGAIN)
 			return;
-		SOCKERR("Error in mgt->worker read operation. "
+		LOGL("Error in mgt->worker read operation. "
 		    "Restarting process.");
 		/* If something went wrong here, the process will be
 		 * left in utter limbo as to whether it should keep
@@ -3753,6 +3753,9 @@ reconfigure(int argc, char **argv)
 	LOGL("{core} Config reloaded in %.2lf seconds. "
 	    "Starting new child processes.\n", t1 - t0);
 
+	config_destroy(CONFIG);
+	CONFIG = cfg_new;
+
 	worker_gen++;
 	start_workers(0, CONFIG->NCORES);
 
@@ -3767,9 +3770,6 @@ reconfigure(int argc, char **argv)
 		 * care of in do_wait
 		 */
 	}
-
-	config_destroy(CONFIG);
-	CONFIG = cfg_new;
 }
 
 void
@@ -3842,7 +3842,7 @@ main(int argc, char **argv)
 		AZ(fstat(fileno(logfile), &logf_st));
 		logf_check_t = time(NULL);
 	} else {
-		logfile = CONFIG->QUIET ? stderr : stdout;
+		logfile = stderr;
 	}
 	AZ(setvbuf(logfile, NULL, _IONBF, BUFSIZ));
 

@@ -69,6 +69,7 @@ char input_line[512];
 "recv-bufsize"		{ return (TOK_RECV_BUFSIZE); }
 "send-bufsize"		{ return (TOK_SEND_BUFSIZE); }
 "log-filename"		{ return (TOK_LOG_FILENAME); }
+"log-level"		{ return (TOK_LOG_LEVEL); }
 "ring-slots"		{ return (TOK_RING_SLOTS); }
 "ring-data-len"		{ return (TOK_RING_DATA_LEN); }
 "pidfile"		{ return (TOK_PIDFILE); }

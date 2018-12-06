@@ -68,10 +68,15 @@ void fail(const char *s);
 
 #define LOG(...)							\
 	do {								\
-		if (!CONFIG->QUIET)					\
+		if (CONFIG->LOG_LEVEL > 1)				\
 			WLOG(LOG_INFO, __VA_ARGS__ );			\
 	} while (0)
-#define ERR(...)	WLOG(LOG_ERR, __VA_ARGS__ )
+
+#define ERR(...)					\
+	do {						\
+		if (CONFIG->LOG_LEVEL > 0)		\
+			WLOG(LOG_ERR, __VA_ARGS__ );	\
+	} while (0)
 
 #define LOGL(...) WLOG(LOG_INFO, __VA_ARGS__)
 
@@ -84,18 +89,20 @@ void fail(const char *s);
 		}						\
 	} while (0)
 
+
 #define LOGPROXY(...)							\
 	do {								\
-		if (!CONFIG->QUIET && (logfile || CONFIG->SYSLOG))	\
+		if (CONFIG->LOG_LEVEL > 1 &&				\
+		    (logfile || CONFIG->SYSLOG))			\
 			logproxy(LOG_INFO, __VA_ARGS__ );		\
 	} while(0)
 
 #define ERRPROXY(...)							\
 	do {								\
-		if (logfile || CONFIG->SYSLOG)				\
+		if (CONFIG->LOG_LEVEL > 0 &&				\
+		    (logfile || CONFIG->SYSLOG))			\
 			logproxy(LOG_ERR, __VA_ARGS__ );		\
 	} while (0)
-
 
 
 #endif  /* LOGGING_H_INCLUDED */

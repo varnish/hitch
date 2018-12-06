@@ -281,10 +281,23 @@ and write-proxy-v1.
 
 Default is off.
 
+log-level = <num>
+-----------------
+
+Log chattiness. 0=silence, 1=errors, 2=info/debug.
+
+This setting can also be changed at run-time by editing the
+configuration file followed by a reload (SIGHUP).
+
+Default is 0.
+
+
 quiet = on|off
 --------------
 
-If quiet is turned on, only error messages will be shown.
+If quiet is turned on, only error messages will be shown. This setting
+is deprecated in favor of ``log-level``.
+
 
 tls-protos = ...
 ----------------

@@ -74,18 +74,6 @@ FILE * logfile;
 struct stat logf_st;
 time_t logf_check_t;
 
-#define LOGPROXY(...)							\
-	do {								\
-		if (!CONFIG->QUIET && (logfile || CONFIG->SYSLOG))		\
-			logproxy(LOG_INFO, __VA_ARGS__ );		\
-	} while(0)
-
-#define ERRPROXY(...)							\
-	do {								\
-		if (logfile || CONFIG->SYSLOG)				\
-			logproxy(LOG_ERR, __VA_ARGS__ );		\
-	} while (0)
-
 double
 Time_now(void)
 {
@@ -147,25 +135,6 @@ WLOG(int level, const char *fmt, ...)
 	VWLOG(level, fmt, ap);
 	va_end(ap);
 }
-
-#define LOG(...)							\
-	do {								\
-		if (!CONFIG->QUIET)					\
-			WLOG(LOG_INFO, __VA_ARGS__ );			\
-	} while (0)
-#define ERR(...)	WLOG(LOG_ERR, __VA_ARGS__ )
-
-#define LOGL(...) WLOG(LOG_INFO, __VA_ARGS__)
-
-#define SOCKERR(msg)						\
-	do {							\
-		if (errno == ECONNRESET) {			\
-			LOG(msg ": %s\n", strerror(errno));	\
-		} else {					\
-			ERR(msg ": %s\n", strerror(errno));	\
-		}						\
-	} while (0)
-
 
 void
 logproxy(int level, const proxystate* ps, const char *fmt, ...)

@@ -71,6 +71,7 @@
 #define CFG_RECV_BUFSIZE "recv-bufsize"
 #define CFG_SEND_BUFSIZE "send-bufsize"
 #define CFG_LOG_FILENAME "log-filename"
+#define CFG_LOG_LEVEL "log-level"
 #define CFG_RING_SLOTS "ring-slots"
 #define CFG_RING_DATA_LEN "ring-data-len"
 #define CFG_PIDFILE "pidfile"
@@ -223,7 +224,7 @@ config_new(void)
 	r->SHCUPD_MCASTTTL    = NULL;
 #endif
 
-	r->QUIET              = 0;
+	r->LOG_LEVEL          = 0;
 	r->SYSLOG             = 0;
 	r->SYSLOG_FACILITY    = LOG_DAEMON;
 	r->TCP_KEEPALIVE_TIME = 3600;
@@ -913,7 +914,14 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 			}
 		}
 	} else if (strcmp(k, CFG_QUIET) == 0) {
-		r = config_param_val_bool(v, &cfg->QUIET);
+		int b;
+		r = config_param_val_bool(v, &b);
+		if (b)
+			cfg->LOG_LEVEL = 0;
+		else
+			cfg->LOG_LEVEL = 1;
+	} else if (strcmp(k, CFG_LOG_LEVEL) == 0) {
+		r = config_param_val_int(v, &cfg->LOG_LEVEL, 1);
 	} else if (strcmp(k, CFG_LOG_FILENAME) == 0) {
 		if (strlen(v) > 0) {
 			config_assign_str(&cfg->LOG_FILENAME, v);
@@ -971,10 +979,6 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		r = config_param_val_int(v, &cfg->RECV_BUFSIZE, 1);
 	} else if (strcmp(k, CFG_SEND_BUFSIZE) == 0) {
 		r = config_param_val_int(v, &cfg->SEND_BUFSIZE, 1);
-	} else if (strcmp(k, CFG_LOG_FILENAME) == 0) {
-		if (strlen(v) > 0) {
-			config_assign_str(&cfg->LOG_FILENAME, v);
-		}
 	} else if (strcmp(k, CFG_PIDFILE) == 0) {
 		if (strlen(v) > 0) {
 			config_assign_str(&cfg->PIDFILE, v);
@@ -1227,7 +1231,9 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "  -g  --group=GROUP          Set gid after binding the socket (Default: \"%s\")\n", config_disp_gid(cfg->GID));
 	fprintf(out, "\n");
 	fprintf(out, "LOGGING:\n");
-	fprintf(out, "  -q  --quiet                Be quiet; emit only error messages\n");
+	fprintf(out, "  -q  --quiet                Be quiet; emit only error messages (deprecated, use 'log-level')\n");
+	fprintf(out, "  -L  --log-level=NUM        Log level. 0=silence, 1=err, 2=info/debug (Default: %d)\n",
+		cfg->LOG_LEVEL);
 	fprintf(out, "  -l  --log-filename=FILE    Send log message to a logfile instead of stderr/stdout\n");
 	fprintf(out, "  -s  --syslog               Send log message to syslog in addition to stderr/stdout\n");
 	fprintf(out, "      --syslog-facility=FACILITY    Syslog facility to use (Default: \"%s\")\n", config_disp_log_facility(cfg->SYSLOG_FACILITY));
@@ -1356,6 +1362,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 		{ CFG_GROUP, 1, NULL, 'g' },
 		{ CFG_QUIET, 0, NULL, 'q' },
 		{ CFG_LOG_FILENAME, 1, NULL, 'l' },
+		{ CFG_LOG_LEVEL, 1, NULL, 'L' },
 		{ CFG_SYSLOG, 0, NULL, 's' },
 		{ CFG_SYSLOG_FACILITY, 1, NULL, CFG_PARAM_SYSLOG_FACILITY },
 		{ CFG_SEND_BUFSIZE, 1, NULL, CFG_PARAM_SEND_BUFSIZE },
@@ -1374,7 +1381,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 		{ "help", 0, NULL, 'h' },
 		{ 0, 0, 0, 0 }
 	};
-#define SHORT_OPTS "c:e:Ob:f:n:B:l:C:U:p:P:M:k:r:u:g:qstVho:R:"
+#define SHORT_OPTS "c:e:Ob:f:n:B:l:L:C:U:p:P:M:k:r:u:g:qstVho:R:"
 
 	if (argc == 1) {
 		config_print_usage(argv[0]);
@@ -1388,8 +1395,9 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 		int option_index = 0;
 		c = getopt_long(argc, argv, SHORT_OPTS,
 			long_options, &option_index);
-		if (c == -1)
+		if (c == -1) {
 			break;
+		}
 		else if (c == '?') {
 			config_error_set("Invalid command line parameters. "
 			    "Run %s --help for instructions.",
@@ -1456,6 +1464,7 @@ CFG_ARG('o', CFG_OCSP_DIR);
 CFG_ON('O', CFG_PREFER_SERVER_CIPHERS);
 CFG_ON('q', CFG_QUIET);
 CFG_ARG('l', CFG_LOG_FILENAME);
+CFG_ARG('L', CFG_LOG_LEVEL);
 CFG_ON('s', CFG_SYSLOG);
 #undef CFG_ARG
 #undef CFG_ON
@@ -1514,7 +1523,7 @@ CFG_ON('s', CFG_SYSLOG);
 
 
 	if (cfg->DAEMONIZE) {
-		cfg->QUIET = 1;
+		cfg->LOG_LEVEL = 0;
 	}
 
 #ifdef USE_SHARED_CACHE

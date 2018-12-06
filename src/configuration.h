@@ -127,7 +127,7 @@ struct __hitch_config {
     char *SHCUPD_MCASTIF;
     char *SHCUPD_MCASTTTL;
 #endif
-    int QUIET;
+    int LOG_LEVEL;
     int SYSLOG;
     int SYSLOG_FACILITY;
     int TCP_KEEPALIVE_TIME;
