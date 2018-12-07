@@ -1522,10 +1522,6 @@ CFG_ON('s', CFG_SYSLOG);
 	}
 
 
-	if (cfg->DAEMONIZE) {
-		cfg->LOG_LEVEL = 0;
-	}
-
 #ifdef USE_SHARED_CACHE
 	if (cfg->SHCUPD_IP != NULL && ! cfg->SHARED_CACHE) {
 		config_error_set("Shared cache update listener is defined,"
