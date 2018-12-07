@@ -3134,8 +3134,13 @@ do_wait(void)
 	}
 
 	/* also check if the ocsp worker killed itself */
-	if (CONFIG->OCSP_DIR != NULL)
-		WAIT_PID(ocsp_proc_pid, start_ocsp_proc());
+	if (ocsp_proc_pid != 0)
+		WAIT_PID(ocsp_proc_pid,
+		    if (CONFIG->OCSP_DIR) {
+			    start_ocsp_proc();
+		    } else {
+			    ocsp_proc_pid = 0;
+		    });
 }
 
 static void
@@ -3763,12 +3768,14 @@ reconfigure(int argc, char **argv)
 	wu.payload.gen = worker_gen;
 	notify_workers(&wu);
 
-	if (CONFIG->OCSP_DIR != NULL) {
+	if (ocsp_proc_pid > 0) {
 		(void) kill(ocsp_proc_pid, SIGTERM);
 		/*
 		 * Restarting the OCSP process is taken
 		 * care of in do_wait
 		 */
+	} else if (CONFIG->OCSP_DIR != NULL && ocsp_proc_pid <= 0) {
+		start_ocsp_proc();
 	}
 }
 
