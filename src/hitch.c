@@ -2582,6 +2582,8 @@ handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 
 	if (wu.type == WORKER_GEN && wu.payload.gen != worker_gen) {
 		/* This means this process has reached its retirement age. */
+		if (worker_state == WORKER_EXITING)
+			return;
 		worker_state = WORKER_EXITING;
 
 		/* Stop accepting new connections. */
@@ -2598,8 +2600,9 @@ handle_mgt_rd(struct ev_loop *loop, ev_io *w, int revents)
 
 		LOGL("Worker %d (gen: %d): State %s\n", core_id, worker_gen,
 		(worker_state == WORKER_EXITING) ? "EXITING" : "ACTIVE");
-	}
-	else if (wu.type == BACKEND_REFRESH) {
+	} else if (wu.type == WORKER_GEN && wu.payload.gen == worker_gen) {
+		return;
+	} else if (wu.type == BACKEND_REFRESH) {
 		struct backend *b;
 		b = backend_create((struct sockaddr *)&wu.payload.addr);
 		backend_deref(&backaddr);
