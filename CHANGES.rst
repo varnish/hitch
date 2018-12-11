@@ -4,6 +4,20 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.5.0 (unreleased)
+------------------------
+
+* Support for UNIX domain socket connections. A backend endpoint can
+  now be specified as a UNIX domain socket, via ``backend = "/path/to/socket"``.
+* New configuration file settings ``pem-dir`` and ``pem-dir-glob``.
+  ``pem-dir`` can be used to specify a directory
+  for loading certificates, without specifying each file individually.
+* Support for TLS 1.3. Thanks to Lasse Karstensen.
+* Fixed a bug that would cause a crash on reload if ``ocsp-dir`` was
+  changed.
+* Add ``log-level``. This supersedes the previous ``quiet`` setting,
+  which is now deprecated.
+
 hitch-1.4.8 (2018-04-19)
 ------------------------
 
