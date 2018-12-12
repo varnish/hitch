@@ -1888,12 +1888,6 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 	memcpy(&p->sig,"\r\n\r\n\0\r\nQUIT\n", 12);
 	p->ver_cmd = 0x21; 	/* v2|PROXY */
 	p->fam = l->sa.sa_family == AF_INET ? 0x11 : 0x21;
-	size_t payload_len = l->sa.sa_family == AF_INET ? 12 : 36;
-#if defined(OPENSSL_WITH_ALPN) || defined(OPENSSL_WITH_NPN)
-	if (selected_len > 0)
-		payload_len += selected_len + 3;
-#endif
-	p->len = htons(payload_len);
 
 	if (l->sa.sa_family == AF_INET) {
 		len += 12;
@@ -1937,7 +1931,7 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 		len += i;
 	}
 #endif
-	assert(len == payload_len + 16);
+	p->len = htons(len - 16);
 	ringbuffer_write_append(&ps->ring_ssl2clear, len);
 }
 
