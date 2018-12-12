@@ -1847,9 +1847,11 @@ get_proto_selected(proxystate *ps, const unsigned char **selected, unsigned *len
 }
 
 static int
-proxy_tlv_append(char *dst, size_t dstlen, unsigned type,
-    const char *val, unsigned len)
+proxy_tlv_append(char *dst, ssize_t dstlen, unsigned type,
+    const char *val, ssize_t len)
 {
+	if (len == -1)
+		len = strlen(val);
 	if (dstlen < len + 3)
 		return (0);
 	dst[0] = type;
@@ -1931,6 +1933,42 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 		len += i;
 	}
 #endif
+	if (CONFIG->PROXY_TLV) {
+#define PP2_TYPE_SSL		0x20
+#define PP2_CLIENT_SSL		0x01
+#define PP2_SUBTYPE_SSL_VERSION	0x21
+#define PP2_SUBTYPE_SSL_CIPHER	0x23
+		char *tlvp = base + len;
+		ssize_t sz = 0;
+		const char *tmp;
+
+		tlvp[0] = PP2_TYPE_SSL;
+		/* tlvp[1..2] to be updated with payload length later */
+		len += 3;
+
+		base[len] = PP2_CLIENT_SSL;
+		base[len + 1] = 1;
+		len += 5;
+		sz += 5;
+
+		tmp = SSL_get_version(ps->ssl);
+		AN(tmp);
+		i = proxy_tlv_append(base + len, maxlen - len,
+		    PP2_SUBTYPE_SSL_VERSION, tmp, -1);
+		len += i;
+		sz += i;
+
+		tmp = SSL_get_cipher_name(ps->ssl);
+		AN(tmp);
+		i = proxy_tlv_append(base + len, maxlen - len,
+		    PP2_SUBTYPE_SSL_CIPHER, tmp, -1);
+		len += i;
+		sz += i;
+
+		tlvp[1] = (sz >> 8) & 0xff;
+		tlvp[2] = sz & 0xff;
+	}
+
 	p->len = htons(len - 16);
 	ringbuffer_write_append(&ps->ring_ssl2clear, len);
 }

@@ -59,8 +59,9 @@ char input_line[512];
 "daemon"		{ return (TOK_DAEMON); }
 "write-ip"		{ return (TOK_WRITE_IP); }
 "write-proxy"		{ return (TOK_WRITE_PROXY); }
-"write-proxy-v1"		{ return (TOK_WRITE_PROXY_V1); }
-"write-proxy-v2"		{ return (TOK_WRITE_PROXY_V2); }
+"write-proxy-v1"	{ return (TOK_WRITE_PROXY_V1); }
+"write-proxy-v2"	{ return (TOK_WRITE_PROXY_V2); }
+"proxy-tlv"		{ return (TOK_PROXY_TLV); }
 "pem-file"		{ return (TOK_PEM_FILE); }
 "proxy-proxy"		{ return (TOK_PROXY_PROXY); }
 "alpn-protos"		{ return (TOK_ALPN_PROTOS); }
