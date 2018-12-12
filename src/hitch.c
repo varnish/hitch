@@ -1834,7 +1834,7 @@ start_handshake(proxystate *ps, int err)
 }
 
 static void
-get_proto_selected(proxystate *ps, const unsigned char **selected, unsigned *len) {
+get_alpn(proxystate *ps, const unsigned char **selected, unsigned *len) {
 	*selected = NULL;
 	*len = 0;
 #ifdef OPENSSL_WITH_ALPN
@@ -1866,12 +1866,7 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 {
 	char *base;
 	int i;
-#if defined(OPENSSL_WITH_ALPN) || defined(OPENSSL_WITH_NPN)
-	const char *selected = NULL;
-	unsigned selected_len = 0;
-	get_proto_selected(ps, (const unsigned char **)&selected,
-	    &selected_len);
-#endif
+
 	struct ha_proxy_v2_hdr *p;
 	union addr {
 		struct sockaddr		sa;
@@ -1925,10 +1920,14 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 	/* This is where we add something related to NPN or ALPN*/
 #if defined(OPENSSL_WITH_ALPN) || defined(OPENSSL_WITH_NPN)
 #define PP2_TYPE_ALPN	0x01
-	if (selected_len > 0) {
+	const char *alpn_tok = NULL;
+	unsigned alpn_len = 0;
+	get_alpn(ps, (const unsigned char **)&alpn_tok,
+	    &alpn_len);
+	if (alpn_len > 0) {
 		/* let the server know that a protocol was selected. */
 		i = proxy_tlv_append(base + len, maxlen - len,
-		    PP2_TYPE_ALPN, selected, selected_len);
+		    PP2_TYPE_ALPN, alpn_tok, alpn_len);
 		AN(i);
 		len += i;
 	}
@@ -2046,26 +2045,26 @@ static int is_protocol_matching(const unsigned char *selected, unsigned len) {
 }
 
 static int is_alpn_shutdown_needed(proxystate *ps) {
-	const unsigned char *selected;
-	unsigned selected_len;
+	const unsigned char *alpn_tok;
+	unsigned alpn_len;
 
 	if (CONFIG->ALPN_PROTOS_LV == NULL)
 		return 0;
 
-	get_proto_selected(ps, &selected, &selected_len);
-	if (selected_len == 0) {
+	get_alpn(ps, &alpn_tok, &alpn_len);
+	if (alpn_len == 0) {
 		/* If alpn / npn was tried, shut down */
 		if(ps->npn_alpn_tried) {
 			LOGPROXY(ps, "Unsuccessful NPN/ALPN negotiation\n");
 			return 1;
 		} else
 			LOGPROXY(ps, "No NPN/ALPN negotiation happened.\n");
-	} else if (!is_protocol_matching(selected, selected_len)) {
+	} else if (!is_protocol_matching(alpn_tok, alpn_len)) {
 		LOGPROXY(ps, "NPN: Unknown protocol selected\n");
 		return 1;
 	} else
 		LOGPROXY(ps, "NPN/ALPN protocol: %.*s\n",
-		    selected_len, selected);
+		    alpn_len, alpn_tok);
 	return 0;
 }
 #endif
