@@ -1846,16 +1846,29 @@ get_proto_selected(proxystate *ps, const unsigned char **selected, unsigned *len
 #endif
 }
 
+static int
+proxy_tlv_append(char *dst, size_t dstlen, unsigned type,
+    const char *val, unsigned len)
+{
+	if (dstlen < len + 3)
+		return (0);
+	dst[0] = type;
+	dst[1] = (len >> 8) & 0xff;
+	dst[2] = len & 0xff;
+	memcpy(dst + 3, val, len);
+	return (len + 3);
+}
+
 static void
 write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 {
 	char *base;
+	int i;
 #if defined(OPENSSL_WITH_ALPN) || defined(OPENSSL_WITH_NPN)
-	const unsigned char *selected = NULL;
+	const char *selected = NULL;
 	unsigned selected_len = 0;
-	char *alpn_base;
-
-	get_proto_selected(ps, &selected, &selected_len);
+	get_proto_selected(ps, (const unsigned char **)&selected,
+	    &selected_len);
 #endif
 	struct ha_proxy_v2_hdr *p;
 	union addr {
@@ -1867,9 +1880,10 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
 	base = ringbuffer_write_ptr(&ps->ring_ssl2clear);
 	p = (struct ha_proxy_v2_hdr *)base;
-	size_t len = 16;
+	size_t len = 16, maxlen;
 	l = (union addr *) local;
 	r = (union addr *) &ps->remote_ip;
+	maxlen = ps->ring_ssl2clear.data_len;
 
 	memcpy(&p->sig,"\r\n\r\n\0\r\nQUIT\n", 12);
 	p->ver_cmd = 0x21; 	/* v2|PROXY */
@@ -1914,14 +1928,13 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 
 	/* This is where we add something related to NPN or ALPN*/
 #if defined(OPENSSL_WITH_ALPN) || defined(OPENSSL_WITH_NPN)
+#define PP2_TYPE_ALPN	0x01
 	if (selected_len > 0) {
 		/* let the server know that a protocol was selected. */
-		alpn_base = base + len;
-		alpn_base[0] = 1 /* PP2_TYPE_ALPN */;
-		alpn_base[1] = (selected_len >> 8) & 0xff;
-		alpn_base[2] = selected_len & 0xff;
-		memcpy(alpn_base + 3, selected, selected_len);
-		len += selected_len + 3;
+		i = proxy_tlv_append(base + len, maxlen - len,
+		    PP2_TYPE_ALPN, selected, selected_len);
+		AN(i);
+		len += i;
 	}
 #endif
 	assert(len == payload_len + 16);
