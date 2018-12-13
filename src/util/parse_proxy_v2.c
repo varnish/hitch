@@ -59,6 +59,7 @@ read_from_socket(const char *port, unsigned char *buf, int len)
 	struct addrinfo *result;
 	struct addrinfo *rp;
 	int listen_socket = -1;
+	int yes = 1;
 
 	memset(&hints, 0, sizeof(struct addrinfo));
 	hints.ai_family = AF_INET;
@@ -84,6 +85,11 @@ read_from_socket(const char *port, unsigned char *buf, int len)
 		    rp->ai_protocol);
 		if (listen_socket == -1)
 			continue;
+		if (setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR,
+			&yes, sizeof(yes)) == -1) {
+			perror("setsockopt");
+			continue;
+		}
 		if (bind(listen_socket, rp->ai_addr, rp->ai_addrlen) == 0)
 			break; // success!
 		close(listen_socket);
