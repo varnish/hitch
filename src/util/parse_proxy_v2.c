@@ -158,7 +158,7 @@ extensions_error(unsigned char *ext, int n_ext)
 int
 print_extensions(unsigned char *extensions, int extensions_len)
 {
-	int i, l, type;
+	int i, j, l, type, subtype, sublen;
 
 	for (i = 0; i < extensions_len; i++) {
 		if(i > extensions_len - 4)
@@ -171,6 +171,31 @@ print_extensions(unsigned char *extensions, int extensions_len)
 		switch(type) {
 		case 0x1: // PP2_TYPE_ALPN
 			printf("ALPN extension:\t%.*s\n", l, extensions + i);
+			break;
+		case 0x20: // PP2_TYPE_SSL
+			printf("PP2_TYPE_SSL client:\t0x%x\n",
+			    *((char *)extensions + i));
+			printf("PP2_TYPE_SSL verify:\t0x%x\n",
+			    *((uint32_t *)extensions + i + 1));
+			j = i + 5;
+			/*  Handle subtypes: */
+			while (j < i + l) {
+				subtype = extensions[j];
+				sublen = (extensions[j + 1] << 8) +
+				    extensions[j + 2];
+				j += 3;
+				switch (subtype) {
+				case 0x21: // PP2_SUBTYPE_SSL_VERSION
+					printf("SSL_VERSION:\t%.*s\n",
+					    sublen, extensions + j);
+					break;
+				case 0x23: // PP2_SUBTYPE_SSL_CIPHER
+					printf("SSL_CIPHER:\t%.*s\n",
+					    sublen, extensions + j);
+					break;
+				}
+				j += sublen;
+			}
 			break;
 		default:
 			printf("ERROR:\tUnknown extension %d\n", type);
