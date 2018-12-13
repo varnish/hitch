@@ -17,6 +17,9 @@ hitch-1.5.0 (unreleased)
   changed.
 * Add ``log-level``. This supersedes the previous ``quiet`` setting,
   which is now deprecated.
+* Add ``proxy-tlv``. This enables extra reporting of cipher and
+  protocol as part of the PROXYv2 protocol.
+* Drop TLSv1.1 from the default TLS protocols list.
 
 hitch-1.4.8 (2018-04-19)
 ------------------------
