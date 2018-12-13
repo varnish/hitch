@@ -303,9 +303,10 @@ tls-protos = ...
 ----------------
 
 The SSL/TLS protocols to be used. This is an unquoted list of
-tokens. Available tokens are SSLv3, TLSv1.0, TLSv1.1 and TLSv1.2.
+tokens. Available tokens are SSLv3, TLSv1.0, TLSv1.1, TLSv1.2 and
+TLSv1.3.
 
-The default is TLSv1.1 and TLSv1.2.
+The default is TLSv1.2 and TLSv1.3.
 
 There are two deprecated options, ssl= and tls=, that also select
 protocols. If "ssl=on" is used, then all protocols are selected. This
