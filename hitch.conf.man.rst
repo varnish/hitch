@@ -381,6 +381,14 @@ and proxy-proxy.
 
 Default is off.
 
+proxy-tlv = on|off
+------------------
+
+Report the chosen cipher and protocol as part of the PROXYv2 header.
+
+Default is on.
+
+
 Example
 =======
 
