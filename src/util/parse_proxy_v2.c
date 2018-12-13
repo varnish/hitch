@@ -61,7 +61,7 @@ read_from_socket(const char *port, unsigned char *buf, int len)
 	int listen_socket = -1;
 
 	memset(&hints, 0, sizeof(struct addrinfo));
-	hints.ai_family = AF_INET;     /* Allow IPv4 or IPv6 */
+	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
 	hints.ai_protocol = 0;
