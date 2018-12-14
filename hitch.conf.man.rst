@@ -241,8 +241,9 @@ Specify a directory for loading x509 certificates.
 A fallback certificate for non-SNI clients may be specified by also
 including a separate ``pem-file`` definition.
 
-In the absence of any ``pem-file`` definitions, an arbitrary
-certificate from ``pem-dir`` will be used as the fallback default.
+The files are processed in lexicographic order. In the absence of any
+``pem-file`` definitions, the first file entry will be used as the
+fallback default.
 
 ::
    

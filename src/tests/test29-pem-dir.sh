@@ -46,7 +46,6 @@ frontend = {
 pem-dir = "${CERTSDIR}/pemdirtest"
 pem-dir-glob = "*site*"
 sni-nomatch-abort = on
-pem-file = "${CERTSDIR}/site3.example.com"
 EOF
 
 start_hitch --config=hitch.cfg
@@ -57,9 +56,12 @@ subj_name_eq "site1.example.com" site1.dump
 s_client -servername site2.example.com -connect localhost:$LISTENPORT >site2.dump
 subj_name_eq "site2.example.com" site2.dump
 
+s_client -servername site3.example.com -connect localhost:$LISTENPORT >site3.dump
+subj_name_eq "site3.example.com" site3.dump
+
 ! s_client -servername default.example.com -connect localhost:$LISTENPORT >default.dump
 run_cmd grep 'unrecognized name' unknown.dump
 
 s_client $NOSNI >cfg-no-sni.dump
-subj_name_eq "site3.example.com" cfg-no-sni.dump
+subj_name_eq "site1.example.com" cfg-no-sni.dump
 
