@@ -4,7 +4,7 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
-hitch-1.5.0 (unreleased)
+hitch-1.5.0 (2018-12-17)
 ------------------------
 
 * Support for UNIX domain socket connections. A backend endpoint can
