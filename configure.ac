@@ -110,6 +110,37 @@ if test "$ac_cv_so_reuseport_works" = yes; then
   AC_DEFINE([SO_REUSEPORT_WORKS], [1], [Define if SO_REUSEPORT works])
 fi
 
+AC_ARG_ENABLE(tfo,
+	AC_HELP_STRING([--enable-tfo],
+		[Enable TCP Fast Open. (default is yes)]),
+	[use_tfo="$enableval"],
+	[use_tfo=yes])
+
+if test x"$use_tfo" != xno; then
+	AC_CACHE_CHECK([whether SO_TFO works],
+		[ac_cv_so_tfo],
+		[AC_RUN_IFELSE(
+			[AC_LANG_PROGRAM([[
+				#include <sys/types.h>
+				#include <sys/socket.h>
+				#include <netinet/tcp.h>
+			]], [[
+				int s = socket(AF_INET, SOCK_STREAM, 0);
+				int i = 5;
+				if (setsockopt(s, SOL_TCP, TCP_FASTOPEN, &i, sizeof i) < 0)
+				return (1);
+				return (0);
+			]])],
+		[ac_cv_so_tfo=yes],
+		[ac_cv_so_tfo=no])
+		]
+	)
+	if test "$ac_cv_so_tfo" != yes; then
+		AC_MSG_ERROR([Socket option TCP_FASTOPEN is not supported by the kernel])
+	fi
+	AC_DEFINE([SO_TFO_WORKS], [1], [TCP Fast Open is enabled])
+fi
+
 SH_TESTS="$(cd $srcdir/src && echo tests/test*.sh)"
 AC_SUBST(SH_TESTS)
 

@@ -4,6 +4,15 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-xxx (unreleased)
+------------------------
+
+* Support for TCP Fast Open. Sinnce kernel version 3.13 Fast Open is enabled by
+  default (Issue: 185_)
+
+.. _185: https://github.com/varnish/hitch/issues/185
+
+
 hitch-1.5.0 (2018-12-17)
 ------------------------
 
