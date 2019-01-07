@@ -1326,6 +1326,17 @@ frontend_listen(const struct front_arg *fa, struct listen_sock_head *slist)
 			goto creat_frontend_err;
 		}
 #endif
+
+#ifdef SO_TFO_WORKS
+		if (setsockopt(ls->sock, SOL_TCP, TCP_FASTOPEN,
+			&t, sizeof(int))
+		    < 0) {
+			ERR("{setsockopt-tcp_fastopen}: %s: %s\n", strerror(errno),
+			    fa->pspec);
+			goto creat_frontend_err;
+		}
+#endif
+
 		if(setnonblocking(ls->sock) < 0) {
 			ERR("{listen sock: setnonblocking}: %s: %s\n",
 			    strerror(errno), fa->pspec);
