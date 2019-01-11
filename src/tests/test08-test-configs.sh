@@ -105,7 +105,7 @@ write-proxy = on
 EOF
 
 # Issue #52.
-run_cmd -s 1 hitch --config=${CONFDIR}/default.cfg --help
+run_cmd hitch --config=${CONFDIR}/default.cfg --help
 
 # Issue #22.
 run_cmd -s 1 hitch --test --config=${CONFDIR}/default.cfg

@@ -1475,13 +1475,10 @@ CFG_ON('s', CFG_SYSLOG);
 			break;
 		case 'V':
 			printf("%s %s\n", basename(argv[0]), VERSION);
-			return (1);
-			break;
+			exit(0);
 		case 'h':
 			config_print_usage(argv[0]);
-			return (1);
-			break;
-
+			exit(0);
 		default:
 			config_error_set("Invalid command line parameters. "
 			    "Run %s --help for instructions.",
