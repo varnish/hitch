@@ -86,6 +86,9 @@ struct front_arg {
 	char			*port;
 	struct cfg_cert_file	*certs;
 	char			*pspec;
+	char                    *pem_dir;
+	char                    *pem_dir_glob;
+	char                    *pem_dir_subdir_glob;
 	int			match_global_certs;
 	int			sni_nomatch_abort;
 	int			prefer_server_ciphers;
@@ -148,6 +151,7 @@ struct __hitch_config {
     int TEST;
     char *PEM_DIR;
     char *PEM_DIR_GLOB;
+    char *PEM_DIR_SUBDIR_GLOB;
     int OCSP_VFY;
     char *OCSP_DIR;
     double OCSP_RESP_TMO;

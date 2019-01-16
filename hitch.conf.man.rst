@@ -262,6 +262,18 @@ Default is none (match any).
   pem-dir-glob = "*.pem"
 
 
+pem-dir-subdir-glob = <string>
+------------------------------
+
+Match filter for subdirectories of ``pem-dir`` to load files from.
+
+Default is none (do not match any subdirectories).
+
+::
+
+  pem-dir-subdir-glob = "*"
+
+
 prefer-server-ciphers = on|off
 ------------------------------
 

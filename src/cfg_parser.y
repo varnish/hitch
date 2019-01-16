@@ -57,7 +57,7 @@ extern char input_line[512];
 %token TOK_TLSv1_3
 %token TOK_SESSION_CACHE TOK_SHARED_CACHE_LISTEN TOK_SHARED_CACHE_PEER
 %token TOK_SHARED_CACHE_IF TOK_PRIVATE_KEY TOK_BACKEND_REFRESH
-%token TOK_OCSP_REFRESH_INTERVAL TOK_PEM_DIR TOK_PEM_DIR_GLOB
+%token TOK_OCSP_REFRESH_INTERVAL TOK_PEM_DIR TOK_PEM_DIR_GLOB TOK_PEM_DIR_SUBDIR_GLOB
 %token TOK_LOG_LEVEL TOK_PROXY_TLV
 
 %parse-param { hitch_config *cfg }
@@ -107,6 +107,7 @@ CFG_RECORD
 	| OCSP_DIR
 	| PEM_DIR
 	| PEM_DIR_GLOB
+	| PEM_DIR_SUBDIR_GLOB
 	| SESSION_CACHE_REC
 	| SHARED_CACHE_LISTEN_REC
 	| SHARED_CACHE_PEER_REC
@@ -148,6 +149,9 @@ FB_REC
 	: FB_HOST
 	| FB_PORT
 	| FB_CERT
+	| FB_PEM_DIR
+	| FB_PEM_DIR_GLOB
+	| FB_PEM_DIR_SUBDIR_GLOB
 	| FB_MATCH_GLOBAL
 	| FB_SNI_NOMATCH_ABORT
 	| FB_TLS
@@ -227,6 +231,14 @@ PEM_DIR_GLOB: TOK_PEM_DIR_GLOB '=' STRING
 
 };
 
+PEM_DIR_SUBDIR_GLOB: TOK_PEM_DIR_SUBDIR_GLOB '=' STRING
+{
+	if ($3)
+		cfg->PEM_DIR_SUBDIR_GLOB = strdup($3);
+	else
+		cfg->PEM_DIR_SUBDIR_GLOB = NULL;
+};
+
 OCSP_DIR: TOK_OCSP_DIR '=' STRING
 {
 	if ($3)
@@ -280,6 +292,36 @@ FB_CERT: TOK_PEM_FILE '=' STRING
 		YYABORT;
 	}
 	cur_pem = NULL;
+};
+
+FB_PEM_DIR: TOK_PEM_DIR '=' STRING
+{
+	if ($3) {
+		size_t l;
+		l = strlen($3);
+		cur_fa->pem_dir = malloc(l + 2);
+		strcpy(cur_fa->pem_dir, $3);
+		if (cur_fa->pem_dir[l-1] != '/')
+			strcat(cur_fa->pem_dir, "/");
+	}
+	else
+		cur_fa->pem_dir = NULL;
+};
+
+FB_PEM_DIR_GLOB: TOK_PEM_DIR_GLOB '=' STRING
+{
+	if ($3)
+		cur_fa->pem_dir_glob = strdup($3);
+	else
+		cur_fa->pem_dir_glob = NULL;
+};
+
+FB_PEM_DIR_SUBDIR_GLOB: TOK_PEM_DIR_SUBDIR_GLOB '=' STRING
+{
+	if ($3)
+		cur_fa->pem_dir_subdir_glob = strdup($3);
+	else
+		cur_fa->pem_dir_subdir_glob = NULL;
 };
 
 FB_MATCH_GLOBAL: TOK_MATCH_GLOBAL '=' BOOL { cur_fa->match_global_certs = $3; };

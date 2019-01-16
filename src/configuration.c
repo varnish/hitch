@@ -139,6 +139,9 @@ front_arg_new(void)
 
 	ALLOC_OBJ(fa, FRONT_ARG_MAGIC);
 	AN(fa);
+	fa->pem_dir = NULL;
+	fa->pem_dir_glob = NULL;
+	fa->pem_dir_subdir_glob = NULL;
 	fa->match_global_certs = -1;
 	fa->sni_nomatch_abort = -1;
 	fa->selected_protos = 0;
@@ -156,6 +159,9 @@ front_arg_destroy(struct front_arg *fa)
 	free(fa->ip);
 	free(fa->port);
 	free(fa->pspec);
+	free(fa->pem_dir);
+	free(fa->pem_dir_glob);
+	free(fa->pem_dir_subdir_glob);
 	free(fa->ciphers);
 	HASH_ITER(hh, fa->certs, cf, cftmp) {
 		CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
@@ -202,6 +208,8 @@ config_new(void)
 	r->CERT_FILES         = NULL;
 	r->LISTEN_ARGS        = NULL;
 	r->PEM_DIR            = NULL;
+	r->PEM_DIR_GLOB       = NULL;
+	r->PEM_DIR_SUBDIR_GLOB = NULL;
 	fa = front_arg_new();
 	fa->port = strdup("8443");
 	fa->pspec = strdup("default");
@@ -284,6 +292,7 @@ config_destroy(hitch_config *cfg)
 	free(cfg->ALPN_PROTOS_LV);
 	free(cfg->PEM_DIR);
 	free(cfg->PEM_DIR_GLOB);
+	free(cfg->PEM_DIR_SUBDIR_GLOB);
 #ifdef USE_SHARED_CACHE
 	int i;
 	free(cfg->SHCUPD_IP);
@@ -743,6 +752,8 @@ check_frontend_uniqueness(struct front_arg *cur_fa, hitch_config *cfg)
 	return(1);
 }
 
+static int front_scan_pem_dir(struct front_arg *fa);
+
 int
 front_arg_add(hitch_config *cfg, struct front_arg *fa)
 {
@@ -778,6 +789,11 @@ front_arg_add(hitch_config *cfg, struct front_arg *fa)
 
 	HASH_ADD_KEYPTR(hh, cfg->LISTEN_ARGS, fa->pspec,
 	    strlen(fa->pspec), fa);
+
+	if (fa->pem_dir != NULL) {
+		if (front_scan_pem_dir(fa)) 
+			return (0);
+	}
 
 	if (fa->match_global_certs == -1) {
 		if (HASH_CNT(hh, fa->certs) == 0)
@@ -1117,11 +1133,16 @@ config_disp_log_facility (int facility)
 	}
 }
 
-int
-config_scan_pem_dir(char *pemdir, hitch_config *cfg)
+static int
+scan_pem_dir(const char *pemdir, \
+             const char *dir_glob, \
+             const char *subdir_glob, \
+             struct cfg_cert_file **cert_files, \
+             struct cfg_cert_file **cert_default)
 {
 	int n, i;
 	struct dirent **d;
+	int retval = 0;
 
 	n = scandir(pemdir, &d, NULL, alphasort);
 	if (n < 0) {
@@ -1133,8 +1154,21 @@ config_scan_pem_dir(char *pemdir, hitch_config *cfg)
 		struct cfg_cert_file *cert;
 		char fpath[PATH_MAX + NAME_MAX];
 
-		if (cfg->PEM_DIR_GLOB != NULL) {
-			if (fnmatch(cfg->PEM_DIR_GLOB, d[i]->d_name, 0))
+		if (d[i]->d_type == DT_DIR) {
+			if (subdir_glob != NULL &&
+			    strcmp(d[i]->d_name, ".") && \
+			    strcmp(d[i]->d_name, "..") && \
+			    fnmatch(subdir_glob, d[i]->d_name, 0) == 0) {
+				snprintf(fpath, PATH_MAX + NAME_MAX, "%s/%s/", pemdir, d[i]->d_name);
+				retval = scan_pem_dir(fpath, dir_glob, subdir_glob, cert_files, cert_default);
+				if (retval != 0)
+					break;
+			}
+			continue;
+		}
+
+		if (dir_glob != NULL) {
+			if (fnmatch(dir_glob, d[i]->d_name, 0))
 				continue;
 		}
 		if (d[i]->d_type != DT_REG)
@@ -1150,10 +1184,10 @@ config_scan_pem_dir(char *pemdir, hitch_config *cfg)
 		if (r != 0) {
 			/* If no default has been set, use the first
 			 * match according to alphasort  */
-			if (cfg->CERT_DEFAULT == NULL)
-				cfg->CERT_DEFAULT = cert;
+			if ((cert_default != NULL) && (*cert_default == NULL))
+				*cert_default = cert;
 			else
-				cfg_cert_add(cert, &cfg->CERT_FILES);
+				cfg_cert_add(cert, cert_files);
 		} else {
 			cfg_cert_file_free(&cert);
 		}
@@ -1161,8 +1195,29 @@ config_scan_pem_dir(char *pemdir, hitch_config *cfg)
 	}
 
 	free(d);
-	return (0);
+	return(retval);
 }
+
+static int
+config_scan_pem_dir(hitch_config *cfg)
+{
+	return scan_pem_dir(cfg->PEM_DIR, \
+	                    cfg->PEM_DIR_GLOB, \
+	                    cfg->PEM_DIR_SUBDIR_GLOB, \
+	                    &cfg->CERT_FILES, \
+	                    &cfg->CERT_DEFAULT);
+}
+
+static int
+front_scan_pem_dir(struct front_arg *fa)
+{
+	return scan_pem_dir(fa->pem_dir, \
+	                    fa->pem_dir_glob, \
+	                    fa->pem_dir_subdir_glob, \
+	                    &fa->certs, \
+	                    NULL);
+}
+
 
 void
 config_print_usage_fd(char *prog, FILE *out)
@@ -1597,7 +1652,7 @@ CFG_ON('s', CFG_SYSLOG);
 	}
 
 	if (cfg->PEM_DIR != NULL) {
-		if (config_scan_pem_dir(cfg->PEM_DIR, cfg))
+		if (config_scan_pem_dir(cfg))
 			return (1);
 	}
 
