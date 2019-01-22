@@ -110,9 +110,9 @@ if test "$ac_cv_so_reuseport_works" = yes; then
   AC_DEFINE([SO_REUSEPORT_WORKS], [1], [Define if SO_REUSEPORT works])
 fi
 
-AC_ARG_ENABLE(tfo,
-	AC_HELP_STRING([--enable-tfo],
-		[Enable TCP Fast Open. (default is yes)]),
+AC_ARG_ENABLE(tcp-fastopen,
+	AC_HELP_STRING([--enable-tcp-fastopen],
+		[Enable TCP Fast Open. (default is on)]),
 	[use_tfo="$enableval"],
 	[use_tfo=yes])
 

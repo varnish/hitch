@@ -390,6 +390,13 @@ Report the chosen cipher and protocol as part of the PROXYv2 header.
 
 Default is on.
 
+tcp-fastopen = on|off
+---------------------
+
+Enable TCP Fast Open.
+
+Default is off.
+
 
 Example
 =======
