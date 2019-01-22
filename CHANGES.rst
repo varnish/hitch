@@ -7,8 +7,7 @@ version.
 hitch-xxx (unreleased)
 ------------------------
 
-* Support for TCP Fast Open. Sinnce kernel version 3.13 Fast Open is enabled by
-  default (Issue: 185_)
+* Support for TCP Fast Open. Is is disabled by default (Issue: 185_)
 
 .. _185: https://github.com/varnish/hitch/issues/185
 

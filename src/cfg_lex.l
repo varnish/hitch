@@ -93,6 +93,7 @@ char input_line[512];
 "shared-cache-if"    	{ return (TOK_SHARED_CACHE_IF); }
 "private-key"		{ return (TOK_PRIVATE_KEY); }
 "backend-refresh"	{ return (TOK_BACKEND_REFRESH); }
+"tcp-fastopen"		{ return (TOK_TFO); }
 
 (?i:"yes"|"y"|"on"|"true"|"t"|\"yes\"|\"y\"|\"on\"|\"true\"|\"t\") {
 	yylval.i = 1;

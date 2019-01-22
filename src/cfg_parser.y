@@ -58,7 +58,7 @@ extern char input_line[512];
 %token TOK_SESSION_CACHE TOK_SHARED_CACHE_LISTEN TOK_SHARED_CACHE_PEER
 %token TOK_SHARED_CACHE_IF TOK_PRIVATE_KEY TOK_BACKEND_REFRESH
 %token TOK_OCSP_REFRESH_INTERVAL TOK_PEM_DIR TOK_PEM_DIR_GLOB
-%token TOK_LOG_LEVEL TOK_PROXY_TLV
+%token TOK_LOG_LEVEL TOK_PROXY_TLV TOK_TFO
 
 %parse-param { hitch_config *cfg }
 
@@ -116,6 +116,7 @@ CFG_RECORD
 	| SEND_BUFSIZE_REC
 	| RECV_BUFSIZE_REC
 	| BACKEND_REFRESH_REC
+	| TFO
 	;
 
 FRONTEND_REC
@@ -573,6 +574,17 @@ SHARED_CACHE_IF_REC: TOK_SHARED_CACHE_IF '=' STRING
 		YYABORT;
 #else
 	fprintf(stderr, "Hitch needs to be compiled with --enable-sessioncache "
+			"for '%s'", input_line);
+	YYABORT;
+#endif
+};
+
+TFO: TOK_TFO '=' BOOL
+{
+#ifdef SO_TFO_WORKS
+	{ cfg->TFO = $3; };
+#else
+	fprintf(stderr, "Hitch needs to be compiled with --enable-tfo"
 			"for '%s'", input_line);
 	YYABORT;
 #endif
