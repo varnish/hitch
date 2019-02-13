@@ -461,7 +461,7 @@ handle_shcupd(struct ev_loop *loop, ev_io *w, int revents)
 		/* drop too unsync updates */
 		r -= sizeof(uint32_t);
 		encdate = *((uint32_t *)&msg[r]);
-		if (!(abs((int)(int32_t)now - ntohl(encdate))
+		if (!((int)(int32_t)now - ntohl(encdate)
 			< SSL_CTX_get_timeout(default_ctx->ctx)))
 			continue;
 
@@ -581,7 +581,11 @@ create_shcupd_socket()
 					fail("{ioctl: SIOCGIFINDEX}");
 				}
 
+#ifdef __FreeBSD__
+				mreqn.imr_ifindex = ifr.ifr_ifru.ifru_index;
+#else
 				mreqn.imr_ifindex = ifr.ifr_ifindex;
+#endif
 			} else if (strchr(CONFIG->SHCUPD_MCASTIF,'.')) {
 				/* appears to be an ipv4 address */
 				mreqn.imr_address.s_addr =
