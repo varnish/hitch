@@ -582,7 +582,11 @@ create_shcupd_socket()
 					fail("{ioctl: SIOCGIFINDEX}");
 				}
 
+#ifdef __FreeBSD__
+				mreqn.imr_ifindex = ifr.ifr_ifru.ifru_index;
+#else
 				mreqn.imr_ifindex = ifr.ifr_ifindex;
+#endif
 			} else if (strchr(CONFIG->SHCUPD_MCASTIF,'.')) {
 				/* appears to be an ipv4 address */
 				mreqn.imr_address.s_addr =
