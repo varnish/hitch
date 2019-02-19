@@ -112,9 +112,9 @@ fi
 
 AC_ARG_ENABLE(tcp-fastopen,
 	AC_HELP_STRING([--enable-tcp-fastopen],
-		[Enable TCP Fast Open. (default is on)]),
+		[Enable TCP Fast Open. (default is auto)]),
 	[use_tfo="$enableval"],
-	[use_tfo=yes])
+	[use_tfo=auto])
 
 if test x"$use_tfo" != xno; then
 	AC_CACHE_CHECK([whether SO_TFO works],
@@ -135,10 +135,12 @@ if test x"$use_tfo" != xno; then
 		[ac_cv_so_tfo=no])
 		]
 	)
-	if test "$ac_cv_so_tfo" != yes; then
+	if test "$ac_cv_so_tfo" != yes && test use_tfo = yes; then
 		AC_MSG_ERROR([Socket option TCP_FASTOPEN is not supported by the kernel])
 	fi
-	AC_DEFINE([SO_TFO_WORKS], [1], [TCP Fast Open is enabled])
+	if test "$ac_cv_so_tfo" = yes; then
+		AC_DEFINE([SO_TFO_WORKS], [1], [TCP Fast Open is enabled])
+	fi
 fi
 
 SH_TESTS="$(cd $srcdir/src && echo tests/test*.sh)"
