@@ -582,6 +582,7 @@ create_shcupd_socket()
 					fail("{ioctl: SIOCGIFINDEX}");
 				}
 
+				/* XXX: better use autoconf to detect those */
 #ifdef __FreeBSD__
 				mreqn.imr_ifindex = ifr.ifr_ifru.ifru_index;
 #else
