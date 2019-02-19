@@ -117,7 +117,7 @@ AC_ARG_ENABLE(tcp-fastopen,
 	[use_tfo=auto])
 
 if test x"$use_tfo" != xno; then
-	AC_CACHE_CHECK([whether SO_TFO works],
+	AC_CACHE_CHECK([whether TCP_FASTOPEN works],
 		[ac_cv_so_tfo],
 		[AC_RUN_IFELSE(
 			[AC_LANG_PROGRAM([[
