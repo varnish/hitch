@@ -143,6 +143,9 @@ if test x"$use_tfo" != xno; then
 	fi
 fi
 
+AC_CHECK_HEADERS([linux/futex.h])
+AM_CONDITIONAL([HAVE_LINUX_FUTEX], [test $ac_cv_header_linux_futex_h = yes])
+
 SH_TESTS="$(cd $srcdir/src && echo tests/test*.sh)"
 AC_SUBST(SH_TESTS)
 
