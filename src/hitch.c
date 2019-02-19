@@ -1327,7 +1327,7 @@ frontend_listen(const struct front_arg *fa, struct listen_sock_head *slist)
 		}
 #endif
 
-#ifdef SO_TFO_WORKS
+#ifdef TCP_FASTOPEN_WORKS
 		if (CONFIG->TFO) {
 			if (setsockopt(ls->sock, SOL_TCP, TCP_FASTOPEN,
 				&t, sizeof(int))

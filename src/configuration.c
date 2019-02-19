@@ -78,7 +78,7 @@
 #define CFG_SNI_NOMATCH_ABORT "sni-nomatch-abort"
 #define CFG_OCSP_DIR "ocsp-dir"
 #define CFG_TLS_PROTOS "tls-protos"
-#ifdef SO_TFO_WORKS
+#ifdef TCP_FASTOPEN_WORKS
 	#define CFG_TFO "enable-tcp-fastopen"
 #endif
 
@@ -215,7 +215,7 @@ config_new(void)
 	r->OCSP_RESP_TMO = 10.0;
 	r->OCSP_CONN_TMO = 4.0;
 	r->OCSP_REFRESH_INTERVAL = 1800;
-#ifdef SO_TFO_WORKS
+#ifdef TCP_FASTOPEN_WORKS
 	r->TFO = 0;
 #endif
 
@@ -998,7 +998,7 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		r = config_param_val_bool(v, &cfg->SNI_NOMATCH_ABORT);
 	} else if (strcmp(k, CFG_OCSP_DIR) == 0) {
 		config_assign_str(&cfg->OCSP_DIR, v);
-#ifdef SO_TFO_WORKS
+#ifdef TCP_FASTOPEN_WORKS
 	} else if (strcmp(k, CFG_TFO) == 0) {
 		config_param_val_bool(v, &cfg->TFO);
 #endif
@@ -1234,7 +1234,7 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "  -C  --session-cache=NUM    Enable and set SSL session cache to specified number\n");
 	fprintf(out, "                             of sessions (Default: %d)\n", cfg->SHARED_CACHE);
 #endif
-#ifdef SO_TFO_WORKS
+#ifdef TCP_FASTOPEN_WORKS
 	fprintf(out, "      --enable-tcp-fastopen  Enable client-side TCP Fast Open. (Default: %s)\n", config_disp_bool(cfg->TFO));
 #endif
 
@@ -1382,7 +1382,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 		{ CFG_SYSLOG_FACILITY, 1, NULL, CFG_PARAM_SYSLOG_FACILITY },
 		{ CFG_SEND_BUFSIZE, 1, NULL, CFG_PARAM_SEND_BUFSIZE },
 		{ CFG_RECV_BUFSIZE, 1, NULL, CFG_PARAM_RECV_BUFSIZE },
-#ifdef SO_TFO_WORKS
+#ifdef TCP_FASTOPEN_WORKS
 		{ CFG_TFO, 0, &cfg->TFO, 1 },
 #endif
 		{ CFG_DAEMON, 0, &cfg->DAEMONIZE, 1 },

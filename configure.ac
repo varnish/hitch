@@ -139,7 +139,7 @@ if test x"$use_tfo" != xno; then
 		AC_MSG_ERROR([Socket option TCP_FASTOPEN is not supported by the kernel])
 	fi
 	if test "$ac_cv_so_tfo" = yes; then
-		AC_DEFINE([SO_TFO_WORKS], [1], [TCP Fast Open is enabled])
+		AC_DEFINE([TCP_FASTOPEN_WORKS], [1], [TCP Fast Open is enabled])
 	fi
 fi
 

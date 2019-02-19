@@ -581,7 +581,7 @@ SHARED_CACHE_IF_REC: TOK_SHARED_CACHE_IF '=' STRING
 
 TFO: TOK_TFO '=' BOOL
 {
-#ifdef SO_TFO_WORKS
+#ifdef TCP_FASTOPEN_WORKS
 	{ cfg->TFO = $3; };
 #else
 	fprintf(stderr, "Hitch needs to be compiled with --enable-tfo"
