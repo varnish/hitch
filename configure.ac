@@ -6,6 +6,7 @@ AC_INIT([hitch], [1.5.0], [opensource@varnish-software.com])
 AC_CONFIG_SRCDIR([src/configuration.c])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_AUX_DIR([build-aux])
+AC_CONFIG_MACRO_DIR([.])
 
 AC_USE_SYSTEM_EXTENSIONS
 
@@ -17,7 +18,6 @@ AM_INIT_AUTOMAKE([
 	parallel-tests
 	subdir-objects
 ])
-AM_SILENT_RULES([yes])
 AM_PROG_AR
 
 # Checks for programs.
@@ -25,22 +25,34 @@ AM_PROG_CC_C_O
 AC_PROG_RANLIB
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
-AC_PROG_YACC
-AC_PROG_LEX
+
+AC_ARG_WITH([lex],
+	AS_HELP_STRING([--with-lex], [Build with lex]),
+	[], [with_lex=no])
+AC_ARG_WITH([yacc],
+	AS_HELP_STRING([--with-yacc], [Build with yacc]),
+	[], [with_yacc=no])
+AC_ARG_ENABLE([documentation],
+	AS_HELP_STRING([--enable-documentation], [Build the documentation]),
+	[], [enable_documentation=no])
+
+test "$with_lex" = yes && AC_PROG_LEX
+test "$with_yacc" = yes && AC_PROG_YACC
+
+if test "$enable_documentation" = yes
+then
+	AC_CHECK_PROGS(RST2MAN, [rst2man rst2man.py], [no])
+	if test "$RST2MAN" = no
+	then
+		AC_MSG_ERROR([rst2man is needed to build the documentation])
+	fi
+fi
+AM_CONDITIONAL([ENABLE_DOCUMENTATION], [test "$enable_documentation" = yes])
 
 AC_CHECK_PROGS(SOCKSTAT, [lsof sockstat fstat], [no])
 if test "x$SOCKSTAT" = xno; then
 	AC_MSG_WARN([No tool found for socket inspection, tests will fail.])
 fi
-
-AC_ARG_WITH([rst2man],
-  AS_HELP_STRING([--with-rst2man=PATH], [Location of rst2man (auto)]),
-  [RST2MAN="$withval"],
-  AC_CHECK_PROGS(RST2MAN, [rst2man rst2man.py], [no]))
-if test "x$RST2MAN" = "xno"; then
-  AC_MSG_WARN([rst2man/rst2man.py were not found, Hitch will lack man pages.  To fix this, please install python-docutils first and re-run configure.])
-fi
-AM_CONDITIONAL([FOUND_RST2MAN], [test "x$RST2MAN" != xno])
 
 AM_MAINTAINER_MODE([disable])
 
