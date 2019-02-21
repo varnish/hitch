@@ -6,7 +6,6 @@ before_install:
 
 before_script:
   - ./bootstrap
-  - ./configure
   - make -j4
 
 script:

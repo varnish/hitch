@@ -1,4 +1,3 @@
-
 sbin_PROGRAMS = hitch
 noinst_LIBRARIES = libcfg.a libforeign.a
 
