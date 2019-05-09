@@ -1951,6 +1951,18 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 		len += i;
 	}
 #endif
+    if (CONFIG->PROXY_AUTHORITY) {
+#define PP2_TYPE_AUTHORITY	0x02
+		const char *servername;
+		unsigned servername_len = 0;
+		servername = SSL_get_servername(ps->ssl, TLSEXT_NAMETYPE_host_name);
+		if (servername) {
+			servername_len = strlen(servername);
+			i = proxy_tlv_append(base + len, maxlen - len,
+				PP2_TYPE_AUTHORITY, servername, servername_len);
+			len += i;
+		}
+	}
 	if (CONFIG->PROXY_TLV) {
 #define PP2_TYPE_SSL		0x20
 #define PP2_CLIENT_SSL		0x01

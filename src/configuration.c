@@ -187,6 +187,7 @@ config_new(void)
 	r->WRITE_PROXY_LINE_V1= 0;
 	r->WRITE_PROXY_LINE_V2= 0;
 	r->PROXY_TLV          = 1;
+	r->PROXY_AUTHORITY	  = 1;
 	r->PROXY_PROXY_LINE   = 0;
 	r->ALPN_PROTOS        = NULL;
 	r->ALPN_PROTOS_LV     = NULL;
