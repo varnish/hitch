@@ -1856,10 +1856,13 @@ proxy_tlv_append(char *dst, ssize_t dstlen, unsigned type,
 static void
 write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 {
+	struct pp2_hdr *p;
+	size_t len = 16, maxlen;
 	char *base;
+	const char *tlv_tok;
+	unsigned tlv_len;
 	int i;
 
-	struct pp2_hdr *p;
 	union addr {
 		struct sockaddr		sa;
 		struct sockaddr_in	sa4;
@@ -1869,7 +1872,6 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
 	base = ringbuffer_write_ptr(&ps->ring_ssl2clear);
 	p = (struct pp2_hdr *)base; /* XXX: is this endian-safe? */
-	size_t len = 16, maxlen;
 	l = (union addr *) local;
 	r = (union addr *) &ps->remote_ip;
 	maxlen = ps->ring_ssl2clear.data_len;
@@ -1914,18 +1916,27 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 
 	/* This is where we add something related to NPN or ALPN*/
 #if defined(OPENSSL_WITH_ALPN) || defined(OPENSSL_WITH_NPN)
-	const char *alpn_tok = NULL;
-	unsigned alpn_len = 0;
-	get_alpn(ps, (const unsigned char **)&alpn_tok,
-	    &alpn_len);
-	if (alpn_len > 0) {
+	tlv_tok = NULL;
+	tlv_len = 0;
+	get_alpn(ps, (const unsigned char **)&tlv_tok, &tlv_len);
+	if (tlv_len > 0) {
 		/* let the server know that a protocol was selected. */
 		i = proxy_tlv_append(base + len, maxlen - len,
-		    PP2_TYPE_ALPN, alpn_tok, alpn_len);
+		    PP2_TYPE_ALPN, tlv_tok, tlv_len);
 		AN(i);
 		len += i;
 	}
 #endif
+	if (CONFIG->PROXY_AUTHORITY) {
+		tlv_tok = SSL_get_servername(ps->ssl,
+		    TLSEXT_NAMETYPE_host_name);
+		if (tlv_tok != NULL) {
+			tlv_len = strlen(tlv_tok);
+			i = proxy_tlv_append(base + len, maxlen - len,
+			    PP2_TYPE_AUTHORITY, tlv_tok, tlv_len);
+			len += i;
+		}
+	}
 	if (CONFIG->PROXY_TLV) {
 		char *tlvp = base + len;
 		ssize_t sz = 0;

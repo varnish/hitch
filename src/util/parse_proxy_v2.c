@@ -169,6 +169,10 @@ print_extensions(unsigned char *extensions, int extensions_len)
 		case PP2_TYPE_ALPN:
 			printf("ALPN extension:\t%.*s\n", l, extensions + i);
 			break;
+		case PP2_TYPE_AUTHORITY:
+			printf("Authority extension:\t%.*s\n", l,
+			    extensions + i);
+			break;
 		case PP2_TYPE_SSL:
 			printf("PP2_TYPE_SSL client:\t0x%x\n",
 			    *((char *)extensions + i));

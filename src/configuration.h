@@ -103,6 +103,7 @@ struct __hitch_config {
 	int			WRITE_PROXY_LINE_V2;
 	int			PROXY_PROXY_LINE;
 	unsigned		PROXY_TLV;
+	unsigned		PROXY_AUTHORITY;
 	char			*ALPN_PROTOS;
 	unsigned char		*ALPN_PROTOS_LV;
 	unsigned		ALPN_PROTOS_LV_LEN;
