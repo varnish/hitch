@@ -98,6 +98,9 @@
 
 #define CFG_CONFIG "config"
 
+#define CFG_DEFAULT_CIPHERS \
+	"EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH"
+
 extern FILE *yyin;
 extern int yyparse(hitch_config *);
 
@@ -181,76 +184,80 @@ config_new(void)
 	(void) i;
 	// set default values
 
-	r->PMODE              = SSL_SERVER;
-	r->SELECTED_TLS_PROTOS= 0;
-	r->WRITE_IP_OCTET     = 0;
-	r->WRITE_PROXY_LINE_V1= 0;
-	r->WRITE_PROXY_LINE_V2= 0;
-	r->PROXY_TLV          = 1;
-	r->PROXY_PROXY_LINE   = 0;
-	r->ALPN_PROTOS        = NULL;
-	r->ALPN_PROTOS_LV     = NULL;
-	r->ALPN_PROTOS_LV_LEN = 0;
-	r->CHROOT             = NULL;
-	r->UID                = -1;
-	r->GID                = -1;
-	r->BACK_IP            = strdup("127.0.0.1");
-	r->BACK_PORT          = strdup("8000");
-	r->NCORES             = 1;
-	r->CIPHER_SUITE       = strdup("EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH");
-	r->ENGINE             = NULL;
-	r->BACKLOG            = 100;
-	r->SNI_NOMATCH_ABORT  = 0;
-	r->CERT_DEFAULT	      = NULL;
-	r->CERT_FILES         = NULL;
-	r->LISTEN_ARGS        = NULL;
-	r->PEM_DIR            = NULL;
-	fa = front_arg_new();
-	fa->port = strdup("8443");
-	fa->pspec = strdup("default");
-	HASH_ADD_KEYPTR(hh, r->LISTEN_ARGS, fa->pspec, strlen(fa->pspec), fa);
-	r->LISTEN_DEFAULT = fa;
-	r->OCSP_DIR           = strdup("/var/lib/hitch/");
-	r->OCSP_VFY = 0;
-	r->OCSP_RESP_TMO = 10.0;
-	r->OCSP_CONN_TMO = 4.0;
-	r->OCSP_REFRESH_INTERVAL = 1800;
+	r->PMODE			= SSL_SERVER;
+	r->SELECTED_TLS_PROTOS		= 0;
+	r->WRITE_IP_OCTET		= 0;
+	r->WRITE_PROXY_LINE_V1		= 0;
+	r->WRITE_PROXY_LINE_V2		= 0;
+	r->PROXY_TLV			= 1;
+	r->PROXY_PROXY_LINE		= 0;
+	r->ALPN_PROTOS			= NULL;
+	r->ALPN_PROTOS_LV		= NULL;
+	r->ALPN_PROTOS_LV_LEN		= 0;
+	r->CHROOT			= NULL;
+	r->UID				= -1;
+	r->GID				= -1;
+	r->BACK_IP			= strdup("127.0.0.1");
+	r->BACK_PORT			= strdup("8000");
+	r->NCORES			= 1;
+	r->CIPHER_SUITE			= strdup(CFG_DEFAULT_CIPHERS);
+	r->ENGINE			= NULL;
+	r->BACKLOG			= 100;
+	r->SNI_NOMATCH_ABORT		= 0;
+	r->CERT_DEFAULT			= NULL;
+	r->CERT_FILES			= NULL;
+	r->LISTEN_ARGS			= NULL;
+	r->PEM_DIR			= NULL;
+	r->OCSP_DIR			= strdup("/var/lib/hitch/");
+	AN(r->OCSP_DIR);
+	r->OCSP_VFY			= 0;
+	r->OCSP_RESP_TMO		= 10.0;
+	r->OCSP_CONN_TMO		= 4.0;
+	r->OCSP_REFRESH_INTERVAL	= 1800;
 #ifdef TCP_FASTOPEN_WORKS
-	r->TFO = 0;
+	r->TFO				= 0;
 #endif
 
 #ifdef USE_SHARED_CACHE
-	r->SHARED_CACHE       = 0;
-	r->SHCUPD_IP          = NULL;
-	r->SHCUPD_PORT        = NULL;
+	r->SHARED_CACHE			= 0;
+	r->SHCUPD_IP			= NULL;
+	r->SHCUPD_PORT			= NULL;
 
 	for (i = 0 ; i < MAX_SHCUPD_PEERS; i++)
 		memset(&r->SHCUPD_PEERS[i], 0, sizeof(shcupd_peer_opt));
 
-	r->SHCUPD_MCASTIF     = NULL;
-	r->SHCUPD_MCASTTTL    = NULL;
+	r->SHCUPD_MCASTIF		= NULL;
+	r->SHCUPD_MCASTTTL		= NULL;
 #endif
 
-	r->LOG_LEVEL          = 0;
-	r->SYSLOG             = 0;
-	r->SYSLOG_FACILITY    = LOG_DAEMON;
-	r->TCP_KEEPALIVE_TIME = 3600;
-	r->BACKEND_REFRESH_TIME = 0;
-	r->DAEMONIZE          = 0;
-	r->PREFER_SERVER_CIPHERS = 0;
-	r->TEST	              = 0;
+	r->LOG_LEVEL			= 0;
+	r->SYSLOG			= 0;
+	r->SYSLOG_FACILITY		= LOG_DAEMON;
+	r->TCP_KEEPALIVE_TIME		= 3600;
+	r->BACKEND_REFRESH_TIME		= 0;
+	r->DAEMONIZE			= 0;
+	r->PREFER_SERVER_CIPHERS	= 0;
+	r->TEST				= 0;
 
-	r->BACKEND_CONNECT_TIMEOUT = 30;
-	r->SSL_HANDSHAKE_TIMEOUT = 30;
+	r->BACKEND_CONNECT_TIMEOUT	= 30;
+	r->SSL_HANDSHAKE_TIMEOUT	= 30;
 
-	r->RECV_BUFSIZE = -1;
-	r->SEND_BUFSIZE = -1;
+	r->RECV_BUFSIZE			= -1;
+	r->SEND_BUFSIZE			= -1;
 
-	r->LOG_FILENAME = NULL;
-	r->PIDFILE = NULL;
+	r->LOG_FILENAME			= NULL;
+	r->PIDFILE			= NULL;
 
-	r->RING_SLOTS = 0;
-	r->RING_DATA_LEN = 0;
+	r->RING_SLOTS			= 0;
+	r->RING_DATA_LEN		= 0;
+
+	fa = front_arg_new();
+	fa->port = strdup("8443");
+	AN(fa->port);
+	fa->pspec = strdup("default");
+	AN(fa->pspec);
+	HASH_ADD_KEYPTR(hh, r->LISTEN_ARGS, fa->pspec, strlen(fa->pspec), fa);
+	r->LISTEN_DEFAULT		= fa;
 
 	return (r);
 }

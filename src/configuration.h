@@ -16,22 +16,22 @@
 
 /* Is NPN available? See openssl/opensslv.h for explanation. */
 #ifndef OPENSSL_NO_NEXTPROTONEG
-#if OPENSSL_VERSION_NUMBER >= 0x1000100fL
-#define OPENSSL_WITH_NPN
-#endif
+#  if OPENSSL_VERSION_NUMBER >= 0x1000100fL
+#    define OPENSSL_WITH_NPN
+#  endif
 #endif
 
 /* Is ALPN available? See openssl/opensslv.h for explanation. */
 #if OPENSSL_VERSION_NUMBER >= 0x1000200fL
-#define OPENSSL_WITH_ALPN
+#  define OPENSSL_WITH_ALPN
 #endif
 
 #ifdef OPENSSL_WITH_ALPN
-#define ALPN_NPN_PREFIX_STR "{alpn}"
+#  define ALPN_NPN_PREFIX_STR "{alpn}"
 #else
-#ifdef OPENSSL_WITH_NPN
-#define ALPN_NPN_PREFIX_STR "{npn}"
-#endif
+#  ifdef OPENSSL_WITH_NPN
+#    define ALPN_NPN_PREFIX_STR "{npn}"
+#  endif
 #endif
 
 #ifdef USE_SHARED_CACHE
@@ -42,10 +42,9 @@
   #endif
 
 typedef struct shcupd_peer_opt {
-     char *ip;
-     char *port;
+	char *ip;
+	char *port;
 } shcupd_peer_opt;
-
 #endif
 
 typedef enum {
@@ -62,8 +61,8 @@ typedef enum {
 #define SSL_OPTION_PROTOS (SSLv3_PROTO | TLS_OPTION_PROTOS)
 
 typedef enum {
-    SSL_SERVER,
-    SSL_CLIENT
+	SSL_SERVER,
+	SSL_CLIENT
 } PROXY_MODE;
 
 struct cfg_cert_file {
@@ -97,64 +96,64 @@ struct front_arg {
 
 /* configuration structure */
 struct __hitch_config {
-    PROXY_MODE PMODE;
-    int SELECTED_TLS_PROTOS;
-    int WRITE_IP_OCTET;
-    int WRITE_PROXY_LINE_V1;
-    int WRITE_PROXY_LINE_V2;
-    int PROXY_PROXY_LINE;
-    unsigned PROXY_TLV;
-    char *ALPN_PROTOS;
-    unsigned char *ALPN_PROTOS_LV;
-    unsigned ALPN_PROTOS_LV_LEN;
-    char *CHROOT;
-    int UID;
-    int GID;
-    struct front_arg *LISTEN_ARGS;
-    struct front_arg *LISTEN_DEFAULT;
-    char *BACK_IP;
-    char *BACK_PORT;
-    char *BACK_PATH;
-    long NCORES;
-    struct cfg_cert_file *CERT_FILES;
-    struct cfg_cert_file *CERT_DEFAULT;
-    char *CIPHER_SUITE;
-    char *ENGINE;
-    int BACKLOG;
+	PROXY_MODE		PMODE;
+	int			SELECTED_TLS_PROTOS;
+	int			WRITE_IP_OCTET;
+	int			WRITE_PROXY_LINE_V1;
+	int			WRITE_PROXY_LINE_V2;
+	int			PROXY_PROXY_LINE;
+	unsigned		PROXY_TLV;
+	char			*ALPN_PROTOS;
+	unsigned char		*ALPN_PROTOS_LV;
+	unsigned		ALPN_PROTOS_LV_LEN;
+	char			*CHROOT;
+	int			UID;
+	int			GID;
+	struct front_arg	*LISTEN_ARGS;
+	struct front_arg	*LISTEN_DEFAULT;
+	char			*BACK_IP;
+	char			*BACK_PORT;
+	char			*BACK_PATH;
+	long			NCORES;
+	struct cfg_cert_file	*CERT_FILES;
+	struct cfg_cert_file	*CERT_DEFAULT;
+	char			*CIPHER_SUITE;
+	char			*ENGINE;
+	int			BACKLOG;
 #ifdef USE_SHARED_CACHE
-    int SHARED_CACHE;
-    char *SHCUPD_IP;
-    char *SHCUPD_PORT;
-    shcupd_peer_opt SHCUPD_PEERS[MAX_SHCUPD_PEERS+1];
-    char *SHCUPD_MCASTIF;
-    char *SHCUPD_MCASTTTL;
+	int			SHARED_CACHE;
+	char			*SHCUPD_IP;
+	char			*SHCUPD_PORT;
+	shcupd_peer_opt		SHCUPD_PEERS[MAX_SHCUPD_PEERS+1];
+	char			*SHCUPD_MCASTIF;
+	char			*SHCUPD_MCASTTTL;
 #endif
-    int LOG_LEVEL;
-    int SYSLOG;
-    int SYSLOG_FACILITY;
-    int TCP_KEEPALIVE_TIME;
-    int BACKEND_REFRESH_TIME;
-    int DAEMONIZE;
-    int PREFER_SERVER_CIPHERS;
-    int BACKEND_CONNECT_TIMEOUT;
-    int SSL_HANDSHAKE_TIMEOUT;
-    int RECV_BUFSIZE;
-    int SEND_BUFSIZE;
-    char* LOG_FILENAME;
-    int RING_SLOTS;
-    int RING_DATA_LEN;
-    char *PIDFILE;
-    int SNI_NOMATCH_ABORT;
-    int TEST;
-    char *PEM_DIR;
-    char *PEM_DIR_GLOB;
-    int OCSP_VFY;
-    char *OCSP_DIR;
-    double OCSP_RESP_TMO;
-    double OCSP_CONN_TMO;
-    int OCSP_REFRESH_INTERVAL;
+	int			LOG_LEVEL;
+	int			SYSLOG;
+	int			SYSLOG_FACILITY;
+	int			TCP_KEEPALIVE_TIME;
+	int			BACKEND_REFRESH_TIME;
+	int			DAEMONIZE;
+	int			PREFER_SERVER_CIPHERS;
+	int			BACKEND_CONNECT_TIMEOUT;
+	int			SSL_HANDSHAKE_TIMEOUT;
+	int			RECV_BUFSIZE;
+	int			SEND_BUFSIZE;
+	char			*LOG_FILENAME;
+	int			RING_SLOTS;
+	int			RING_DATA_LEN;
+	char			*PIDFILE;
+	int			SNI_NOMATCH_ABORT;
+	int			TEST;
+	char			*PEM_DIR;
+	char			*PEM_DIR_GLOB;
+	int			OCSP_VFY;
+	char			*OCSP_DIR;
+	double			OCSP_RESP_TMO;
+	double			OCSP_CONN_TMO;
+	int			OCSP_REFRESH_INTERVAL;
 #ifdef TCP_FASTOPEN_WORKS
-	int TFO;
+	int			TFO;
 #endif
 };
 

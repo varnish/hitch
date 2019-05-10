@@ -120,24 +120,22 @@ CFG_RECORD
 	;
 
 FRONTEND_REC
-	: TOK_FRONTEND '=' STRING
-{
-	if ($3 && config_param_validate("frontend", $3, cfg, /* XXX: */ "",
-	    yyget_lineno()) != 0)
-		YYABORT;
-}
-	| TOK_FRONTEND '=' '{'
-{
-	/* NB: Mid-rule action */
-	AZ(cur_fa);
-	cur_fa = front_arg_new();
-}
-	FRONTEND_BLK '}'
-{
-	if (front_arg_add(cfg, cur_fa) != 1)
-		YYABORT;
-	cur_fa = NULL;
-};
+	: TOK_FRONTEND '=' STRING {
+		/* XXX: passing an empty string for file */
+		if ($3 && config_param_validate("frontend", $3, cfg, "",
+		    yyget_lineno()) != 0)
+			YYABORT;
+	}
+	| TOK_FRONTEND '=' '{' {
+		/* NB: Mid-rule action */
+		AZ(cur_fa);
+		cur_fa = front_arg_new();
+	}
+	FRONTEND_BLK '}' {
+		if (front_arg_add(cfg, cur_fa) != 1)
+			YYABORT;
+		cur_fa = NULL;
+	};
 
 FRONTEND_BLK: FB_RECS;
 FB_RECS
@@ -158,8 +156,7 @@ FB_REC
 	| FB_PREF_SRV_CIPH
 	;
 
-FB_HOST: TOK_HOST '=' STRING
-{
+FB_HOST: TOK_HOST '=' STRING {
 	if ($3) {
 		if (strcmp($3, "*") == 0)
 			cur_fa->ip = NULL;
@@ -186,27 +183,23 @@ PB_REC
 
 PB_CERT: TOK_PB_CERT '=' STRING { if ($3) cur_pem->filename = strdup($3); };
 
-PB_OCSP_RESP_FILE: TOK_PB_OCSP_FILE '=' STRING
-{
+PB_OCSP_RESP_FILE: TOK_PB_OCSP_FILE '=' STRING {
 	if ($3)
 		cur_pem->ocspfn = strdup($3);
 };
 
-OCSP_VERIFY: TOK_OCSP_VERIFY '=' BOOL
-{
+OCSP_VERIFY: TOK_OCSP_VERIFY '=' BOOL {
 	if (cur_pem != NULL)
 		cur_pem->ocsp_vfy = $3;
 	else
 		cfg->OCSP_VFY = $3;
 };
 
-PRIVATE_KEY: TOK_PRIVATE_KEY '=' STRING
-{
+PRIVATE_KEY: TOK_PRIVATE_KEY '=' STRING {
 	if ($3) cur_pem->priv_key_filename = strdup($3);
 };
 
-PEM_DIR: TOK_PEM_DIR '=' STRING
-{
+PEM_DIR: TOK_PEM_DIR '=' STRING {
 	if ($3) {
 		size_t l;
 		l = strlen($3);
@@ -219,8 +212,7 @@ PEM_DIR: TOK_PEM_DIR '=' STRING
 		cfg->PEM_DIR = NULL;
 };
 
-PEM_DIR_GLOB: TOK_PEM_DIR_GLOB '=' STRING
-{
+PEM_DIR_GLOB: TOK_PEM_DIR_GLOB '=' STRING {
 	if ($3)
 		cfg->PEM_DIR_GLOB = strdup($3);
 	else
@@ -228,67 +220,61 @@ PEM_DIR_GLOB: TOK_PEM_DIR_GLOB '=' STRING
 
 };
 
-OCSP_DIR: TOK_OCSP_DIR '=' STRING
-{
+OCSP_DIR: TOK_OCSP_DIR '=' STRING {
 	if ($3)
 		cfg->OCSP_DIR = strdup($3);
 	else
 		cfg->OCSP_DIR = NULL;
 };
 
-OCSP_RESP_TMO: TOK_OCSP_RESP_TMO '=' UINT
-{
+OCSP_RESP_TMO: TOK_OCSP_RESP_TMO '=' UINT {
 	cfg->OCSP_RESP_TMO = $3;
 };
 
-OCSP_CONN_TMO: TOK_OCSP_CONN_TMO '=' UINT
-{
+OCSP_CONN_TMO: TOK_OCSP_CONN_TMO '=' UINT {
 	cfg->OCSP_CONN_TMO = $3;
 };
 
-OCSP_REFRESH_INTERVAL: TOK_OCSP_REFRESH_INTERVAL '=' UINT
-{
+OCSP_REFRESH_INTERVAL: TOK_OCSP_REFRESH_INTERVAL '=' UINT {
 	cfg->OCSP_REFRESH_INTERVAL = $3;
 }
 
-FB_CERT: TOK_PEM_FILE '=' STRING
-{
-	if ($3 != NULL) {
-		int r;
-		struct cfg_cert_file *cert;
-		cert = cfg_cert_file_new();
-		cert->filename = strdup($3);
-		r = cfg_cert_vfy(cert);
-		if (r == 0) {
-			cfg_cert_file_free(&cert);
+FB_CERT
+	: TOK_PEM_FILE '=' STRING {
+		if ($3 != NULL) {
+			int r;
+			struct cfg_cert_file *cert;
+			cert = cfg_cert_file_new();
+			cert->filename = strdup($3);
+			r = cfg_cert_vfy(cert);
+			if (r == 0) {
+				cfg_cert_file_free(&cert);
+				YYABORT;
+			}
+			cfg_cert_add(cert, &cur_fa->certs);
+		}
+	}
+	| TOK_PEM_FILE '=' '{' {
+		/* NB: Mid-rule action */
+		AZ(cur_pem);
+		cur_pem = cfg_cert_file_new();
+	}
+	PEM_BLK '}' {
+		if (cfg_cert_vfy(cur_pem) != 0)
+			cfg_cert_add(cur_pem, &cur_fa->certs);
+		else {
+			cfg_cert_file_free(&cur_pem);
 			YYABORT;
 		}
-		cfg_cert_add(cert, &cur_fa->certs);
-	}
-}
-	| TOK_PEM_FILE '=' '{'
-{
-	/* NB: Mid-rule action */
-	AZ(cur_pem);
-	cur_pem = cfg_cert_file_new();
-}
-	PEM_BLK '}'
-{
-	if (cfg_cert_vfy(cur_pem) != 0)
-		cfg_cert_add(cur_pem, &cur_fa->certs);
-	else {
-		cfg_cert_file_free(&cur_pem);
-		YYABORT;
-	}
-	cur_pem = NULL;
-};
+		cur_pem = NULL;
+	};
 
 FB_MATCH_GLOBAL: TOK_MATCH_GLOBAL '=' BOOL { cur_fa->match_global_certs = $3; };
 
-FB_SNI_NOMATCH_ABORT:TOK_SNI_NOMATCH_ABORT '=' BOOL
-{
+FB_SNI_NOMATCH_ABORT:TOK_SNI_NOMATCH_ABORT '=' BOOL {
 		cur_fa->sni_nomatch_abort = $3;
 };
+
 // this is not optimal, but it was not before, either.
 FB_TLS: TOK_TLS '=' BOOL {
 	if (cur_fa->selected_protos != 0) {
@@ -306,6 +292,7 @@ FB_TLS: TOK_TLS '=' BOOL {
 		fprintf(stderr,
 		    "Warning: tls = off is deprecated and has no effect.\n");
 }
+
 FB_SSL: TOK_SSL '=' BOOL {
 	if (cur_fa->selected_protos != 0) {
 		fprintf(stderr, "%s (%s, line %d):"
@@ -322,6 +309,7 @@ FB_SSL: TOK_SSL '=' BOOL {
 		fprintf(stderr,
 		    "Warning: ssl = off is deprecated and has no effect.\n");
 }
+
 FB_TLS_PROTOS: TOK_TLS_PROTOS {
 	if (cur_fa->selected_protos != 0) {
 		fprintf(stderr, "%s (%s, line %d):"
@@ -333,16 +321,20 @@ FB_TLS_PROTOS: TOK_TLS_PROTOS {
 		YYABORT;
 	}
 } '=' FB_TLS_PROTOS_LIST;
+
 FB_TLS_PROTOS_LIST: FB_TLS_PROTO | FB_TLS_PROTOS_LIST FB_TLS_PROTO;
 FB_TLS_PROTO
-: TOK_SSLv3 { cur_fa->selected_protos |= SSLv3_PROTO; }
-| TOK_TLSv1_0 { cur_fa->selected_protos |= TLSv1_0_PROTO; }
-| TOK_TLSv1_1 { cur_fa->selected_protos |= TLSv1_1_PROTO; }
-| TOK_TLSv1_2 { cur_fa->selected_protos |= TLSv1_2_PROTO; };
-| TOK_TLSv1_3 { cur_fa->selected_protos |= TLSv1_3_PROTO; };
-FB_CIPHERS: TOK_CIPHERS '=' STRING { if ($3) cur_fa->ciphers = strdup($3); };
-FB_PREF_SRV_CIPH: TOK_PREFER_SERVER_CIPHERS '=' BOOL
-{
+	: TOK_SSLv3 { cur_fa->selected_protos |= SSLv3_PROTO; }
+	| TOK_TLSv1_0 { cur_fa->selected_protos |= TLSv1_0_PROTO; }
+	| TOK_TLSv1_1 { cur_fa->selected_protos |= TLSv1_1_PROTO; }
+	| TOK_TLSv1_2 { cur_fa->selected_protos |= TLSv1_2_PROTO; }; // XXX
+	| TOK_TLSv1_3 { cur_fa->selected_protos |= TLSv1_3_PROTO; };
+
+FB_CIPHERS: TOK_CIPHERS '=' STRING {
+	if ($3) cur_fa->ciphers = strdup($3);
+};
+
+FB_PREF_SRV_CIPH: TOK_PREFER_SERVER_CIPHERS '=' BOOL {
 	cur_fa->prefer_server_ciphers = $3;
 };
 
@@ -398,6 +390,7 @@ TLS_PROTOS_REC: TOK_TLS_PROTOS {
 		YYABORT;
 	}
 } '=' TLS_PROTOS_LIST;
+
 TLS_PROTOS_LIST: TLS_PROTO | TLS_PROTOS_LIST TLS_PROTO;
 TLS_PROTO
 	: TOK_SSLv3 { cfg->SELECTED_TLS_PROTOS |= SSLv3_PROTO; }
@@ -408,73 +401,68 @@ TLS_PROTO
 
 SSL_ENGINE_REC: TOK_SSL_ENGINE '=' STRING { if ($3) cfg->ENGINE = strdup($3); };
 
-PREFER_SERVER_CIPHERS_REC: TOK_PREFER_SERVER_CIPHERS '=' BOOL
-{
+PREFER_SERVER_CIPHERS_REC: TOK_PREFER_SERVER_CIPHERS '=' BOOL {
 	cfg->PREFER_SERVER_CIPHERS = $3;
 };
 
-CHROOT_REC: TOK_CHROOT '=' STRING
-{
-	if ($3 && config_param_validate("chroot", $3, cfg, /* XXX: */ "",
+CHROOT_REC: TOK_CHROOT '=' STRING {
+	/* XXX: passing an empty string for file */
+	if ($3 && config_param_validate("chroot", $3, cfg, "",
 	    yyget_lineno()) != 0)
 		YYABORT;
 };
 
-BACKEND_REC: TOK_BACKEND '=' STRING
-{
-	if ($3 && config_param_validate("backend", $3, cfg, /* XXX: */ "",
+BACKEND_REC: TOK_BACKEND '=' STRING {
+	/* XXX: passing an empty string for file */
+	if ($3 && config_param_validate("backend", $3, cfg, "",
 	    yyget_lineno()) != 0)
 		YYABORT;
 };
 
-PEM_FILE_REC: TOK_PEM_FILE '=' STRING
-{
-	if ($3 && config_param_validate("pem-file", $3, cfg, /* XXX: */ "",
-	    yyget_lineno()) != 0)
-		YYABORT;
-}
-	| TOK_PEM_FILE '=' '{'
-{
-	/* NB: Mid-rule action */
-	AZ(cur_pem);
-	cur_pem = cfg_cert_file_new();
-}
-	PEM_BLK '}'
-{
-	if (cfg_cert_vfy(cur_pem) != 0) {
-		if (cfg->CERT_DEFAULT != NULL) {
-			struct cfg_cert_file *tmp = cfg->CERT_DEFAULT;
-			cfg_cert_add(tmp, &cfg->CERT_FILES);
-		}
-		cfg->CERT_DEFAULT = cur_pem;
-	} else {
-		cfg_cert_file_free(&cur_pem);
-		YYABORT;
+PEM_FILE_REC
+	: TOK_PEM_FILE '=' STRING {
+		/* XXX: passing an empty string for file */
+		if ($3 && config_param_validate("pem-file", $3, cfg, "",
+		    yyget_lineno()) != 0)
+			YYABORT;
 	}
-	cur_pem = NULL;
-};
-
+	| TOK_PEM_FILE '=' '{' {
+		/* NB: Mid-rule action */
+		AZ(cur_pem);
+		cur_pem = cfg_cert_file_new();
+	}
+	PEM_BLK '}' {
+		if (cfg_cert_vfy(cur_pem) != 0) {
+			if (cfg->CERT_DEFAULT != NULL) {
+				struct cfg_cert_file *tmp = cfg->CERT_DEFAULT;
+				cfg_cert_add(tmp, &cfg->CERT_FILES);
+			}
+			cfg->CERT_DEFAULT = cur_pem;
+		} else {
+			cfg_cert_file_free(&cur_pem);
+			YYABORT;
+		}
+		cur_pem = NULL;
+	};
 
 SYSLOG_REC: TOK_SYSLOG '=' BOOL { cfg->SYSLOG = $3; };
 DAEMON_REC: TOK_DAEMON '=' BOOL { cfg->DAEMONIZE = $3; };
-SNI_NOMATCH_ABORT_REC
-	: TOK_SNI_NOMATCH_ABORT '=' BOOL
-{
+SNI_NOMATCH_ABORT_REC : TOK_SNI_NOMATCH_ABORT '=' BOOL {
 	cfg->SNI_NOMATCH_ABORT = $3;
 };
 
 CIPHERS_REC: TOK_CIPHERS '=' STRING { if ($3) cfg->CIPHER_SUITE = strdup($3); };
 
-USER_REC: TOK_USER '=' STRING
-{
-	if ($3 && config_param_validate("user", $3, cfg, /* XXX: */ "",
+USER_REC: TOK_USER '=' STRING {
+	/* XXX: passing an empty string for file */
+	if ($3 && config_param_validate("user", $3, cfg, "",
 	    yyget_lineno()) != 0)
 		YYABORT;
 };
 
-GROUP_REC: TOK_GROUP '=' STRING
-{
-	if ($3 && config_param_validate("group", $3, cfg, /* XXX: */ "",
+GROUP_REC: TOK_GROUP '=' STRING {
+	/* XXX: passing an empty string for file */
+	if ($3 && config_param_validate("group", $3, cfg, "",
 	    yyget_lineno()) != 0)
 		YYABORT;
 };
@@ -483,34 +471,29 @@ WRITE_IP_REC: TOK_WRITE_IP '=' BOOL { cfg->WRITE_IP_OCTET = $3; };
 
 WRITE_PROXY_REC: TOK_WRITE_PROXY '=' BOOL { cfg->WRITE_PROXY_LINE_V2 = $3; };
 
-WRITE_PROXY_V1_REC: TOK_WRITE_PROXY_V1 '=' BOOL
-{
+WRITE_PROXY_V1_REC: TOK_WRITE_PROXY_V1 '=' BOOL {
 	cfg->WRITE_PROXY_LINE_V1 = $3;
 };
 
-WRITE_PROXY_V2_REC: TOK_WRITE_PROXY_V2 '=' BOOL
-{
+WRITE_PROXY_V2_REC: TOK_WRITE_PROXY_V2 '=' BOOL {
 	cfg->WRITE_PROXY_LINE_V2 = $3;
 };
 
-PROXY_TLV_REC: TOK_PROXY_TLV '=' BOOL
-{
-	cfg->PROXY_TLV = $3;
-};
+PROXY_TLV_REC: TOK_PROXY_TLV '=' BOOL { cfg->PROXY_TLV = $3; };
 
 PROXY_PROXY_REC: TOK_PROXY_PROXY '=' BOOL { cfg->PROXY_PROXY_LINE = $3; };
 
-ALPN_PROTOS_REC: TOK_ALPN_PROTOS '=' STRING
-{
-	if ($3 && config_param_validate("alpn-protos", $3, cfg, /* XXX: */ "",
+ALPN_PROTOS_REC: TOK_ALPN_PROTOS '=' STRING {
+	/* XXX: passing an empty string for file */
+	if ($3 && config_param_validate("alpn-protos", $3, cfg, "",
 	    yyget_lineno()) != 0)
 		YYABORT;
 };
 
-SYSLOG_FACILITY_REC: TOK_SYSLOG_FACILITY '=' STRING
-{
+SYSLOG_FACILITY_REC: TOK_SYSLOG_FACILITY '=' STRING {
+	/* XXX: passing an empty string for file */
 	if ($3 &&
-	    config_param_validate("syslog-facility", $3, cfg, /* XXX: */ "",
+	    config_param_validate("syslog-facility", $3, cfg, "",
 	    yyget_lineno()) != 0)
 		YYABORT;
 };
@@ -519,18 +502,17 @@ SEND_BUFSIZE_REC: TOK_SEND_BUFSIZE '=' UINT { cfg->SEND_BUFSIZE = $3; };
 
 RECV_BUFSIZE_REC: TOK_RECV_BUFSIZE '=' UINT { cfg->RECV_BUFSIZE = $3; };
 
-LOG_FILENAME_REC: TOK_LOG_FILENAME '=' STRING
-{
+LOG_FILENAME_REC: TOK_LOG_FILENAME '=' STRING {
+	/* XXX: passing an empty string for file */
 	if ($3 &&
-	    config_param_validate("log-filename", $3, cfg, /* XXX: */ "",
+	    config_param_validate("log-filename", $3, cfg, "",
 	    yyget_lineno()) != 0)
 		YYABORT;
 };
 
 LOG_LEVEL_REC: TOK_LOG_LEVEL '=' UINT { cfg->LOG_LEVEL = $3; };
 
-SESSION_CACHE_REC: TOK_SESSION_CACHE '=' UINT
-{
+SESSION_CACHE_REC: TOK_SESSION_CACHE '=' UINT {
 #ifdef USE_SHARED_CACHE
 	cfg->SHARED_CACHE = $3;
 #else
@@ -540,11 +522,11 @@ SESSION_CACHE_REC: TOK_SESSION_CACHE '=' UINT
 #endif
 };
 
-SHARED_CACHE_LISTEN_REC: TOK_SHARED_CACHE_LISTEN '=' STRING
-{
+SHARED_CACHE_LISTEN_REC: TOK_SHARED_CACHE_LISTEN '=' STRING {
 #ifdef USE_SHARED_CACHE
+	/* XXX: passing an empty string for file */
 	if ($3 && config_param_validate("shared-cache-listen", $3, cfg,
-		/* XXX: */ "", yyget_lineno()) != 0)
+		"", yyget_lineno()) != 0)
 		YYABORT;
 #else
 	fprintf(stderr, "Hitch needs to be compiled with --enable-sessioncache "
@@ -553,11 +535,11 @@ SHARED_CACHE_LISTEN_REC: TOK_SHARED_CACHE_LISTEN '=' STRING
 #endif
 };
 
-SHARED_CACHE_PEER_REC: TOK_SHARED_CACHE_PEER  '=' STRING
-{
+SHARED_CACHE_PEER_REC: TOK_SHARED_CACHE_PEER  '=' STRING {
 #ifdef USE_SHARED_CACHE
+	/* XXX: passing an empty string for file */
 	if ($3 && config_param_validate("shared-cache-peer", $3, cfg,
-		/* XXX: */ "", yyget_lineno()) != 0)
+		"", yyget_lineno()) != 0)
 		YYABORT;
 #else
 	fprintf(stderr, "Hitch needs to be compiled with --enable-sessioncache "
@@ -566,11 +548,11 @@ SHARED_CACHE_PEER_REC: TOK_SHARED_CACHE_PEER  '=' STRING
 #endif
 };
 
-SHARED_CACHE_IF_REC: TOK_SHARED_CACHE_IF '=' STRING
-{
+SHARED_CACHE_IF_REC: TOK_SHARED_CACHE_IF '=' STRING {
 #ifdef USE_SHARED_CACHE
+	/* XXX: passing an empty string for file */
 	if ($3 && config_param_validate("shared-cache-if", $3, cfg,
-		/* XXX: */ "", yyget_lineno()) != 0)
+		"", yyget_lineno()) != 0)
 		YYABORT;
 #else
 	fprintf(stderr, "Hitch needs to be compiled with --enable-sessioncache "
@@ -579,8 +561,7 @@ SHARED_CACHE_IF_REC: TOK_SHARED_CACHE_IF '=' STRING
 #endif
 };
 
-TFO: TOK_TFO '=' BOOL
-{
+TFO: TOK_TFO '=' BOOL {
 #ifdef TCP_FASTOPEN_WORKS
 	{ cfg->TFO = $3; };
 #else
@@ -590,8 +571,7 @@ TFO: TOK_TFO '=' BOOL
 #endif
 };
 
-BACKEND_REFRESH_REC: TOK_BACKEND_REFRESH '=' UINT
-{
+BACKEND_REFRESH_REC: TOK_BACKEND_REFRESH '=' UINT {
 	cfg->BACKEND_REFRESH_TIME = $3;
 };
 
