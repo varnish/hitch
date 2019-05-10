@@ -327,7 +327,7 @@ FB_TLS_PROTO
 	: TOK_SSLv3 { cur_fa->selected_protos |= SSLv3_PROTO; }
 	| TOK_TLSv1_0 { cur_fa->selected_protos |= TLSv1_0_PROTO; }
 	| TOK_TLSv1_1 { cur_fa->selected_protos |= TLSv1_1_PROTO; }
-	| TOK_TLSv1_2 { cur_fa->selected_protos |= TLSv1_2_PROTO; }; // XXX
+	| TOK_TLSv1_2 { cur_fa->selected_protos |= TLSv1_2_PROTO; }
 	| TOK_TLSv1_3 { cur_fa->selected_protos |= TLSv1_3_PROTO; };
 
 FB_CIPHERS: TOK_CIPHERS '=' STRING {
