@@ -76,6 +76,7 @@
 #include "hitch.h"
 #include "hssl_locks.h"
 #include "logging.h"
+#include "proxyv2.h"
 #include "ocsp.h"
 #include "shctx.h"
 #include "foreign/vpf.h"
@@ -232,34 +233,6 @@ static void insert_sni_names(sslctx *sc, sni_name **sn_tab);
 static int load_cert_ctx(sslctx *so);
 #endif /* OPENSSL_NO_TLSEXT */
 
-
-union ha_proxy_v2_addr {
-	struct {        /* for TCP/UDP over IPv4, len = 12 */
-		uint32_t src_addr;
-		uint32_t dst_addr;
-		uint16_t src_port;
-		uint16_t dst_port;
-	} ipv4;
-	struct {        /* for TCP/UDP over IPv6, len = 36 */
-		uint8_t  src_addr[16];
-		uint8_t  dst_addr[16];
-		uint16_t src_port;
-		uint16_t dst_port;
-	} ipv6;
-	struct {        /* for AF_UNIX sockets, len = 216 */
-		uint8_t src_addr[108];
-		uint8_t dst_addr[108];
-	} local;
-};
-
-struct ha_proxy_v2_hdr {
-	uint8_t			sig[12];
-	uint8_t			ver_cmd;
-	uint8_t			fam;
-	uint16_t		len;	/* number of following bytes
-					 * part of the header */
-	union ha_proxy_v2_addr	addr;
-};
 
 enum worker_update_type {
 	WORKER_GEN,
@@ -1886,7 +1859,7 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 	char *base;
 	int i;
 
-	struct ha_proxy_v2_hdr *p;
+	struct pp2_hdr *p;
 	union addr {
 		struct sockaddr		sa;
 		struct sockaddr_in	sa4;
@@ -1895,15 +1868,18 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 
 	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
 	base = ringbuffer_write_ptr(&ps->ring_ssl2clear);
-	p = (struct ha_proxy_v2_hdr *)base;
+	p = (struct pp2_hdr *)base; /* XXX: is this endian-safe? */
 	size_t len = 16, maxlen;
 	l = (union addr *) local;
 	r = (union addr *) &ps->remote_ip;
 	maxlen = ps->ring_ssl2clear.data_len;
+	/* XXX: should it be rounded down to PP2_HEADER_MAX? */
 
-	memcpy(&p->sig,"\r\n\r\n\0\r\nQUIT\n", 12);
-	p->ver_cmd = 0x21; 	/* v2|PROXY */
-	p->fam = l->sa.sa_family == AF_INET ? 0x11 : 0x21;
+	memcpy(&p->sig, PP2_SIG, sizeof PP2_SIG);
+	p->ver_cmd = PP2_VERSION|PP2_CMD_PROXY;
+	p->fam = l->sa.sa_family == AF_INET ?
+	    PP2_TRANS_STREAM|PP2_FAM_INET :
+	    PP2_TRANS_STREAM|PP2_FAM_INET6;
 
 	if (l->sa.sa_family == AF_INET) {
 		len += 12;
@@ -1938,7 +1914,6 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 
 	/* This is where we add something related to NPN or ALPN*/
 #if defined(OPENSSL_WITH_ALPN) || defined(OPENSSL_WITH_NPN)
-#define PP2_TYPE_ALPN	0x01
 	const char *alpn_tok = NULL;
 	unsigned alpn_len = 0;
 	get_alpn(ps, (const unsigned char **)&alpn_tok,
@@ -1952,10 +1927,6 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 	}
 #endif
 	if (CONFIG->PROXY_TLV) {
-#define PP2_TYPE_SSL		0x20
-#define PP2_CLIENT_SSL		0x01
-#define PP2_SUBTYPE_SSL_VERSION	0x21
-#define PP2_SUBTYPE_SSL_CIPHER	0x23
 		char *tlvp = base + len;
 		ssize_t sz = 0;
 		const char *tmp;

@@ -47,10 +47,7 @@
 #include <string.h>
 #include <openssl/opensslv.h>
 
-unsigned char PROXY_V2_HEADER[12] = { 0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D,
-				      0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A};
-
-#define MAX_HEADER_SIZE 536
+#include "proxyv2.h"
 
 ssize_t
 read_from_socket(const char *port, unsigned char *buf, int len)
@@ -169,10 +166,10 @@ print_extensions(unsigned char *extensions, int extensions_len)
 		if (l <= 0 || i + l > extensions_len)
 			return (extensions_error(extensions, extensions_len));
 		switch(type) {
-		case 0x1: // PP2_TYPE_ALPN
+		case PP2_TYPE_ALPN:
 			printf("ALPN extension:\t%.*s\n", l, extensions + i);
 			break;
-		case 0x20: // PP2_TYPE_SSL
+		case PP2_TYPE_SSL:
 			printf("PP2_TYPE_SSL client:\t0x%x\n",
 			    *((char *)extensions + i));
 			printf("PP2_TYPE_SSL verify:\t0x%x\n",
@@ -185,11 +182,11 @@ print_extensions(unsigned char *extensions, int extensions_len)
 				    extensions[j + 2];
 				j += 3;
 				switch (subtype) {
-				case 0x21: // PP2_SUBTYPE_SSL_VERSION
+				case PP2_SUBTYPE_SSL_VERSION:
 					printf("SSL_VERSION:\t%.*s\n",
 					    sublen, extensions + j);
 					break;
-				case 0x23: // PP2_SUBTYPE_SSL_CIPHER
+				case PP2_SUBTYPE_SSL_CIPHER:
 					printf("SSL_CIPHER:\t%.*s\n",
 					    sublen, extensions + j);
 					break;
@@ -213,14 +210,14 @@ print_extensions(unsigned char *extensions, int extensions_len)
 int
 main(int argc, const char **argv)
 {
-	unsigned char proxy_header[MAX_HEADER_SIZE + 1];
+	unsigned char proxy_header[PP2_HEADER_MAX + 1];
 	ssize_t n = 0;
 	int address_len = 0;
 
 	if (argc == 1)
-		n = read(STDIN_FILENO, proxy_header, MAX_HEADER_SIZE);
+		n = read(STDIN_FILENO, proxy_header, PP2_HEADER_MAX);
 	else if (argc == 2)
-		n = read_from_socket(argv[1], proxy_header, MAX_HEADER_SIZE);
+		n = read_from_socket(argv[1], proxy_header, PP2_HEADER_MAX);
 	else {
 		fprintf(stderr, "Usage: parse_proxy_v2 [port]\n");
 		return (1);
@@ -237,59 +234,68 @@ main(int argc, const char **argv)
 		fprintf(stdout,
 		    "ERROR:\tPROXY v1 parsing not supported in this tool.\n");
 		return (1);
-	} else if (memcmp(PROXY_V2_HEADER, proxy_header, 12) != 0) {
+	} else if (memcmp(PP2_SIG, proxy_header, sizeof PP2_SIG) != 0) {
 		printf("ERROR:\tNot a valid PROXY header\n");
 		return (1);
 	}
+
 	printf("PROXY v2 detected.\n");
-	switch (proxy_header[12]) {
-	case 0x20:
+	if ((proxy_header[12] & PP2_VERSION_MASK) != PP2_VERSION) {
+		printf("ERROR:\t13th byte has illegal version %02x\n",
+		    proxy_header[12]);
+		return (1);
+	}
+
+	switch (proxy_header[12] & PP2_CMD_MASK) {
+	case PP2_CMD_LOCAL:
 		printf("ERROR:\tLOCAL connection\n");
 		return (1);
-	case 0x21:
+	case PP2_CMD_PROXY:
 		printf("Connection:\tPROXYed connection detected\n");
 		break;
 	default:
-		printf("ERROR:\t13th byte has illegal value %d\n",
-		    (int)proxy_header[12]);
+		printf("ERROR:\t13th byte has illegal command %02x\n",
+		    proxy_header[12]);
 		return (1);
 	}
+
 	switch (proxy_header[13]) {
-	case 0x00:
+	case PP2_TRANS_UNSPEC|PP2_FAM_UNSPEC:
 		printf("ERROR:\tProtocol:\tUnspecified/unsupported\n");
 		return (1);
-	case 0x11:
+	case PP2_TRANS_STREAM|PP2_FAM_INET:
 		printf("Protocol:\tTCP over IPv4\n");
 		address_len = 12;
 		break;
-	case 0x12:
+	case PP2_TRANS_DGRAM|PP2_FAM_INET:
 		printf("Protocol:\tUDP over IPv4\n");
 		printf("ERROR:\tProtocol unsupported in hitch seen\n");
 		address_len = 12;
 		break;
-	case 0x21:
+	case PP2_TRANS_STREAM|PP2_FAM_INET6:
 		printf("Protocol:\tTCP over IPv6\n");
 		address_len = 36;
 		break;
-	case 0x22:
+	case PP2_TRANS_DGRAM|PP2_FAM_INET6:
 		printf("Protocol:\tUDP over IPv6\n");
 		printf("ERROR:\tProtocol unsupported in hitch\n");
 		address_len = 36;
 		break;
-	case 0x31:
+	case PP2_FAM_UNIX|PP2_TRANS_STREAM:
 		printf("Protocol:\tUNIX stream\n");
 		address_len = 216;
 		break;
-	case 0x32:
+	case PP2_FAM_UNIX|PP2_TRANS_DGRAM:
 		printf("Protocol:\tUNIX datagram\n");
 		printf("ERROR:\tProtocol unsupported in hitch\n");
 		address_len = 216;
 		break;
 	default:
-		printf("ERROR:\t14th byte has illegal value %d\n",
-		    (int)proxy_header[13]);
+		printf("ERROR:\t14th byte has illegal value %02x\n",
+		    proxy_header[13]);
 		return (1);
 	}
+
 	int additional_len = (proxy_header[14] << 8) + proxy_header[15];
 	if (additional_len < address_len) {
 		printf("ERROR:\tThe the total header length %d does"

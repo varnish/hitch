@@ -24,6 +24,7 @@ nobase_noinst_HEADERS = \
 	hssl_locks.h \
 	logging.h \
 	ocsp.h \
+	proxyv2.h \
 	ringbuffer.h \
 	shctx.h \
 	ssl_err.h \
