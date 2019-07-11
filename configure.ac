@@ -35,11 +35,15 @@ AC_ARG_WITH([yacc],
 AC_ARG_ENABLE([documentation],
 	AS_HELP_STRING([--enable-documentation], [Build the documentation]),
 	[], [enable_documentation=no])
+AC_ARG_ENABLE([warnings],
+	AS_HELP_STRING([--enable-warnings], [Enable warnings]),
+	[], [enable_warnings=no])
 
 test "$with_lex" = yes && AC_PROG_LEX
 test "$with_yacc" = yes && AC_PROG_YACC
 
 AM_CONDITIONAL([ENABLE_DOCUMENTATION], [test "$enable_documentation" = yes])
+AM_CONDITIONAL([ENABLE_WARNINGS], [test "$enable_warnings" = yes])
 
 AM_COND_IF([ENABLE_DOCUMENTATION], [
 	AC_CHECK_PROGS(RST2MAN, [rst2man rst2man.py], [no])
@@ -163,10 +167,17 @@ AC_SUBST(SH_TESTS)
 
 dnl Desired CFLAGS
 HITCH_CHECK_FLAGS([HITCH_CFLAGS], [
-	-O2
 	-g
-	-Wall
-	-W
+	-O2
+])
+
+AM_COND_IF([ENABLE_WARNINGS], [
+	dnl XXX: expand developer warnings?
+	HITCH_CHECK_FLAGS([HITCH_CFLAGS], [
+		-Wall
+		-W
+		-Werror
+	])
 ])
 
 AC_SUBST([HITCH_CFLAGS])

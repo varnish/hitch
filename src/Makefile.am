@@ -49,7 +49,6 @@ libcfg_a_SOURCES = \
 	cfg_parser.y
 
 libcfg_a_CFLAGS = \
-	$(AM_CFLAGS) \
 	$(SSL_CFLAGS)
 
 libforeign_a_SOURCES = \
@@ -70,11 +69,10 @@ hitch_SOURCES = \
 	ringbuffer.c
 
 hitch_CFLAGS = \
-	$(AM_CFLAGS) \
+	$(HITCH_CFLAGS) \
 	$(SSL_CFLAGS) \
 	$(CRYPTO_CFLAGS) \
-	$(EV_CFLAGS) \
-	-Werror
+	$(EV_CFLAGS)
 
 hitch_LDADD = \
 	$(SSL_LIBS) \
