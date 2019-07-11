@@ -39,15 +39,15 @@ AC_ARG_ENABLE([documentation],
 test "$with_lex" = yes && AC_PROG_LEX
 test "$with_yacc" = yes && AC_PROG_YACC
 
-if test "$enable_documentation" = yes
-then
+AM_CONDITIONAL([ENABLE_DOCUMENTATION], [test "$enable_documentation" = yes])
+
+AM_COND_IF([ENABLE_DOCUMENTATION], [
 	AC_CHECK_PROGS(RST2MAN, [rst2man rst2man.py], [no])
 	if test "$RST2MAN" = no
 	then
 		AC_MSG_ERROR([rst2man is needed to build the documentation])
 	fi
-fi
-AM_CONDITIONAL([ENABLE_DOCUMENTATION], [test "$enable_documentation" = yes])
+])
 
 AC_CHECK_PROGS(SOCKSTAT, [lsof sockstat fstat], [no])
 if test "x$SOCKSTAT" = xno; then
