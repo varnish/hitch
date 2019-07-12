@@ -776,29 +776,40 @@ sni_try_lookup(SSL *ssl, const char *sni_key, const struct sni_name_s *sn_tab)
 static int
 sni_switch_ctx(SSL *ssl, int *al, void *data)
 {
-	const char *servername;
 	const struct frontend *fr = NULL;
+	const char *servername;
+	char *sni_key;
 	int lookup_global = 1;
 	int sni_nomatch_abort = CONFIG->SNI_NOMATCH_ABORT;
 
+	AN(ssl);
 	(void)al;
 	if (data != NULL)
 		CAST_OBJ_NOTNULL(fr, data, FRONTEND_MAGIC);
 
 	servername = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
-	if (!servername)
+	if (servername == NULL)
 		return (SSL_TLSEXT_ERR_NOACK);
 
+	sni_key = strdup(servername);
+	AN(sni_key);
+
 	if (fr != NULL) {
-		if (sni_try_lookup(ssl, servername, fr->sni_names))
+		if (sni_try_lookup(ssl, sni_key, fr->sni_names)) {
+			free(sni_key);
 			return (SSL_TLSEXT_ERR_OK);
+		}
 		lookup_global = fr->match_global_certs;
 		if (fr->sni_nomatch_abort != -1)
 			sni_nomatch_abort = fr->sni_nomatch_abort;
 	}
 
-	if (lookup_global && sni_try_lookup(ssl, servername, sni_names))
+	if (lookup_global && sni_try_lookup(ssl, sni_key, sni_names)) {
+		free(sni_key);
 		return (SSL_TLSEXT_ERR_OK);
+	}
+
+	free(sni_key);
 
 	/* No matching certs */
 	if (sni_nomatch_abort)
