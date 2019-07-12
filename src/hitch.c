@@ -751,6 +751,24 @@ sni_lookup(const char *sni_key, const sni_name *sn_tab)
 	return (NULL);
 }
 
+static int
+sni_try_lookup(SSL *ssl, const char *sni_key, const struct sni_name_s *sn_tab)
+{
+	const sslctx *sc;
+
+	AN(ssl);
+	AN(sni_key);
+	CHECK_OBJ_NOTNULL(sn_tab, SNI_NAME_MAGIC);
+
+	sc = sni_lookup(sni_key, sn_tab);
+	if (sc == NULL)
+		return (0);
+
+	CHECK_OBJ(sc, SSLCTX_MAGIC);
+	SSL_set_SSL_CTX(ssl, sc->ctx);
+	return (1);
+}
+
 /*
  * Switch the context of the current SSL object to the most appropriate one
  * based on the SNI header
@@ -759,7 +777,6 @@ static int
 sni_switch_ctx(SSL *ssl, int *al, void *data)
 {
 	const char *servername;
-	const sslctx *sc;
 	const struct frontend *fr = NULL;
 	int lookup_global = 1;
 	int sni_nomatch_abort = CONFIG->SNI_NOMATCH_ABORT;
@@ -772,25 +789,16 @@ sni_switch_ctx(SSL *ssl, int *al, void *data)
 	if (!servername)
 		return (SSL_TLSEXT_ERR_NOACK);
 
-#define TRY_SNI_MATCH(sn_tab)					\
-	do {							\
-		sc = sni_lookup(servername, (sn_tab));		\
-		if (sc != NULL) {				\
-			CHECK_OBJ_NOTNULL(sc, SSLCTX_MAGIC);	\
-			SSL_set_SSL_CTX(ssl, sc->ctx);		\
-			return (SSL_TLSEXT_ERR_OK);		\
-		}						\
-	} while (0)
-
 	if (fr != NULL) {
-		TRY_SNI_MATCH(fr->sni_names);
+		if (sni_try_lookup(ssl, servername, fr->sni_names))
+			return (SSL_TLSEXT_ERR_OK);
 		lookup_global = fr->match_global_certs;
 		if (fr->sni_nomatch_abort != -1)
 			sni_nomatch_abort = fr->sni_nomatch_abort;
 	}
 
-	if (lookup_global)
-		TRY_SNI_MATCH(sni_names);
+	if (lookup_global && sni_try_lookup(ssl, servername, sni_names))
+		return (SSL_TLSEXT_ERR_OK);
 
 	/* No matching certs */
 	if (sni_nomatch_abort)
