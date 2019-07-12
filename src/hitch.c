@@ -725,24 +725,26 @@ sni_match(const sni_name *sn, const char *srvname)
 	}
 }
 
-static sslctx *
-sni_lookup(const char *servername, const sni_name *sn_tab)
+static const sslctx *
+sni_lookup(const char *sni_key, const sni_name *sn_tab)
 {
 	const sni_name *sn;
 
-	HASH_FIND_STR(sn_tab, servername, sn);
+	AN(sni_key);
+	CHECK_OBJ_NOTNULL(sn_tab, SNI_NAME_MAGIC);
+
+	HASH_FIND_STR(sn_tab, sni_key, sn);
 	if (sn == NULL) {
 		char *s;
 		/* attempt another lookup for wildcard matches */
-		s = strchr(servername, '.');
-		if (s != NULL) {
+		s = strchr(sni_key, '.');
+		if (s != NULL)
 			HASH_FIND_STR(sn_tab, s, sn);
-		}
 	}
 
 	if (sn != NULL) {
 		CHECK_OBJ_NOTNULL(sn, SNI_NAME_MAGIC);
-		if (sni_match(sn, servername))
+		if (sni_match(sn, sni_key))
 			return (sn->sctx);
 	}
 
@@ -757,7 +759,7 @@ static int
 sni_switch_ctx(SSL *ssl, int *al, void *data)
 {
 	const char *servername;
-	sslctx *sc;
+	const sslctx *sc;
 	const struct frontend *fr = NULL;
 	int lookup_global = 1;
 	int sni_nomatch_abort = CONFIG->SNI_NOMATCH_ABORT;
