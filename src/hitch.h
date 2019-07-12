@@ -97,6 +97,7 @@ typedef struct sni_name_s {
 	unsigned		magic;
 #define SNI_NAME_MAGIC		0xb0626581
 	char			*servername;
+	char			*sni_key;
 	sslctx			*sctx;
 	int			is_wildcard;
 	VTAILQ_ENTRY(sni_name_s)	list;

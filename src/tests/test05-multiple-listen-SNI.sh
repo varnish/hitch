@@ -42,3 +42,6 @@ subj_name_eq "default.example.com" cfg-no-sni.dump
 
 s_client -servername site1.example.com >cfg-sni.dump
 subj_name_eq "site1.example.com" cfg-sni.dump
+
+s_client -servername SITE1.EXAMPLE.COM >cfg-sni-upper.dump
+subj_name_eq "site1.example.com" cfg-sni-upper.dump

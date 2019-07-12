@@ -716,12 +716,12 @@ static int
 sni_match(const sni_name *sn, const char *srvname)
 {
 	if (!sn->is_wildcard)
-		return (strcasecmp(srvname, sn->servername) == 0);
+		return (strcasecmp(srvname, sn->sni_key) == 0);
 	else {
 		char *s = strchr(srvname, '.');
 		if (s == NULL)
 			return (0);
-		return (strcasecmp(s, sn->servername + 1) == 0);
+		return (strcasecmp(s, sn->sni_key + 1) == 0);
 	}
 }
 
@@ -769,6 +769,22 @@ sni_try_lookup(SSL *ssl, const char *sni_key, const struct sni_name_s *sn_tab)
 	return (1);
 }
 
+char *
+sni_build_key(const char *servername)
+{
+	char *key, *c;
+
+	if (servername == NULL)
+		return (NULL);
+
+	AN(servername);
+	key = strdup(servername);
+
+	for (c = key; *c != '\0'; c++)
+		*c = tolower(*c);
+	return (key);
+}
+
 /*
  * Switch the context of the current SSL object to the most appropriate one
  * based on the SNI header
@@ -791,7 +807,7 @@ sni_switch_ctx(SSL *ssl, int *al, void *data)
 	if (servername == NULL)
 		return (SSL_TLSEXT_ERR_NOACK);
 
-	sni_key = strdup(servername);
+	sni_key = sni_build_key(servername);
 	AN(sni_key);
 
 	if (fr != NULL) {
@@ -839,6 +855,7 @@ sctx_free(sslctx *sc, sni_name **sn_tab)
 		if (sn_tab != NULL)
 			HASH_DEL(*sn_tab, sn);
 		free(sn->servername);
+		free(sn->sni_key);
 		FREE_OBJ(sn);
 	}
 
@@ -1078,9 +1095,10 @@ insert_sni_names(sslctx *sc, sni_name **sn_tab)
 
 	VTAILQ_FOREACH(sn, &sc->sni_list, list) {
 		CHECK_OBJ_NOTNULL(sn, SNI_NAME_MAGIC);
-		key = sn->servername;
+		key = sn->sni_key;
+		AN(key);
 		if (sn->is_wildcard)
-			key = sn->servername + 1;
+			key = sn->sni_key + 1;
 		HASH_FIND_STR(*sn_tab, key, sn2);
 		if (sn2 != NULL) {
 			ERR("Warning: SNI name '%s' from '%s' overridden"
@@ -1116,6 +1134,7 @@ load_cert_ctx(sslctx *so)
 			(unsigned char **)&sn->servername, asn1_str);	\
 		sn->is_wildcard =					\
 		    (strstr(sn->servername, "*.") == sn->servername);	\
+		sn->sni_key = sni_build_key(sn->servername);		\
 		sn->sctx = so;						\
 		VTAILQ_INSERT_TAIL(&so->sni_list, sn, list);		\
 	} while (0)
