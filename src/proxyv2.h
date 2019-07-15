@@ -70,7 +70,7 @@ struct pp2_tlv {
 	uint8_t	type;
 	uint8_t	length_hi;
 	uint8_t	length_lo;
-	uint8_t	value[0];
+	uint8_t	value[];
 };
 
 #define PP2_TYPE_ALPN		0x01
@@ -97,7 +97,7 @@ struct pp2_tlv {
 struct pp2_tlv_ssl {
 	uint8_t		client;
 	uint32_t	verify;
-	struct pp2_tlv	sub_tlv[0];
+	struct pp2_tlv	sub_tlv[];
 };
 
 #define PP2_CLIENT_SSL		0x01
