@@ -857,6 +857,7 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	EVP_PKEY *pkey;
 	int selected_protos = CONFIG->SELECTED_TLS_PROTOS;
 	char *ciphers = CONFIG->CIPHER_SUITE;
+	char *ciphers_v3 = CONFIG->CIPHER_SUITE_V3;
 	int pref_srv_ciphers = CONFIG->PREFER_SERVER_CIPHERS;
 
 	if (fa != NULL) {
@@ -865,6 +866,8 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 			selected_protos = fa->selected_protos;
 		if (fa->ciphers != NULL)
 			ciphers = fa->ciphers;
+		if (fa->ciphers_v3 != NULL)
+			ciphers_v3 = fa->ciphers_v3;
 		if (fa->prefer_server_ciphers != -1)
 			pref_srv_ciphers = fa->prefer_server_ciphers;
 	}
@@ -913,6 +916,17 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 			return (NULL);
 		}
 	}
+
+#ifdef SSL_OP_NO_TLSv1_3
+	if (ciphers_v3 != NULL) {
+		if (SSL_CTX_set_ciphersuites(ctx, ciphers_v3) != 1) {
+			log_ssl_error(NULL, "{core} SSL_CTX_set_ciphersuites");
+			return (NULL);
+		}
+	}
+#else
+	(void)ciphers_v3;
+#endif
 
 	if (pref_srv_ciphers)
 		SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);

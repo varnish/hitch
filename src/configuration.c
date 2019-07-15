@@ -40,6 +40,8 @@
 
 // BEGIN: configuration parameters
 #define CFG_CIPHERS "ciphers"
+#define CFG_CIPHERS_V3 "ciphers_v3"
+#define CFG_PARAM_CIPHERS_V3 48174
 #define CFG_SSL_ENGINE "ssl-engine"
 #define CFG_PREFER_SERVER_CIPHERS "prefer-server-ciphers"
 #define CFG_BACKEND "backend"
@@ -100,6 +102,9 @@
 
 #define CFG_DEFAULT_CIPHERS \
 	"EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH"
+
+#define CFG_DEFAULT_CIPHERS_V3 \
+	"TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256"
 
 extern FILE *yyin;
 extern int yyparse(hitch_config *);
@@ -202,6 +207,7 @@ config_new(void)
 	r->BACK_PORT			= strdup("8000");
 	r->NCORES			= 1;
 	r->CIPHER_SUITE			= strdup(CFG_DEFAULT_CIPHERS);
+	r->CIPHER_SUITE_V3		= strdup(CFG_DEFAULT_CIPHERS_V3);
 	r->ENGINE			= NULL;
 	r->BACKLOG			= 100;
 	r->SNI_NOMATCH_ABORT		= 0;
@@ -291,6 +297,7 @@ config_destroy(hitch_config *cfg)
 		cfg_cert_file_free(&cfg->CERT_DEFAULT);
 
 	free(cfg->CIPHER_SUITE);
+	free(cfg->CIPHER_SUITE_V3);
 	free(cfg->ENGINE);
 	free(cfg->PIDFILE);
 	free(cfg->OCSP_DIR);
@@ -636,6 +643,16 @@ cfg_cert_add(struct cfg_cert_file *cf, struct cfg_cert_file **dst)
 	HASH_ADD_KEYPTR(hh, *dst, cf->filename, strlen(cf->filename), cf);
 }
 
+int
+tlsv1_3_enabled(void)
+{
+#ifdef SSL_OP_NO_TLSv1_3
+	return (1);
+#else
+	return (0);
+#endif
+}
+
 #ifdef USE_SHARED_CACHE
 /* Parse mcast and ttl options */
 static int
@@ -828,6 +845,10 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 	} else if (strcmp(k, CFG_CIPHERS) == 0) {
 		if (strlen(v) > 0) {
 			config_assign_str(&cfg->CIPHER_SUITE, v);
+		}
+	} else if (strcmp(k, CFG_CIPHERS_V3) == 0) {
+		if (strlen(v) > 0) {
+			config_assign_str(&cfg->CIPHER_SUITE_V3, v);
 		}
 	} else if (strcmp(k, CFG_SSL_ENGINE) == 0) {
 		if (strlen(v) > 0) {
@@ -1202,7 +1223,8 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "\n");
 	fprintf(out, "      --tls                   TLSv1 (default. No SSLv3)\n");
 	fprintf(out, "      --ssl                   SSLv3 (enables SSLv3)\n");
-	fprintf(out, "  -c  --ciphers=SUITE         Sets allowed ciphers (Default: \"%s\")\n", config_disp_str(cfg->CIPHER_SUITE));
+	fprintf(out, "  -c  --ciphers=SUITE         Sets allowed ciphers for TLSv1.1 and TLSv1.2 (Default: \"%s\")\n", config_disp_str(cfg->CIPHER_SUITE));
+	fprintf(out, "      --ciphers_v3=SUITE      Sets allowed ciphers for TLSv1.3 (Default: \"%s\")\n", config_disp_str(cfg->CIPHER_SUITE_V3));
 	fprintf(out, "  -e  --ssl-engine=NAME       Sets OpenSSL engine (Default: \"%s\")\n", config_disp_str(cfg->ENGINE));
 	fprintf(out, "  -O  --prefer-server-ciphers Prefer server list order\n");
 	fprintf(out, "\n");
@@ -1366,6 +1388,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 		{ "ssl", 0, &ssl, 1},
 		{ "client", 0, &client, 1},
 		{ CFG_CIPHERS, 1, NULL, 'c' },
+		{ CFG_CIPHERS_V3, 1, NULL, CFG_PARAM_CIPHERS_V3 },
 		{ CFG_PREFER_SERVER_CIPHERS, 0, NULL, 'O' },
 		{ CFG_BACKEND, 1, NULL, 'b' },
 		{ CFG_FRONTEND, 1, NULL, 'f' },
@@ -1469,6 +1492,7 @@ CFG_ARG(CFG_PARAM_SEND_BUFSIZE, CFG_SEND_BUFSIZE);
 CFG_ARG(CFG_PARAM_RECV_BUFSIZE, CFG_RECV_BUFSIZE);
 CFG_ARG(CFG_PARAM_ALPN_PROTOS, CFG_ALPN_PROTOS);
 CFG_ARG('c', CFG_CIPHERS);
+CFG_ARG(CFG_PARAM_CIPHERS_V3, CFG_CIPHERS_V3);
 CFG_ARG('e', CFG_SSL_ENGINE);
 CFG_ARG('b', CFG_BACKEND);
 CFG_ARG('f', CFG_FRONTEND);

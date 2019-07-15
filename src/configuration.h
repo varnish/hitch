@@ -87,6 +87,7 @@ struct front_arg {
 	int			sni_nomatch_abort;
 	int			prefer_server_ciphers;
 	char			*ciphers;
+	char			*ciphers_v3;
 	int			selected_protos;
 	int			mark;
 	UT_hash_handle		hh;
@@ -117,6 +118,7 @@ struct __hitch_config {
 	struct cfg_cert_file	*CERT_FILES;
 	struct cfg_cert_file	*CERT_DEFAULT;
 	char			*CIPHER_SUITE;
+	char			*CIPHER_SUITE_V3;
 	char			*ENGINE;
 	int			BACKLOG;
 #ifdef USE_SHARED_CACHE

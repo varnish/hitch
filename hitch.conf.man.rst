@@ -85,6 +85,8 @@ Chroot directory
 ciphers = ...
 -------------
 
+For TLSv1.1 and TLSv1.2 connections. For TLSv1.3, see ciphers_v3.
+
 List of ciphers to use in the secure communication. Refer to the
 OpenSSL documentation for a complete list of supported ciphers.
 
@@ -94,6 +96,18 @@ the example file below) or to pay close attention to security advisories
 related OpenSSL's ciphers.
 
 This option is also available in frontend blocks.
+
+ciphers_v3 = ...
+----------------
+
+See ciphers.
+
+For TLSv1.3 connections, an independent list of ciphers is used. This list
+is made of new ciphers, which are not accepted by TLS1.1 and TLS1.2 and
+vica-versa, the old ciphers of TLS1.1 and TLS1.2 are not accepted by TLSv1.3
+
+To use TLSv1.1, TLSv1.2 along with TLSv1.3, both cipers and ciphers_v3 needs to be
+changed, if the default values are not desired.
 
 daemon = on|off
 ---------------

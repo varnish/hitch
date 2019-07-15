@@ -34,6 +34,10 @@ set of ciphers that suits your needs.
 
 Normally you do not have to change this.
 
+TLSv1.3 uses an indepentent list of ciphers, use ``ciphers_v3`` to change the default value:
+
+    "TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256"
+
 ## Using multiple certificates
 
 To add multiple certificates to the hitch config, simply specify multiple ``pem-file``

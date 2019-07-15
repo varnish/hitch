@@ -26,6 +26,7 @@ void cfg_cert_file_free(struct cfg_cert_file **cfptr);
 int cfg_cert_vfy(struct cfg_cert_file *cf);
 void yyerror(hitch_config *, const char *);
 void cfg_cert_add(struct cfg_cert_file *cf, struct cfg_cert_file **dst);
+int tlsv1_3_enabled(void);
 
 static struct front_arg *cur_fa;
 static struct cfg_cert_file *cur_pem;
@@ -58,7 +59,7 @@ extern char input_line[512];
 %token TOK_SESSION_CACHE TOK_SHARED_CACHE_LISTEN TOK_SHARED_CACHE_PEER
 %token TOK_SHARED_CACHE_IF TOK_PRIVATE_KEY TOK_BACKEND_REFRESH
 %token TOK_OCSP_REFRESH_INTERVAL TOK_PEM_DIR TOK_PEM_DIR_GLOB
-%token TOK_LOG_LEVEL TOK_PROXY_TLV TOK_PROXY_AUTHORITY TOK_TFO
+%token TOK_LOG_LEVEL TOK_PROXY_TLV TOK_PROXY_AUTHORITY TOK_TFO TOK_CIPHERS_V3
 
 %parse-param { hitch_config *cfg }
 
@@ -77,6 +78,7 @@ CFG_RECORD
 	| BACKEND_REC
 	| PEM_FILE_REC
 	| CIPHERS_REC
+	| CIPHERS_V3_REC
 	| TLS_REC
 	| SSL_REC
 	| TLS_PROTOS_REC
@@ -153,6 +155,7 @@ FB_REC
 	| FB_SSL
 	| FB_TLS_PROTOS
 	| FB_CIPHERS
+	| FB_CIPHERS_V3
 	| FB_PREF_SRV_CIPH
 	;
 
@@ -334,6 +337,18 @@ FB_CIPHERS: TOK_CIPHERS '=' STRING {
 	if ($3) cur_fa->ciphers = strdup($3);
 };
 
+FB_CIPHERS_V3: TOK_CIPHERS_V3 '=' STRING {
+	if ($3) {
+		if (!tlsv1_3_enabled()) {
+			fprintf(stderr, "TLSv1.3 ciphers have been specified, but"
+				" the installed OpenSSL version does not support TLSv1.3. "
+				"for '%s'\n", input_line);
+			YYABORT;
+		}
+		cur_fa->ciphers_v3 = strdup($3);
+	}
+};
+
 FB_PREF_SRV_CIPH: TOK_PREFER_SERVER_CIPHERS '=' BOOL {
 	cur_fa->prefer_server_ciphers = $3;
 };
@@ -397,7 +412,14 @@ TLS_PROTO
 	| TOK_TLSv1_0 { cfg->SELECTED_TLS_PROTOS |= TLSv1_0_PROTO; }
 	| TOK_TLSv1_1 { cfg->SELECTED_TLS_PROTOS |= TLSv1_1_PROTO; }
 	| TOK_TLSv1_2 { cfg->SELECTED_TLS_PROTOS |= TLSv1_2_PROTO; }
-	| TOK_TLSv1_3 { cfg->SELECTED_TLS_PROTOS |= TLSv1_3_PROTO; };
+	| TOK_TLSv1_3 {
+	if (!tlsv1_3_enabled()) {
+		fprintf(stderr, "TLSv1.3 has been enabled, but the installed OpenSSL "
+			"version does not support it. for '%s'\n", input_line);
+		YYABORT;
+	}
+	cfg->SELECTED_TLS_PROTOS |= TLSv1_3_PROTO;
+};
 
 SSL_ENGINE_REC: TOK_SSL_ENGINE '=' STRING { if ($3) cfg->ENGINE = strdup($3); };
 
@@ -452,6 +474,17 @@ SNI_NOMATCH_ABORT_REC : TOK_SNI_NOMATCH_ABORT '=' BOOL {
 };
 
 CIPHERS_REC: TOK_CIPHERS '=' STRING { if ($3) cfg->CIPHER_SUITE = strdup($3); };
+CIPHERS_V3_REC: TOK_CIPHERS_V3 '=' STRING {
+	if ($3) {
+		if (!tlsv1_3_enabled()) {
+			fprintf(stderr, "TLSv1.3 ciphers have been specified, but"
+				" the installed OpenSSL version does not support TLSv1.3. "
+				"for '%s'\n", input_line);
+			YYABORT;
+		}
+		cfg->CIPHER_SUITE_V3 = strdup($3);
+	}
+};
 
 USER_REC: TOK_USER '=' STRING {
 	/* XXX: passing an empty string for file */
