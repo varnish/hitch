@@ -189,6 +189,8 @@ HITCH_CHECK_FUNC([X509_NAME_ENTRY_get_data], [$CRYPTO_LIBS], [
 		[OpenSSL has X509_NAME_ENTRY_get_data()])
 ])
 
+AC_CHECK_MEMBERS([struct ssl_st.s3], [], [], [[#include <openssl/ssl.h>]])
+
 SH_TESTS="$(cd $srcdir/src && echo tests/test*.sh)"
 AC_SUBST(SH_TESTS)
 

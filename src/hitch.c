@@ -2132,7 +2132,7 @@ static void end_handshake(proxystate *ps) {
 #endif
 	LOGPROXY(ps,"ssl end handshake\n");
 	/* Disable renegotiation (CVE-2009-3555) */
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#ifdef HAVE_STRUCT_SSL_ST_S3
 	/* For OpenSSL 1.1, setting the following flag does not seem
 	 * to be possible. This is OK, since SSLv3 negotiation will
 	 * not happen in OpenSSL 0.9.8m or later unless
