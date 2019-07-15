@@ -1588,11 +1588,11 @@ CFG_ON('s', CFG_SYSLOG);
 			    " Negotiated protocol will be communicated to the"
 			    " backend.\n");
 		*/
-#ifndef OPENSSL_WITH_ALPN
+#  ifndef OPENSSL_WITH_ALPN
 		fprintf(stderr, ALPN_NPN_PREFIX_STR " Warning: Hitch has been"
 		    " compiled against a version of OpenSSL without ALPN"
 		    " support.\n");
-#endif
+#  endif
 #else
 		/* No support for ALPN / NPN support in OpenSSL */
 		if (multi_proto ||
