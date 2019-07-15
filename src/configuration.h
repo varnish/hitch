@@ -13,16 +13,9 @@
 
 #include "foreign/uthash.h"
 
-/* Is NPN available? See openssl/opensslv.h for explanation. */
-#ifndef OPENSSL_NO_NEXTPROTONEG
-#  if OPENSSL_VERSION_NUMBER >= 0x1000100fL
-#    define OPENSSL_WITH_NPN
-#  endif
-#endif
-
-/* Is ALPN available? See openssl/opensslv.h for explanation. */
-#if OPENSSL_VERSION_NUMBER >= 0x1000200fL
-#  define OPENSSL_WITH_ALPN
+/* This macro disables NPN even in openssl/ssl.h */
+#ifdef OPENSSL_NO_NEXTPROTONEG
+#  undef OPENSSL_WITH_NPN
 #endif
 
 #ifdef OPENSSL_WITH_ALPN

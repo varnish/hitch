@@ -162,6 +162,14 @@ fi
 AC_CHECK_HEADERS([linux/futex.h])
 AM_CONDITIONAL([HAVE_LINUX_FUTEX], [test $ac_cv_header_linux_futex_h = yes])
 
+HITCH_CHECK_FUNC([SSL_get0_alpn_selected], [$SSL_LIBS], [
+	AC_DEFINE([OPENSSL_WITH_ALPN], [1], [OpenSSL supports ALPN])
+])
+
+HITCH_CHECK_FUNC([SSL_get0_next_proto_negotiated], [$SSL_LIBS], [
+	AC_DEFINE([OPENSSL_WITH_NPN], [1], [OpenSSL supports NPN])
+])
+
 SH_TESTS="$(cd $srcdir/src && echo tests/test*.sh)"
 AC_SUBST(SH_TESTS)
 
