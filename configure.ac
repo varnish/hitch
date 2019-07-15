@@ -170,8 +170,23 @@ HITCH_CHECK_FUNC([SSL_get0_next_proto_negotiated], [$SSL_LIBS], [
 	AC_DEFINE([OPENSSL_WITH_NPN], [1], [OpenSSL supports NPN])
 ])
 
+HITCH_CHECK_FUNC([SSL_CTX_get_default_passwd_cb], [$SSL_LIBS], [
+	AC_DEFINE([HAVE_SSL_CTX_GET_DEFAULT_PASSWD_CB], [1],
+		[OpenSSL has SSL_CTX_get_default_passwd_cb()])
+])
+
+HITCH_CHECK_FUNC([SSL_CTX_get_default_passwd_cb_userdata], [$SSL_LIBS], [
+	AC_DEFINE([HAVE_SSL_CTX_GET_DEFAULT_PASSWD_CB_USERDATA], [1],
+		[OpenSSL has SSL_CTX_get_default_passwd_cb_userdata()])
+])
+
 HITCH_CHECK_FUNC([CRYPTO_get_locking_callback], [$CRYPTO_LIBS], [
 	AC_DEFINE([OPENSSL_WITH_LOCKS], [1], [OpenSSL needs explicit locking])
+])
+
+HITCH_CHECK_FUNC([X509_NAME_ENTRY_get_data], [$CRYPTO_LIBS], [
+	AC_DEFINE([HAVE_X509_NAME_ENTRY_GET_DATA], [1],
+		[OpenSSL has X509_NAME_ENTRY_get_data()])
 ])
 
 SH_TESTS="$(cd $srcdir/src && echo tests/test*.sh)"

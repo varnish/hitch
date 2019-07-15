@@ -107,6 +107,19 @@
 #endif
 #endif
 
+#ifndef HAVE_SSL_CTX_GET_DEFAULT_PASSWD_CB
+#  define SSL_CTX_get_default_passwd_cb(ctx) ((ctx)->default_passwd_callback)
+#endif
+
+#ifndef HAVE_SSL_CTX_GET_DEFAULT_PASSWD_CB_USERDATA
+#  define SSL_CTX_get_default_passwd_cb_userdata(ctx) \
+	((ctx)->default_passwd_callback_userdata)
+#endif
+
+#ifndef HAVE_X509_NAME_ENTRY_GET_DATA
+#  define X509_NAME_ENTRY_get_data(entry) ((entry)->value)
+#endif
+
 /* logging.c */
 extern FILE *logfile;
 extern struct stat logf_st;
@@ -694,10 +707,6 @@ load_privatekey(SSL_CTX *ctx, const char *file)
 		return NULL;
 	}
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
-#define SSL_CTX_get_default_passwd_cb(ctx) (ctx->default_passwd_callback)
-#define SSL_CTX_get_default_passwd_cb_userdata(ctx) (ctx->default_passwd_callback_userdata)
-#endif
 	pkey = PEM_read_bio_PrivateKey(bio, NULL,
 	    SSL_CTX_get_default_passwd_cb(ctx),
 	    SSL_CTX_get_default_passwd_cb_userdata(ctx));
@@ -1176,9 +1185,6 @@ load_cert_ctx(sslctx *so)
 		return (1);
 	}
 	x509_entry = X509_NAME_get_entry(x509_name, i);
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-#define X509_NAME_ENTRY_get_data(e) (e->value)
-#endif
 	AN(x509_entry);
 	PUSH_CTX(X509_NAME_ENTRY_get_data(x509_entry), ctx);
 
