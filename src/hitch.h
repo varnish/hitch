@@ -50,9 +50,9 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
-#include "asn_gentm.h"
 #include "configuration.h"
 #include "ringbuffer.h"
+#include "foreign/asn_gentm.h"
 #include "foreign/miniobj.h"
 #include "foreign/vas.h"
 #include "foreign/vsb.h"

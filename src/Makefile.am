@@ -17,7 +17,6 @@ TESTS = @SH_TESTS@
 TEST_EXTENSIONS = .sh
 
 nobase_noinst_HEADERS = \
-	asn_gentm.h \
 	configuration.h \
 	hitch.h \
 	hssl_locks.h \
@@ -28,6 +27,7 @@ nobase_noinst_HEADERS = \
 	shctx.h \
 	ssl_err.h \
 	sysl_tbl.h \
+	foreign/asn_gentm.h \
 	foreign/flopen.h \
 	foreign/miniobj.h \
 	foreign/uthash.h \
@@ -52,6 +52,7 @@ libcfg_a_CFLAGS = \
 	$(SSL_CFLAGS)
 
 libforeign_a_SOURCES = \
+	foreign/asn_gentm.c \
 	foreign/flopen.c \
 	foreign/vas.c \
 	foreign/vpf.c \
@@ -60,7 +61,6 @@ libforeign_a_SOURCES = \
 
 
 hitch_SOURCES = \
-	asn_gentm.c \
 	configuration.c \
 	hitch.c \
 	hssl_locks.c \
