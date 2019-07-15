@@ -55,6 +55,7 @@
 #include "foreign/asn_gentm.h"
 #include "foreign/miniobj.h"
 #include "foreign/vas.h"
+#include "foreign/vqueue.h"
 #include "foreign/vsb.h"
 
 

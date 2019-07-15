@@ -11,7 +11,6 @@
 #include <sys/types.h>
 #include <openssl/ssl.h>
 
-#include "foreign/vqueue.h"
 #include "foreign/uthash.h"
 
 /* Is NPN available? See openssl/opensslv.h for explanation. */
