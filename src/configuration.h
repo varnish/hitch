@@ -35,12 +35,10 @@
 #endif
 
 #ifdef USE_SHARED_CACHE
-  #include "shctx.h"
-
-  #ifndef MAX_SHCUPD_PEERS
-    #define MAX_SHCUPD_PEERS 15
-  #endif
-
+#  include "shctx.h"
+#  ifndef MAX_SHCUPD_PEERS
+#    define MAX_SHCUPD_PEERS 15
+#  endif
 typedef struct shcupd_peer_opt {
 	char *ip;
 	char *port;
