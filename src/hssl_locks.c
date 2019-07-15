@@ -41,7 +41,7 @@
  * requires the application to set its own locking callbacks.
  */
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#ifdef OPENSSL_WITH_LOCKS
 
 static int num_locks = 0;
 static pthread_mutex_t *locks = NULL;
