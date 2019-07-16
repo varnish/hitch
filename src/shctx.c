@@ -171,14 +171,21 @@ shared_context_unlock(void)
 	(struct shared_session *)ebmb_lookup(&shctx->active.key.node.branches, \
 	    (k), SSL_MAX_SSL_SESSION_ID_LENGTH);
 
-/* Other Macros */
+/* Copy-with-padding Macros */
 
-#define shsess_set_key(s, k, l)						\
-	do {								\
-		memcpy((s)->key_data, (k), (l));			\
-		if ((l) < SSL_MAX_SSL_SESSION_ID_LENGTH)		\
-			memset((s)->key_data + (l), 0,			\
-			    SSL_MAX_SSL_SESSION_ID_LENGTH - (l));	\
+#define shsess_memcpypad(dst, dlen, src, slen)			\
+	do {							\
+		assert((slen) <= (dlen));			\
+		memcpy((dst), (src), (slen));			\
+		if ((slen) < (dlen))				\
+			memset((char *)(dst) + (slen), 0,	\
+			    (dlen) - (slen));			\
+	} while (0)
+
+#define shsess_set_key(s, k, l)					\
+	do {							\
+		shsess_memcpypad((s)->key_data,			\
+		    SSL_MAX_SSL_SESSION_ID_LENGTH, (k), (l));	\
 	} while (0)
 
 /* SSL context callbacks */
@@ -228,12 +235,8 @@ shctx_new_cb(SSL *ssl, SSL_SESSION *sess)
 	shared_context_unlock();
 
 	if (shared_session_new_cbk) { /* if user level callback is set */
-
-		/* copy sessionid padded with 0 into the sessionid + data aligned buffer */
-		memcpy(encsess, key, keylen);
-		if (keylen < SSL_MAX_SSL_SESSION_ID_LENGTH)
-			memset(encsess+keylen, 0,
-			    SSL_MAX_SSL_SESSION_ID_LENGTH - keylen);
+		shsess_memcpypad(encsess, SSL_MAX_SSL_SESSION_ID_LENGTH,
+		    key, keylen);
 
 		shared_session_new_cbk(encsess,
 		    SSL_MAX_SSL_SESSION_ID_LENGTH + data_len,
@@ -254,7 +257,7 @@ shctx_get_cb(SSL *ssl, const unsigned char *key, int key_len, int *do_copy)
 {
 	struct shared_session *shsess;
 	unsigned char data[SHSESS_MAX_DATA_LEN], *p;
-	unsigned char tmpkey[SSL_MAX_SSL_SESSION_ID_LENGTH];
+	unsigned char padded_key[SSL_MAX_SSL_SESSION_ID_LENGTH];
 	unsigned data_len;
 	long cdate;
 	SSL_SESSION *sess;
@@ -264,17 +267,11 @@ shctx_get_cb(SSL *ssl, const unsigned char *key, int key_len, int *do_copy)
         /* allow the session to be freed automatically by openssl */
 	*do_copy = 0;
 
-	/* tree key is zeros padded sessionid */
-	if ( key_len < SSL_MAX_SSL_SESSION_ID_LENGTH ) {
-		memcpy(tmpkey, key, key_len);
-		memset(tmpkey + key_len, 0,
-		    SSL_MAX_SSL_SESSION_ID_LENGTH - key_len);
-		key = tmpkey;
-	}
+	shsess_memcpypad(padded_key, sizeof padded_key, key, (size_t)key_len);
 
 	shared_context_lock();
 
-	shsess = shsess_tree_lookup(key);
+	shsess = shsess_tree_lookup(padded_key);
 	if(shsess == NULL) {
 		shared_context_unlock();
 		return (NULL);
@@ -307,25 +304,18 @@ void
 shctx_remove_cb(SSL_CTX *ctx, SSL_SESSION *sess)
 {
 	struct shared_session *shsess;
-	unsigned char tmpkey[SSL_MAX_SSL_SESSION_ID_LENGTH];
+	unsigned char padded_key[SSL_MAX_SSL_SESSION_ID_LENGTH];
 	const unsigned char *key;
 	unsigned keylen;
 
 	AN(ctx);
 
 	key = SSL_SESSION_get_id(sess, &keylen);
-
-	/* tree key is zeros padded sessionid */
-	if (keylen < SSL_MAX_SSL_SESSION_ID_LENGTH) {
-		memcpy(tmpkey, key, keylen);
-		memset(tmpkey + keylen, 0,
-		    SSL_MAX_SSL_SESSION_ID_LENGTH - keylen);
-		key = tmpkey;
-	}
+	shsess_memcpypad(padded_key, sizeof padded_key, key, (size_t)keylen);
 
 	shared_context_lock();
 
-	shsess = shsess_tree_lookup(key);
+	shsess = shsess_tree_lookup(padded_key);
 	if (shsess != NULL)
 		shsess_set_free(shsess);
 
