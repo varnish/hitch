@@ -74,7 +74,7 @@ ringbuffer_read_next(ringbuffer *rb, int * length)
 {
 	assert(rb->used);
 	*length = rb->head->left;
-	return rb->head->ptr;
+	return (rb->head->ptr);
 }
 
 /* Mark consumption of only part of the read head buffer */
@@ -103,7 +103,7 @@ char *
 ringbuffer_write_ptr(ringbuffer *rb)
 {
 	assert(rb->used < rb->num_slots);
-	return rb->tail->data;
+	return (rb->tail->data);
 }
 
 /* Mark the tail appended for `length` bytes, and move the cursor
@@ -126,27 +126,27 @@ ringbuffer_write_append(ringbuffer *rb, int length)
 int
 ringbuffer_size(ringbuffer *rb)
 {
-    return rb->used;
+    return (rb->used);
 }
 
 /* Used size of the ringbuffer */
 int
 ringbuffer_capacity(ringbuffer *rb)
 {
-    return rb->num_slots;
+    return (rb->num_slots);
 }
 
 /* Is the ringbuffer completely empty (implies: no data to be written) */
 int
 ringbuffer_is_empty(ringbuffer *rb)
 {
-    return rb->used == 0;
+    return (rb->used == 0);
 }
 
 /* Is the ringbuffer completely full (implies: no more data should be read) */
 int
 ringbuffer_is_full(ringbuffer *rb)
 {
-    return rb->used == rb->num_slots;
+    return (rb->used == rb->num_slots);
 }
 

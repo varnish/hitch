@@ -44,11 +44,11 @@
 #include <sys/wait.h>  /* WAIT_PID */
 
 #ifdef __linux__
-#include <sys/prctl.h>
+#  include <sys/prctl.h>
 #endif
 
 #ifdef __sun
-#include <sys/filio.h>
+#  include <sys/filio.h>
 #endif
 
 #include <net/if.h>
@@ -84,27 +84,28 @@
 #include "foreign/vsa.h"
 
 #ifndef MSG_NOSIGNAL
-# define MSG_NOSIGNAL 0
+#  define MSG_NOSIGNAL 0
 #endif
 #ifndef AI_ADDRCONFIG
-# define AI_ADDRCONFIG 0
+#  define AI_ADDRCONFIG 0
 #endif
 
 /* For Mac OS X */
 #ifndef TCP_KEEPIDLE
-# ifdef TCP_KEEPALIVE
-#  define TCP_KEEPIDLE TCP_KEEPALIVE
-# endif
+#  ifdef TCP_KEEPALIVE
+#    define TCP_KEEPIDLE TCP_KEEPALIVE
+#  endif
 #endif
+
 #ifndef SOL_TCP
-# define SOL_TCP IPPROTO_TCP
+#  define SOL_TCP IPPROTO_TCP
 #endif
 
 /* Do we have SNI support? */
 #ifndef OPENSSL_NO_TLSEXT
-#ifndef SSL_CTRL_SET_TLSEXT_HOSTNAME
-#define OPENSSL_NO_TLSEXT
-#endif
+#  ifndef SSL_CTRL_SET_TLSEXT_HOSTNAME
+#    define OPENSSL_NO_TLSEXT
+#  endif
 #endif
 
 #ifndef HAVE_SSL_CTX_GET_DEFAULT_PASSWD_CB
@@ -124,7 +125,6 @@
 extern FILE *logfile;
 extern struct stat logf_st;
 extern time_t logf_check_t;
-
 
 /* Globals */
 struct ev_loop *loop;
@@ -341,7 +341,7 @@ static int init_ecdh(SSL_CTX *ctx) {
 #endif /* NID_X9_62_prime256v1 */
 #endif /* OPENSSL_NO_EC */
 
-	return 0;
+	return (0);
 }
 #endif /* OPENSSL_NO_DH */
 
@@ -375,7 +375,7 @@ static int npn_select_cb(SSL *ssl, const unsigned char **out,
 	*out = (unsigned char *) CONFIG->ALPN_PROTOS_LV;
 	*outlen = CONFIG->ALPN_PROTOS_LV_LEN;
 
-	return SSL_TLSEXT_ERR_OK;
+	return (SSL_TLSEXT_ERR_OK);
 }
 #endif
 
@@ -397,15 +397,15 @@ static int alpn_select_cb(SSL *ssl,
 	selected = SSL_select_next_proto((unsigned char **)out, outlen,
 	    CONFIG->ALPN_PROTOS_LV, CONFIG->ALPN_PROTOS_LV_LEN, in, inlen);
 	if (selected == OPENSSL_NPN_NEGOTIATED)
-		return SSL_TLSEXT_ERR_OK;
+		return (SSL_TLSEXT_ERR_OK);
 	else {
 		assert(selected == OPENSSL_NPN_NO_OVERLAP);
 		LOGPROXY(ps, "ALPN: no overlap in protocols.\n");
 		/* Here it is possible to add logging of which protocols
 		   the client wanted */
-		return SSL_TLSEXT_ERR_NOACK;
+		return (SSL_TLSEXT_ERR_NOACK);
 	}
-	return SSL_TLSEXT_ERR_NOACK;
+	return (SSL_TLSEXT_ERR_NOACK);
 }
 #endif
 
@@ -491,16 +491,16 @@ compute_secret(RSA *rsa, unsigned char *secret)
 
 	length = i2d_RSAPrivateKey(rsa, NULL);
 	if (length <= 0)
-		return -1;
+		return (-1);
 
 	p = buf = (unsigned char *)malloc(length*sizeof(unsigned char));
 	if (!buf)
-		return -1;
+		return (-1);
 
 	i2d_RSAPrivateKey(rsa,&p);
 	SHA1(buf, length, secret);
 	free(buf);
-	return 0;
+	return (0);
 }
 
 /* Create udp socket to receive and send updates */
@@ -690,7 +690,7 @@ create_shcupd_socket()
 	}
 
 	freeaddrinfo(ai);
-	return s;
+	return (s);
 }
 
 #endif /*USE_SHARED_CACHE */
@@ -704,7 +704,7 @@ load_privatekey(SSL_CTX *ctx, const char *file)
 	bio = BIO_new_file(file, "r");
 	if (!bio) {
 		log_ssl_error(NULL, "{core} BIO_new_file");
-		return NULL;
+		return (NULL);
 	}
 
 	pkey = PEM_read_bio_PrivateKey(bio, NULL,
@@ -714,7 +714,7 @@ load_privatekey(SSL_CTX *ctx, const char *file)
 
 	if (!pkey) {
 		log_ssl_error(NULL, "{core} PEM_read_bio_PrivateKey");
-		return NULL;
+		return (NULL);
 	}
 
 	return (pkey);
@@ -1562,7 +1562,7 @@ create_back_socket(struct backend *b)
 	int s = socket(addr->sa_family, SOCK_STREAM, 0);
 
 	if (s == -1)
-		return -1;
+		return (-1);
 
 	if (addr->sa_family != PF_UNIX) {
 		int flag = 1;
@@ -2084,11 +2084,11 @@ static int is_protocol_matching(const unsigned char *selected, unsigned len) {
 			    0 == memcmp(selected,
 				CONFIG->ALPN_PROTOS_LV + i + 1,
 				len))
-				return 1;
+				return (1);
 			i+= CONFIG->ALPN_PROTOS_LV[i] + 1;
 		}
 	}
-	return 0;
+	return (0);
 }
 
 static int is_alpn_shutdown_needed(proxystate *ps) {
@@ -2096,23 +2096,23 @@ static int is_alpn_shutdown_needed(proxystate *ps) {
 	unsigned alpn_len;
 
 	if (CONFIG->ALPN_PROTOS_LV == NULL)
-		return 0;
+		return (0);
 
 	get_alpn(ps, &alpn_tok, &alpn_len);
 	if (alpn_len == 0) {
 		/* If alpn / npn was tried, shut down */
 		if(ps->npn_alpn_tried) {
 			LOGPROXY(ps, "Unsuccessful NPN/ALPN negotiation\n");
-			return 1;
+			return (1);
 		} else
 			LOGPROXY(ps, "No NPN/ALPN negotiation happened.\n");
 	} else if (!is_protocol_matching(alpn_tok, alpn_len)) {
 		LOGPROXY(ps, "NPN: Unknown protocol selected\n");
-		return 1;
+		return (1);
 	} else
 		LOGPROXY(ps, "NPN/ALPN protocol: %.*s\n",
 		    alpn_len, alpn_tok);
-	return 0;
+	return (0);
 }
 #endif
 
@@ -2643,7 +2643,7 @@ Get_Sockaddr(const struct sockaddr *sa, socklen_t *sl)
 		*sl = 0;
 		return (NULL);
 	}
-	return sa;
+	return (sa);
 }
 
 static void

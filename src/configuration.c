@@ -135,7 +135,7 @@ config_error_set(char *fmt, ...)
 const char *
 config_error_get(void)
 {
-	return error_buf;
+	return (error_buf);
 }
 
 struct front_arg *
@@ -320,7 +320,7 @@ config_assign_str(char **dst, char *v)
 	assert(v != NULL);
 
 	if (strlen(v) <= 0)
-		return(NULL);
+		return (NULL);
 	if (*dst != NULL)
 		free(*dst);
 

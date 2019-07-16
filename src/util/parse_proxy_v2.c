@@ -115,7 +115,7 @@ read_from_socket(const char *port, unsigned char *buf, int len)
 	fprintf(stderr, "Read %zd bytes in recv\n", n);
 	close(sock);
 	close(listen_socket);
-	return n;
+	return (n);
 }
 
 void
@@ -320,7 +320,7 @@ main(int argc, const char **argv)
 		    " not implemented.\n");
 	}
 	if (address_len < additional_len)
-		return print_extensions(proxy_header + 16 + address_len,
-		    additional_len - address_len);
+		return (print_extensions(proxy_header + 16 + address_len,
+		    additional_len - address_len));
 	return (0);
 }
