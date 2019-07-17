@@ -309,6 +309,8 @@ TLSv1.3.
 
 The default is TLSv1.2 and TLSv1.3.
 
+Note: You need OpenSSL-1.1.1 to have TLSv1.3 working.
+
 There are two deprecated options, ssl= and tls=, that also select
 protocols. If "ssl=on" is used, then all protocols are selected. This
 is known to be insecure, and is strongly discouraged. If "tls=on" is
