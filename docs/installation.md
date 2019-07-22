@@ -17,12 +17,13 @@ Install prerequisites on Debian based systems:
 To install `hitch`:
 
     $ ./bootstrap   # if running from git
-    $ ./configure
     $ make
     $ sudo make install
 
 This will install Hitch to /usr/local/, unless you override the destination
-with ./configure --prefix=/foo (as usual)
+with ./bootstap --prefix=/foo (as usual)
+
+Note: ./bootstrap calls ./configure, and passes on its parameters.
 
 
 ## Installing from packages
