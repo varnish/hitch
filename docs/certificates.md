@@ -33,7 +33,7 @@ To complete this chain you merge the files into a single PEM file that you give 
 
 And then start Hitch:
 
-    $ hitch --backend=[127.0.0.1]:80 example.pem
+    $ hitch --backend='[127.0.0.1]:80' example.pem
 
 and you're done!
 

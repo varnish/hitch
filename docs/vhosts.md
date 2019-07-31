@@ -9,7 +9,7 @@ handshake decide which certificate to present to the client.
 *SNI example*:
 
 	$ ./hitch --backend=example.com:80 \
-		--frontend=[*]:443 \
+		--frontend='[*]:443' \
 		site1.example.com.pem site2.example.com.pem site3.example.com.pem
 
 Hitch will automatically try to find the best matching certificate to give to the client. The last
