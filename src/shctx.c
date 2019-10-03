@@ -74,18 +74,6 @@ cmpxchg(unsigned *ptr, unsigned old, unsigned new)
 }
 
 static inline unsigned char
-atomic_inc(unsigned *ptr)
-{
-	unsigned char ret;
-	__asm volatile("lock incl %0\n"
-		     "setne %1\n"
-		     : "+m" (*ptr), "=qm" (ret)
-		     :
-		     : "memory");
-	return (ret);
-}
-
-static inline unsigned char
 atomic_dec(unsigned *ptr)
 {
 	unsigned char ret;
