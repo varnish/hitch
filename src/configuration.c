@@ -1152,7 +1152,8 @@ config_disp_log_facility (int facility)
 int
 config_scan_pem_dir(char *pemdir, hitch_config *cfg)
 {
-	int n, i;
+	int n, i, plen;
+	int retval = 0;
 	struct dirent **d;
 
 	n = scandir(pemdir, &d, NULL, alphasort);
@@ -1163,7 +1164,9 @@ config_scan_pem_dir(char *pemdir, hitch_config *cfg)
 	}
 	for (i = 0; i < n; i++) {
 		struct cfg_cert_file *cert;
-		char fpath[PATH_MAX + NAME_MAX];
+		char *fpath;
+
+		plen = strlen(pemdir) + strlen(d[i]->d_name) + 1;
 
 		if (cfg->PEM_DIR_GLOB != NULL) {
 			if (fnmatch(cfg->PEM_DIR_GLOB, d[i]->d_name, 0))
@@ -1172,12 +1175,21 @@ config_scan_pem_dir(char *pemdir, hitch_config *cfg)
 		if (d[i]->d_type != DT_REG)
 			continue;
 
-		strncpy(fpath, pemdir, PATH_MAX + NAME_MAX - 1);
-		strncat(fpath, d[i]->d_name,
-		    PATH_MAX + NAME_MAX - strlen(fpath) - 1);
+		fpath = malloc(plen);
+		AN(fpath);
+
+		if (snprintf(fpath, plen, "%s%s", pemdir, d[i]->d_name) < 0) {
+			config_error_set("An error occured while "
+			    "combining path");
+			free(fpath);
+			retval = 1;
+			break;
+		}
 
 		cert = cfg_cert_file_new();
 		config_assign_str(&cert->filename, fpath);
+		free(fpath);
+
 		int r = cfg_cert_vfy(cert);
 		if (r != 0) {
 			/* If no default has been set, use the first
@@ -1189,11 +1201,13 @@ config_scan_pem_dir(char *pemdir, hitch_config *cfg)
 		} else {
 			cfg_cert_file_free(&cert);
 		}
-		free(d[i]);
 	}
 
+	for (i = 0; i < n; i++)
+		free(d[i]);
 	free(d);
-	return (0);
+
+	return (retval);
 }
 
 void
