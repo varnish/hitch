@@ -745,16 +745,30 @@ static int
 check_frontend_uniqueness(struct front_arg *cur_fa, hitch_config *cfg)
 {
 	struct front_arg *fa, *fatmp;
+	int retval = 1;
+
 	HASH_ITER(hh, cfg->LISTEN_ARGS, fa, fatmp) {
-		if ((cur_fa->ip == NULL || strcmp(cur_fa->ip, fa->ip) == 0) &&
+		if (cur_fa->ip == NULL && fa->ip == NULL &&
 		    strcmp(cur_fa->port, fa->port) == 0) {
-			config_error_set("Redundant frontend "
-			"(matching IP and port) definition: '%s:%s'.",
-			    fa->ip, fa->port);
-			return (0);
+			retval = 0;
+			break;
+		}
+		else if (cur_fa->ip == NULL || fa->ip == NULL)
+			continue;
+		else if (strcmp(cur_fa->ip, fa->ip) == 0 &&
+			 strcmp(cur_fa->port, fa->port) == 0) {
+			retval = 0;
+			break;
 		}
 	}
-	return(1);
+
+	if (retval == 0) {
+		config_error_set("Redundant frontend "
+		    "(matching IP and port) definition: '%s:%s'.",
+		    fa->ip, fa->port);
+	}
+
+	return(retval);
 }
 
 int
