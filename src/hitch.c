@@ -2995,6 +2995,20 @@ drop_privileges(void)
 }
 
 static int
+verify_privileges(void)
+{
+	if (geteuid() == 0 &&
+	    !(CONFIG->UID == 0 && CONFIG->GID == 0)) {
+		ERR("{core} ERROR: "
+		    "Refusing to run workers as root, "
+		    "unless user and group is explicitly set"
+		    " to root.\n");
+		return (0);
+	}
+	return (1);
+}
+
+static int
 backaddr_init_uds(void)
 {
 	struct sockaddr_un sun;
@@ -3132,11 +3146,8 @@ start_workers(int start_index, int count)
 				change_root();
 			if (CONFIG->UID >= 0 || CONFIG->GID >= 0)
 				drop_privileges();
-			if (geteuid() == 0) {
-				ERR("{core} ERROR: "
-				    "Refusing to run workers as root.\n");
+			if (!verify_privileges())
 				_exit(1);
-			}
 			handle_connections(pfd[0]);
 			exit(0);
 		} else { /* parent. Track new child. */
@@ -3157,11 +3168,8 @@ start_ocsp_proc(void)
 	} else if (ocsp_proc_pid == 0) {
 		if (CONFIG->UID >= 0 || CONFIG->GID >= 0)
 			drop_privileges();
-		if (geteuid() == 0) {
-			ERR("{core} ERROR: "
-			    "Refusing to run workers as root.\n");
+		if (!verify_privileges())
 			_exit(1);
-		}
 		handle_ocsp_task();
 	}
 
@@ -3985,10 +3993,8 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-	if (geteuid() == 0 && CONFIG->UID < 0) {
-		ERR("{core} ERROR: Refusing to run workers as root.\n");
+	if (!verify_privileges())
 		exit(1);
-	}
 
 	if (CONFIG->DAEMONIZE)
 		daemonize();
