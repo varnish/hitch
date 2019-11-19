@@ -50,6 +50,8 @@ If you're handling a large number of connections, you'll probably want to raise
 If you are listening to ports under 1024 (443 comes to mind), you need
 to start Hitch as root. In those cases you *must* use --user/-u to set
 a non-privileged user `hitch` can setuid() to.
+If you are aware of the security implications and insist on running the worker
+threads as root too, both the user and the group must be set to root.
 
 
 ## Preparing PEM files
