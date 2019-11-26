@@ -4,10 +4,11 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
-hitch-xxx (unreleased)
+hitch-1.5.1 (2019-11-26)
 ------------------------
 
 * Support for TCP Fast Open. Is is disabled by default (Issue: 185_)
+* Various code cleanups and minor bug fixes.
 
 .. _185: https://github.com/varnish/hitch/issues/185
 
