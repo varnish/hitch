@@ -3993,8 +3993,10 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-	if (!verify_privileges())
+	if (geteuid() == 0 && CONFIG->UID < 0) {
+		ERR("{core} ERROR: Refusing to run workers as root.\n");
 		exit(1);
+	}
 
 	if (CONFIG->DAEMONIZE)
 		daemonize();
