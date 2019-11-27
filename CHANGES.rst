@@ -4,6 +4,15 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.5.2 (2019-11-27)
+------------------------
+
+* Fix a problem introduced in the previous release that prevented us
+  from running as a non-privileged user (Issue: 322_).
+
+.. _322: https://github.com/varnish/hitch/issues/322
+
+
 hitch-1.5.1 (2019-11-26)
 ------------------------
 
