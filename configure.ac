@@ -39,8 +39,24 @@ AC_ARG_ENABLE([warnings],
 	AS_HELP_STRING([--enable-warnings], [Enable warnings]),
 	[], [enable_warnings=no])
 
-test "$with_lex" = yes && AC_PROG_LEX
-test "$with_yacc" = yes && AC_PROG_YACC
+if test "$with_lex" = yes
+then
+	AC_PROG_LEX
+	if test "$LEX" = :
+	then
+		AC_MSG_ERROR([flex or lex not found])
+
+	fi
+fi
+
+if test "$with_yacc" = yes
+then
+	AC_PROG_YACC
+	if test -z "$YACC" || ! $YACC -V >/dev/null 2>&1
+	then
+		AC_MSG_ERROR([bison, byacc or yacc not found])
+	fi
+fi
 
 AM_CONDITIONAL([ENABLE_DOCUMENTATION], [test "$enable_documentation" = yes])
 AM_CONDITIONAL([ENABLE_WARNINGS], [test "$enable_warnings" = yes])
