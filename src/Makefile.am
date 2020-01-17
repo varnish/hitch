@@ -16,6 +16,9 @@ TESTS_ENVIRONMENT = \
 TESTS = @SH_TESTS@
 TEST_EXTENSIONS = .sh
 
+# issue 292
+XFAIL_TESTS = tests/test35-ticket-resume-tls1_3.sh
+
 nobase_noinst_HEADERS = \
 	configuration.h \
 	hitch.h \
