@@ -13,9 +13,5 @@ EOF
 
 start_hitch --config=hitch.cfg
 
-# this will fail on platforms that have OpenSSL compiled without SSLv3
-# XXX: find how to detect the lack of SSLv3
 s_client -tls1_2
-
-# this will fail on platforms that have OpenSSL compiled without SSLv3
 ! s_client -tls1_1

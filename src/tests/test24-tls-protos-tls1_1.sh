@@ -3,6 +3,11 @@
 
 . hitch_test.sh
 
+if ! openssl s_client -help 2>&1 | grep -q -e "-ssl3"
+then
+	skip "Missing SSLv3 support"
+fi
+
 # only TLSv1.1
 cat >hitch.cfg <<EOF
 backend = "[hitch-tls.org]:80"
@@ -14,8 +19,5 @@ EOF
 start_hitch --config=hitch.cfg
 
 # this will fail on platforms that have OpenSSL compiled without SSLv3
-# XXX: find how to detect the lack of SSLv3
 ! s_client -tls1_2
-
-# this will fail on platforms that have OpenSSL compiled without SSLv3
 s_client -tls1_1

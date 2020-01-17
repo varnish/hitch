@@ -3,9 +3,9 @@
 
 . hitch_test.sh
 
-if ! openssl s_client -help 2>&1 | grep -q -e "-tls1_3";
+if ! openssl s_client -help 2>&1 | grep -q -e "-tls1_3"
 then
-    skip "Missing TLSv1.3 support"
+	skip "Missing TLSv1.3 support"
 fi
 
 # only TLSv1.3
