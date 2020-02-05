@@ -3365,62 +3365,6 @@ init_signals()
 
 }
 
-#define NULL_DEV "/dev/null"
-static void
-daemonize()
-{
-	/* logging.c */
-	if (logfile == stdout || logfile == stderr) {
-		logfile = NULL;
-	}
-
-	/* go to root directory */
-	if (chdir("/") != 0) {
-		ERR("Unable change directory to /: %s\n", strerror(errno));
-		exit(1);
-	}
-
-	/* let's make some children, baby :) */
-	pid_t pid = fork();
-	if (pid < 0) {
-		ERR("Unable to daemonize: fork failed: %s\n", strerror(errno));
-		exit(1);
-	}
-
-	/* am i the parent? */
-	if (pid != 0) {
-		LOGL("{core} Daemonized as pid %d.\n", pid);
-		exit(0);
-	}
-
-	/* reopen standard streams to null device */
-	if (freopen(NULL_DEV, "r", stdin) == NULL) {
-		ERR("Unable to reopen stdin to %s: %s\n",
-		    NULL_DEV, strerror(errno));
-		exit(1);
-	}
-	if (freopen(NULL_DEV, "w", stdout) == NULL) {
-		ERR("Unable to reopen stdout to %s: %s\n",
-		    NULL_DEV, strerror(errno));
-		exit(1);
-	}
-	if (freopen(NULL_DEV, "w", stderr) == NULL) {
-		ERR("Unable to reopen stderr to %s: %s\n",
-		    NULL_DEV, strerror(errno));
-		exit(1);
-	}
-
-	/* this is child, the new master */
-	pid_t s = setsid();
-	if (s < 0) {
-		ERR("Unable to create new session, setsid(2) failed: "
-		    "%s :: %d\n", strerror(errno), s);
-		exit(1);
-	}
-
-	LOG("Successfully daemonized as pid %d.\n", getpid());
-}
-
 static void
 openssl_check_version()
 {
@@ -4031,8 +3975,12 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-	if (CONFIG->DAEMONIZE)
-		daemonize();
+	if (CONFIG->DAEMONIZE) {
+		if (daemon(0, 0) == -1) {
+			ERR("Unable to daemonize: %s\n", strerror(errno));
+			exit(1);
+		}
+	}
 
 	master_pid = getpid();
 
