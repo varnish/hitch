@@ -60,8 +60,7 @@ Command line arguments
   -L  --log-level=NUM        Log level. 0=silence, 1=err, 2=info/debug
   -s  --syslog               Send log message to syslog in addition to stderr/stdout
   --syslog-facility=FACILITY    Syslog facility to use (Default: "daemon")
-  --daemon               Fork into background and become a daemon;
-                         this also sets the --quiet option (Default: off)
+  --daemon               Run as background daemon and disable file based logging (Default: off)
   --write-ip             Write 1 octet with the IP family followed by the IP
                          address in 4 (IPv4) or 16 (IPv6) octets little-endian
                          to backend before the actual data

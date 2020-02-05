@@ -98,7 +98,7 @@ This option is also available in frontend blocks.
 daemon = on|off
 ---------------
 
-Run as daemon. Default is off.
+Run as background daemon and disable file based logging. Default is off.
 
 frontend = ...
 --------------

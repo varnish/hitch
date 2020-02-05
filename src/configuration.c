@@ -1290,7 +1290,7 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "      --syslog-facility=FACILITY    Syslog facility to use (Default: \"%s\")\n", config_disp_log_facility(cfg->SYSLOG_FACILITY));
 	fprintf(out, "\n");
 	fprintf(out, "OTHER OPTIONS:\n");
-	fprintf(out, "      --daemon               Fork into background and become a daemon (Default: %s)\n", config_disp_bool(cfg->DAEMONIZE));
+	fprintf(out, "      --daemon               Run as background daemon and disable file based logging (Default: %s)\n", config_disp_bool(cfg->DAEMONIZE));
 	fprintf(out, "      --write-ip             Write 1 octet with the IP family followed by the IP\n");
 	fprintf(out, "                             address in 4 (IPv4) or 16 (IPv6) octets little-endian\n");
 	fprintf(out, "                             to backend before the actual data\n");
