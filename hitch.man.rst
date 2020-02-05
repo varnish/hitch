@@ -58,6 +58,7 @@ Command line arguments
   -g  --group=GROUP          Set gid after binding the socket (Default: "")
   -q  --quiet                Be quiet; emit only error messages (deprecated in favor of ``log-level``)
   -L  --log-level=NUM        Log level. 0=silence, 1=err, 2=info/debug
+  --log-filename=FILE        Send log message to a logfile instead of stderr/stdout
   -s  --syslog               Send log message to syslog in addition to stderr/stdout
   --syslog-facility=FACILITY    Syslog facility to use (Default: "daemon")
   --daemon               Run as background daemon and disable file based logging (Default: off)
