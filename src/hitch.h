@@ -104,7 +104,7 @@ typedef struct sni_name_s {
 	UT_hash_handle		hh;
 } sni_name;
 
-sni_name *sni_names;
+extern sni_name *sni_names;
 
 #endif /* OPENSSL_NO_TLSEXT */
 
