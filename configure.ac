@@ -207,6 +207,13 @@ HITCH_CHECK_FUNC([X509_NAME_ENTRY_get_data], [$CRYPTO_LIBS], [
 
 AC_CHECK_MEMBERS([struct ssl_st.s3], [], [], [[#include <openssl/ssl.h>]])
 
+AS_VERSION_COMPARE([$($PKG_CONFIG --modversion openssl)], [1.1.1],
+	[openssl111=no],
+	[openssl111=yes], [openssl111=yes])
+
+AS_IF([test "x$openssl111" = xyes],
+	[AC_DEFINE([HAVE_TLS_1_3], [1], [Define to 1 if TLSv1.3 is available])], [])
+
 SH_TESTS="$(cd $srcdir/src && echo tests/test*.sh)"
 AC_SUBST(SH_TESTS)
 
