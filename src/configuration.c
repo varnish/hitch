@@ -162,7 +162,8 @@ front_arg_destroy(struct front_arg *fa)
 	free(fa->ip);
 	free(fa->port);
 	free(fa->pspec);
-	free(fa->ciphers);
+	free(fa->ciphers_tlsv12);
+	free(fa->ciphersuites_tlsv13);
 	HASH_ITER(hh, fa->certs, cf, cftmp) {
 		CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
 		HASH_DEL(fa->certs, cf);
@@ -201,7 +202,7 @@ config_new(void)
 	r->BACK_IP			= strdup("127.0.0.1");
 	r->BACK_PORT			= strdup("8000");
 	r->NCORES			= 1;
-	r->CIPHER_SUITE			= strdup(CFG_DEFAULT_CIPHERS);
+	r->CIPHERS_TLSv12		= strdup(CFG_DEFAULT_CIPHERS);
 	r->ENGINE			= NULL;
 	r->BACKLOG			= 100;
 	r->SNI_NOMATCH_ABORT		= 0;
@@ -290,7 +291,8 @@ config_destroy(hitch_config *cfg)
 	if (cfg->CERT_DEFAULT != NULL)
 		cfg_cert_file_free(&cfg->CERT_DEFAULT);
 
-	free(cfg->CIPHER_SUITE);
+	free(cfg->CIPHERS_TLSv12);
+	free(cfg->CIPHERSUITES_TLSv13);
 	free(cfg->ENGINE);
 	free(cfg->PIDFILE);
 	free(cfg->OCSP_DIR);
@@ -841,7 +843,7 @@ config_param_validate(char *k, char *v, hitch_config *cfg,
 		cfg->SELECTED_TLS_PROTOS = SSL_OPTION_PROTOS;
 	} else if (strcmp(k, CFG_CIPHERS) == 0) {
 		if (strlen(v) > 0) {
-			config_assign_str(&cfg->CIPHER_SUITE, v);
+			config_assign_str(&cfg->CIPHERS_TLSv12, v);
 		}
 	} else if (strcmp(k, CFG_SSL_ENGINE) == 0) {
 		if (strlen(v) > 0) {
@@ -1230,7 +1232,7 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "\n");
 	fprintf(out, "      --tls                   TLSv1 (default. No SSLv3)\n");
 	fprintf(out, "      --ssl                   SSLv3 (enables SSLv3)\n");
-	fprintf(out, "  -c  --ciphers=SUITE         Sets allowed ciphers (Default: \"%s\")\n", config_disp_str(cfg->CIPHER_SUITE));
+	fprintf(out, "  -c  --ciphers=SUITE         Sets allowed ciphers (Default: \"%s\")\n", config_disp_str(cfg->CIPHERS_TLSv12));
 	fprintf(out, "  -e  --ssl-engine=NAME       Sets OpenSSL engine (Default: \"%s\")\n", config_disp_str(cfg->ENGINE));
 	fprintf(out, "  -O  --prefer-server-ciphers Prefer server list order\n");
 	fprintf(out, "\n");

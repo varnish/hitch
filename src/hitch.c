@@ -903,17 +903,20 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	sslctx *sc;
 	EVP_PKEY *pkey;
 	int selected_protos = CONFIG->SELECTED_TLS_PROTOS;
-	char *ciphers = CONFIG->CIPHER_SUITE;
+	char *ciphers = CONFIG->CIPHERS_TLSv12;
+	char *ciphersuites = CONFIG->CIPHERSUITES_TLSv13;
 	int pref_srv_ciphers = CONFIG->PREFER_SERVER_CIPHERS;
 
 	if (fa != NULL) {
 		CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
 		if (fa->selected_protos != 0)
 			selected_protos = fa->selected_protos;
-		if (fa->ciphers != NULL)
-			ciphers = fa->ciphers;
+		if (fa->ciphers_tlsv12 != NULL)
+			ciphers = fa->ciphers_tlsv12;
 		if (fa->prefer_server_ciphers != -1)
 			pref_srv_ciphers = fa->prefer_server_ciphers;
+		if (fa->ciphersuites_tlsv13)
+			ciphersuites = fa->ciphersuites_tlsv13;
 	}
 
 	long ssloptions = SSL_OP_NO_SSLv2 | SSL_OP_ALL |
@@ -960,6 +963,17 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 			return (NULL);
 		}
 	}
+
+#if HAVE_TLS_1_3
+	if (ciphersuites != NULL) {
+		if (SSL_CTX_set_ciphersuites(ctx, ciphersuites) != 1) {
+			log_ssl_error(NULL, "{core} SSL_CTX_set_ciphersuites");
+			return (NULL);
+		}
+	}
+#else
+	(void) ciphersuites;
+#endif
 
 	if (pref_srv_ciphers)
 		SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
