@@ -330,17 +330,28 @@ init_dh(SSL_CTX *ctx, const char *cert)
 	return (0);
 }
 
-static int init_ecdh(SSL_CTX *ctx) {
+static int init_ecdh(SSL_CTX *ctx, const char *ecdh_curve) {
 #ifndef OPENSSL_NO_EC
-#ifdef NID_X9_62_prime256v1
-	EC_KEY *ecdh = NULL;
-	ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
-	SSL_CTX_set_tmp_ecdh(ctx, ecdh);
-	EC_KEY_free(ecdh);
-	LOG("{core} ECDH Initialized with NIST P-256\n");
-#endif /* NID_X9_62_prime256v1 */
+	if (ecdh_curve == NULL || strcmp(ecdh_curve, "auto") == 0) {
+		/* For openssl >= 1.1 'auto' is default on and this is
+		 * just a NOOP macro. */
+		AN(SSL_CTX_set_ecdh_auto(ctx, 1));
+	} else {
+		/* For openssl >= 1.1 this should really be "groups"
+		 * instead of "curves", but we use the old name to
+		 * support openssl 1.0 as well */
+		if (SSL_CTX_set1_curves_list(ctx,
+			ecdh_curve) == 0) {
+			log_ssl_error(NULL,
+			    "{core} Configuring ecdh curves '%s' failed\n",
+			    ecdh_curve);
+		}
+	}
+	LOG("{core} ECDH Initialized\n");
+#else
+	(void) ctx;
+	(void) ecdh_curve;
 #endif /* OPENSSL_NO_EC */
-
 	return (0);
 }
 #endif /* OPENSSL_NO_DH */
@@ -1030,7 +1041,7 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 
 #ifndef OPENSSL_NO_DH
 	init_dh(ctx, cf->filename);
-	init_ecdh(ctx);
+	init_ecdh(ctx, CONFIG->ECDH_CURVE);
 #endif /* OPENSSL_NO_DH */
 
 #ifndef OPENSSL_NO_TLSEXT

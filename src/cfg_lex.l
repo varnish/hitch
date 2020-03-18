@@ -97,6 +97,7 @@ char input_line[512];
 "private-key"			{ return (TOK_PRIVATE_KEY); }
 "backend-refresh"		{ return (TOK_BACKEND_REFRESH); }
 "tcp-fastopen"			{ return (TOK_TFO); }
+"ecdh-curve"			{ return (TOK_ECDH_CURVE); }
 
 (?i:"yes"|"y"|"on"|"true"|"t"|\"yes\"|\"y\"|\"on\"|\"true\"|\"t\") {
 	yylval.i = 1;

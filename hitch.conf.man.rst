@@ -334,6 +334,18 @@ kept for backwards compatibility.
 
 This option is also available in frontend blocks.
 
+ecdh-curve = <string>
+~~~~~~~~~~~~~~~~~~~~~
+
+Sets the list of supported TLS curves. A special value of ``auto``
+will leave it up to OpenSSL to automatically pick the most appropriate
+curve for a client.
+
+::
+
+   ecdh-curve = "X25519:prime256v1:secp384r1"
+
+
 sni-nomatch-abort = on|off
 --------------------------
 

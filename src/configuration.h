@@ -140,6 +140,7 @@ struct __hitch_config {
 	int			TEST;
 	char			*PEM_DIR;
 	char			*PEM_DIR_GLOB;
+	char			*ECDH_CURVE;
 	int			OCSP_VFY;
 	char			*OCSP_DIR;
 	double			OCSP_RESP_TMO;
