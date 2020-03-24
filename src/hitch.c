@@ -1067,6 +1067,7 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 			    sc->filename);
 			sc->staple_fn = fn;
 		}
+		free(fn);
 	}
 
 	if (sc->staple == NULL && cf->ocspfn != NULL) {
@@ -2898,9 +2899,11 @@ handle_connections(int mgt_fd)
 
 	loop = ev_default_loop(EVFLAG_AUTO);
 
+#ifndef LIBFUZZER
 	ev_timer timer_ppid_check;
 	ev_timer_init(&timer_ppid_check, check_ppid, 1.0, 1.0);
 	ev_timer_start(loop, &timer_ppid_check);
+#endif
 
 	VTAILQ_FOREACH(fr, &frontends, list) {
 		VTAILQ_FOREACH(ls, &fr->socks, list) {
@@ -3140,13 +3143,23 @@ init_globals(void)
 		    CONFIG->SYSLOG_FACILITY);
 }
 
+static void *
+client_worker(void *pfd_ptr)
+{
+	int *pfd = (int*) pfd_ptr;
+	//close(pfd[1]);
+	handle_connections(pfd[0]);
+	printf("Exiting?\n");
+	return NULL;
+}
+
 /* Forks COUNT children starting with START_INDEX.  We keep a struct
  * child_proc per child so the parent can manage it later. */
 void
 start_workers(int start_index, int count)
 {
 	struct worker_proc *c;
-	int pfd[2];
+	static int pfd[256 * 2];
 
 	/* don't do anything if we're not allowed to create new workers */
 	if (!create_workers)
@@ -3155,30 +3168,15 @@ start_workers(int start_index, int count)
 	for (core_id = start_index;
 	    core_id < start_index + count; core_id++) {
 		ALLOC_OBJ(c, WORKER_PROC_MAGIC);
-		AZ(pipe(pfd));
-		c->pfd = pfd[1];
+		AZ(pipe(&pfd[core_id*2]));
+		c->pfd = pfd[core_id*2 + 1];
 		c->gen = worker_gen;
-		c->pid = fork();
 		c->core_id = core_id;
-		if (c->pid == -1) {
-			ERR("{core} fork() failed: %s; Goodbye cruel world!\n",
-			    strerror(errno));
-			exit(1);
-		} else if (c->pid == 0) { /* child */
-			close(pfd[1]);
-			FREE_OBJ(c);
-			if (CONFIG->CHROOT && CONFIG->CHROOT[0])
-				change_root();
-			if (CONFIG->UID >= 0 || CONFIG->GID >= 0)
-				drop_privileges();
-			if (!verify_privileges())
-				_exit(1);
-			handle_connections(pfd[0]);
-			exit(0);
-		} else { /* parent. Track new child. */
-			close(pfd[0]);
-			VTAILQ_INSERT_TAIL(&worker_procs, c, list);
-		}
+		VTAILQ_INSERT_TAIL(&worker_procs, c, list);
+		pthread_t pt;
+		pthread_create(&pt, NULL, client_worker, &pfd[core_id*2 + 0]);
+		c->pid = pt;
+		//close(pfd[0]);
 	}
 }
 
@@ -3935,8 +3933,12 @@ sleep_and_refresh(hitch_config *CONFIG)
 
 /* Process command line args, create the bound socket,
  * spawn child (worker) processes, and respawn if any die */
-int
-main(int argc, char **argv)
+#ifndef LIBFUZZER
+int main
+#else
+int fuzzy_main
+#endif
+(int argc, char **argv)
 {
 	// initialize configuration
 	struct front_arg *fa, *ftmp;
@@ -4056,6 +4058,10 @@ main(int argc, char **argv)
 #endif /* USE_SHARED_CACHE */
 
 	LOGL("{core} %s initialization complete\n", PACKAGE_STRING);
+#ifdef LIBFUZZER
+	return 0;
+#endif
+
 	for (;;) {
 #ifdef USE_SHARED_CACHE
 		if (CONFIG->SHCUPD_PORT) {
