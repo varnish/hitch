@@ -150,49 +150,8 @@
    `char[]'. */
 #define YYTEXT_POINTER 1
 
-/* Define to 1 if on MINIX. */
-/* #undef _MINIX */
-
-/* Define to 2 if the system does not provide POSIX.1 features except with
-   this defined. */
-/* #undef _POSIX_1_SOURCE */
-
-/* Define to 1 if you need to in order for `stat' and other things to work. */
-/* #undef _POSIX_SOURCE */
-
-/* Define for Solaris 2.5.1 so the uint32_t typedef from <sys/synch.h>,
-   <pthread.h>, or <semaphore.h> is not used. If the typedef were allowed, the
-   #define below would cause a syntax error. */
-/* #undef _UINT32_T */
-
-/* Define to `int' if <sys/types.h> doesn't define. */
-/* #undef gid_t */
-
 /* Define to `__inline__' or `__inline' if that's what the C compiler
    calls it, or to nothing if 'inline' is not supported under any name.  */
 #ifndef __cplusplus
 /* #undef inline */
 #endif
-
-/* Define to the type of a signed integer type of width exactly 32 bits if
-   such a type exists and the standard includes do not define it. */
-/* #undef int32_t */
-
-/* Define to `int' if <sys/types.h> does not define. */
-/* #undef pid_t */
-
-/* Define to `unsigned int' if <sys/types.h> does not define. */
-/* #undef size_t */
-
-/* Define to `int' if <sys/types.h> does not define. */
-/* #undef ssize_t */
-
-/* Define to `int' if <sys/types.h> doesn't define. */
-/* #undef uid_t */
-
-/* Define to the type of an unsigned integer type of width exactly 32 bits if
-   such a type exists and the standard includes do not define it. */
-/* #undef uint32_t */
-
-/* Define as `fork' if `vfork' does not work. */
-/* #undef vfork */

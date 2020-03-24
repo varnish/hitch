@@ -34,11 +34,15 @@ set(HITCH_SOURCES
 	cfg_parser.c
 	cfg_lex.c
 )
+if (LIBFUZZER)
+	list(APPEND HITCH_SOURCES ${CMAKE_SOURCE_DIR}/fuzzer.c)
+endif()
 
 add_executable(hitch ${HITCH_SOURCES})
 target_include_directories(hitch PRIVATE ${PATH})
 target_include_directories(hitch PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(hitch PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_compile_definitions(hitch PRIVATE _POSIX_C_SOURCE=200809L)
 target_link_libraries(hitch foreign ev pthread crypto ssl)
 add_dependencies(hitch cfglex_generate cfgparser_generate)
 # build hitch executable into the top binary folder
@@ -55,6 +59,7 @@ if (LIBFUZZER)
         message(FATAL_ERROR "You can only use Clang when libfuzzer is enabled")
     endif()
     target_compile_options(hitch PUBLIC ${FUZZER_CFLAGS})
+	target_compile_definitions(hitch PUBLIC LIBFUZZER=1)
 	target_link_libraries(hitch ${FUZZER_LFLAGS})
 endif()
 

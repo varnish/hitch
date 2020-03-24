@@ -8,7 +8,7 @@ option(DEBUGGING    "Debugging build" OFF)
 option(GCSECTIONS   "Garbage collect empty sections" OFF)
 option(NATIVE       "Enable native performance" ON)
 option(SANITIZE     "Enable asan/ubsan sanitizers" OFF)
-option(LIBFUZZER    "Enable fuzzing with clang libfuzzer")
+option(LIBFUZZER    "Enable fuzzing with clang libfuzzer" OFF)
 option(LIBCPP       "Enable compiling with libc++ and linking with LLD" OFF)
 
 set(CMAKE_C_FLAGS "-Wall -Wextra -std=c11 -O2 -g")
