@@ -1062,10 +1062,15 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	if (CONFIG->OCSP_DIR) {
 		char *fn = HOCSP_fn(sc->filename);
 		/* attempt loading of cached ocsp staple */
-		if (fn != NULL && HOCSP_init_file(fn, sc, 1) == 0) {
-			LOG("{core} Loaded cached OCSP staple for cert '%s'\n",
-			    sc->filename);
-			sc->staple_fn = fn;
+		if (fn != NULL) {
+			if (HOCSP_init_file(fn, sc, 1) == 0) {
+				LOG("{core} Loaded cached OCSP staple "
+				    "for cert '%s'\n", sc->filename);
+				sc->staple_fn = fn;
+			}
+			else {
+				free(fn);
+			}
 		}
 	}
 
