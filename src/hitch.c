@@ -3975,6 +3975,8 @@ main(int argc, char **argv)
 	AZ(setvbuf(logfile, NULL, _IONBF, BUFSIZ));
 
 	if (CONFIG->TEST) {
+		/* Override log level for config test */
+		CONFIG->LOG_LEVEL = 3;
 		fprintf(stderr, "Trying to initialize SSL contexts with your"
 		    " certificates\n");
 		init_globals();
