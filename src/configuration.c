@@ -232,7 +232,7 @@ config_new(void)
 	r->SHCUPD_MCASTTTL		= NULL;
 #endif
 
-	r->LOG_LEVEL			= 0;
+	r->LOG_LEVEL			= 1;
 	r->SYSLOG			= 0;
 	r->SYSLOG_FACILITY		= LOG_DAEMON;
 	r->TCP_KEEPALIVE_TIME		= 3600;
