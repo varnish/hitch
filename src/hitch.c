@@ -3931,10 +3931,6 @@ main(int argc, char **argv)
 		return (0);
 	}
 
-
-	if (CONFIG->DAEMONIZE && (logfile == stdout || logfile == stderr))
-		logfile = NULL;
-
 	LOGL("{core} %s starting\n", PACKAGE_STRING);
 	create_workers = 1;
 
@@ -3976,6 +3972,13 @@ main(int argc, char **argv)
 	}
 
 	if (CONFIG->DAEMONIZE) {
+		if (!CONFIG->SYSLOG && !CONFIG->LOG_FILENAME) {
+			LOG("{core} Warning: daemonizing with neither "
+			    "'syslog' nor 'log-filename' configured: "
+			    "Hitch will not produce log messages.\n");
+		}
+		if (logfile == stdout || logfile == stderr)
+			logfile = NULL;
 		if (daemon(0, 0) == -1) {
 			ERR("Unable to daemonize: %s\n", strerror(errno));
 			exit(1);
