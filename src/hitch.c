@@ -3954,17 +3954,6 @@ main(int argc, char **argv)
 		return (1);
 	}
 
-	if (CONFIG->TEST) {
-		fprintf(stderr, "Trying to initialize SSL contexts with your"
-		    " certificates\n");
-		init_globals();
-		init_openssl();
-		init_certs();
-		fprintf(stderr, "%s configuration looks ok.\n",
-		    basename(argv[0]));
-		return (0);
-	}
-
 	if (CONFIG->LOG_FILENAME) {
 		FILE* f;
 		if ((f = fopen(CONFIG->LOG_FILENAME, "a")) == NULL) {
@@ -3984,6 +3973,18 @@ main(int argc, char **argv)
 		logfile = stderr;
 	}
 	AZ(setvbuf(logfile, NULL, _IONBF, BUFSIZ));
+
+	if (CONFIG->TEST) {
+		fprintf(stderr, "Trying to initialize SSL contexts with your"
+		    " certificates\n");
+		init_globals();
+		init_openssl();
+		init_certs();
+		fprintf(stderr, "%s configuration looks ok.\n",
+		    basename(argv[0]));
+		return (0);
+	}
+
 
 	if (CONFIG->DAEMONIZE && (logfile == stdout || logfile == stderr))
 		logfile = NULL;
