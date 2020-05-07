@@ -111,6 +111,8 @@ struct __hitch_config {
 	struct cfg_cert_file	*CERT_DEFAULT;
 	char			*CIPHERS_TLSv12;
 	char			*CIPHERSUITES_TLSv13;
+	int			CLIENT_VERIFY;
+	char			*CLIENT_VERIFY_CA;
 	char			*ENGINE;
 	int			BACKLOG;
 #ifdef USE_SHARED_CACHE

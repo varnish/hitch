@@ -48,6 +48,11 @@ char input_line[512];
 "TLSv1.3"			{ return (TOK_TLSv1_3); }
 "ciphers"			{ return (TOK_CIPHERS); }
 "ciphersuites"			{ return (TOK_CIPHERSUITES); }
+"client-verify"			{ return (TOK_CLIENT_VERIFY); }
+"none"				{ return (TOK_VERIFY_NONE); }
+"optional"			{ return (TOK_VERIFY_OPT); }
+"required"			{ return (TOK_VERIFY_REQ); }
+"client-verify-ca"		{ return (TOK_CLIENT_VERIFY_CA); }
 "ssl-engine"			{ return (TOK_SSL_ENGINE); }
 "prefer-server-ciphers"		{ return (TOK_PREFER_SERVER_CIPHERS); }
 "workers"			{ return (TOK_WORKERS); }

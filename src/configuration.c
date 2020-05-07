@@ -216,6 +216,8 @@ config_new(void)
 	r->OCSP_RESP_TMO		= 10.0;
 	r->OCSP_CONN_TMO		= 4.0;
 	r->OCSP_REFRESH_INTERVAL	= 1800;
+	r->CLIENT_VERIFY		= SSL_VERIFY_NONE;
+	r->CLIENT_VERIFY_CA		= NULL;
 #ifdef TCP_FASTOPEN_WORKS
 	r->TFO				= 0;
 #endif
@@ -300,6 +302,7 @@ config_destroy(hitch_config *cfg)
 	free(cfg->ALPN_PROTOS_LV);
 	free(cfg->PEM_DIR);
 	free(cfg->PEM_DIR_GLOB);
+	free(cfg->CLIENT_VERIFY_CA);
 #ifdef USE_SHARED_CACHE
 	int i;
 	free(cfg->SHCUPD_IP);
@@ -1574,6 +1577,12 @@ CFG_ON('s', CFG_SYSLOG);
 		return (1);
 	}
 
+	if (cfg->CLIENT_VERIFY != SSL_VERIFY_NONE &&
+	    cfg->CLIENT_VERIFY_CA == NULL) {
+		config_error_set("Setting 'client-verify-ca' is required when"
+		    " configuring client-verify");
+		return (1);
+	}
 
 #ifdef USE_SHARED_CACHE
 	if (cfg->SHCUPD_IP != NULL && ! cfg->SHARED_CACHE) {

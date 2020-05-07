@@ -37,6 +37,8 @@
 
 #include "config.h"
 
+#include <openssl/x509.h>
+#include <openssl/x509_vfy.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -904,6 +906,59 @@ Find_issuer(X509 *subj, STACK_OF(X509) *chain)
 }
 
 
+static int
+client_vfy_init(SSL_CTX *ctx, int flags, const char *cafile)
+{
+	X509_STORE *vfy;
+	STACK_OF(X509_OBJECT) *objs;
+	X509_OBJECT *o;
+	X509 *crt;
+	int i;
+
+	AN(cafile);
+	assert(flags != SSL_VERIFY_NONE);
+	AN(flags & SSL_VERIFY_PEER);
+
+	vfy = X509_STORE_new();
+	if (!vfy) {
+		log_ssl_error(NULL, "X509_STORE_new: allocation failed");
+		return (1);
+	}
+	if (X509_STORE_load_locations(vfy, cafile, NULL) == 0) {
+		log_ssl_error(NULL, "client_verify_ca: unable to "
+		    "load file '%s'",
+		    cafile);
+		X509_STORE_free(vfy);
+		return (1);
+	}
+
+	SSL_CTX_set1_verify_cert_store(ctx, vfy);
+
+#ifdef HAVE_X509_STORE_GET0_OBJECTS
+	objs = X509_STORE_get0_objects(vfy);
+#else
+	objs = vfy->objs;
+#endif
+	for (i = 0; i < sk_X509_OBJECT_num(objs); i++) {
+		o = sk_X509_OBJECT_value(objs, i);
+#ifdef HAVE_X509_OBJECT_GET0_X509
+		crt = X509_OBJECT_get0_X509(o);
+#else
+		crt = o->data.x509;
+#endif
+		if (crt != NULL) {
+			/* SSL_CTX_add_client_CA makes a copy of the
+			 * subject name, so the X509_STORE_free below
+			 * is safe. */
+			SSL_CTX_add_client_CA(ctx, crt);
+		}
+	}
+
+	SSL_CTX_set_verify(ctx, flags, NULL);
+
+	X509_STORE_free(vfy);
+	return (0);
+}
 
 /* Initialize an SSL context */
 static sslctx *
@@ -985,6 +1040,12 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 #else
 	(void) ciphersuites;
 #endif
+	if (CONFIG->CLIENT_VERIFY != SSL_VERIFY_NONE) {
+		AN(CONFIG->CLIENT_VERIFY_CA);
+		if (client_vfy_init(ctx, CONFIG->CLIENT_VERIFY,
+			CONFIG->CLIENT_VERIFY_CA))
+			return (NULL);
+	}
 
 	if (pref_srv_ciphers)
 		SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);

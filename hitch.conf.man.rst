@@ -111,6 +111,37 @@ preference.
 
 This option is also available in frontend blocks.
 
+client-verify = required|optional|none
+--------------------------------------
+
+Configures client certificate validation. The setting must be one of
+``none``, ``required`` or ``optional``.
+
+The default setting is ``client-verify = none``, in which case Hitch
+will not send a certificate request to the client.
+
+If ``client-verify = require`` is configured, Hitch will only permit
+connections that present a valid certificate. The certificate will be
+verified using the certificate provided in the ``client-verify-ca``
+parameter.
+
+If ``optional``, Hitch will send certificate requests, but still
+permit connections that do not present one.
+
+For settings ``optional`` and ``required``, we also require that the
+``client-verify-ca`` is configured.
+
+
+client-verify-ca = <string>
+---------------------------
+
+Specifies a file containing the certificates of the CAs that will be
+used to verify a client certificate.
+
+For multiple CAs, this file can be a concatenation of multiple
+pem-files for the relevant certificate authorities.
+
+
 daemon = on|off
 ---------------
 

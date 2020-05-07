@@ -205,6 +205,16 @@ HITCH_CHECK_FUNC([X509_NAME_ENTRY_get_data], [$CRYPTO_LIBS], [
 		[OpenSSL has X509_NAME_ENTRY_get_data()])
 ])
 
+HITCH_CHECK_FUNC([X509_STORE_get0_objects], [$CRYPTO_LIBS], [
+	AC_DEFINE([HAVE_X509_STORE_GET0_OBJECTS], [1],
+		[OpenSSL has X509_STORE_get0_objects()])
+])
+
+HITCH_CHECK_FUNC([X509_OBJECT_get0_X509], [$CRYPTO_LIBS], [
+	AC_DEFINE([HAVE_X509_OBJECT_GET0_X509], [1],
+		[OpenSSL has X509_OBJECT_get0_X509()])
+])
+
 AC_CHECK_MEMBERS([struct ssl_st.s3], [], [], [[#include <openssl/ssl.h>]])
 
 AS_VERSION_COMPARE([$($PKG_CONFIG --modversion openssl)], [1.1.1],
