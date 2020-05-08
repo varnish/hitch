@@ -149,6 +149,7 @@ front_arg_new(void)
 	fa->sni_nomatch_abort = -1;
 	fa->selected_protos = 0;
 	fa->prefer_server_ciphers = -1;
+	fa->client_verify = -1;
 
 	return (fa);
 }
@@ -1388,6 +1389,7 @@ int
 config_parse_cli(int argc, char **argv, hitch_config *cfg)
 {
 	static int tls = 0, ssl = 0;
+	struct front_arg *fa, *fatmp;
 	static int client = 0;
 	int c, i;
 
@@ -1584,6 +1586,20 @@ CFG_ON('s', CFG_SYSLOG);
 		return (1);
 	}
 
+	HASH_ITER(hh, cfg->LISTEN_ARGS, fa, fatmp) {
+		if (fa->client_verify != -1 &&
+		    fa->client_verify != SSL_VERIFY_NONE) {
+			if (!fa->client_verify_ca && !cfg->CLIENT_VERIFY_CA) {
+				config_error_set("No 'client-verify-ca' "
+				    "configured for frontend '%s'",
+				    fa->pspec);
+				return (1);
+			}
+		}
+
+	}
+
+
 #ifdef USE_SHARED_CACHE
 	if (cfg->SHCUPD_IP != NULL && ! cfg->SHARED_CACHE) {
 		config_error_set("Shared cache update listener is defined,"
@@ -1665,7 +1681,6 @@ CFG_ON('s', CFG_SYSLOG);
 	}
 
 	if (cfg->PMODE == SSL_SERVER && cfg->CERT_DEFAULT == NULL) {
-		struct front_arg *fa, *fatmp;
 		HASH_ITER(hh, cfg->LISTEN_ARGS, fa, fatmp)
 			if (HASH_CNT(hh, fa->certs) == 0) {
 				config_error_set("No x509 certificate PEM file "

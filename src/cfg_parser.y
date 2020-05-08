@@ -153,6 +153,8 @@ FB_REC
 	: FB_HOST
 	| FB_PORT
 	| FB_CERT
+	| FB_CLIENT_VERIFY
+	| FB_CLIENT_VERIFY_CA
 	| FB_MATCH_GLOBAL
 	| FB_SNI_NOMATCH_ABORT
 	| FB_TLS
@@ -275,6 +277,13 @@ FB_CERT
 		}
 		cur_pem = NULL;
 	};
+
+FB_CLIENT_VERIFY: TOK_CLIENT_VERIFY '=' CLIENT_VERIFY_OPT;
+
+FB_CLIENT_VERIFY_CA: TOK_CLIENT_VERIFY_CA '=' STRING {
+	cur_fa->client_verify_ca = strdup($3);
+};
+
 
 FB_MATCH_GLOBAL: TOK_MATCH_GLOBAL '=' BOOL { cur_fa->match_global_certs = $3; };
 
@@ -612,14 +621,24 @@ CLIENT_VERIFY_REC: TOK_CLIENT_VERIFY '=' CLIENT_VERIFY_OPT;
 
 CLIENT_VERIFY_OPT
 	: TOK_VERIFY_NONE {
-		cfg->CLIENT_VERIFY = SSL_VERIFY_NONE;
+		if (cur_fa)
+			cur_fa->client_verify = SSL_VERIFY_NONE;
+		else
+			cfg->CLIENT_VERIFY = SSL_VERIFY_NONE;
 	}
 	| TOK_VERIFY_OPT {
-		cfg->CLIENT_VERIFY = SSL_VERIFY_PEER;
+		if (cur_fa)
+			cur_fa->client_verify = SSL_VERIFY_PEER;
+		else
+			cfg->CLIENT_VERIFY = SSL_VERIFY_PEER;
 	}
 	| TOK_VERIFY_REQ {
-		cfg->CLIENT_VERIFY =
-		    SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+		if (cur_fa)
+			cur_fa->client_verify =
+			    SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+		else
+			cfg->CLIENT_VERIFY =
+			    SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
 	};
 
 CLIENT_VERIFY_CA_REC: TOK_CLIENT_VERIFY_CA '=' STRING {

@@ -81,6 +81,8 @@ struct front_arg {
 	char			*ciphers_tlsv12;
 	char			*ciphersuites_tlsv13;
 	int			selected_protos;
+	int			client_verify;
+	char			*client_verify_ca;
 	int			mark;
 	UT_hash_handle		hh;
 };

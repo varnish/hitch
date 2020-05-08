@@ -972,6 +972,7 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	char *ciphers = CONFIG->CIPHERS_TLSv12;
 	char *ciphersuites = CONFIG->CIPHERSUITES_TLSv13;
 	int pref_srv_ciphers = CONFIG->PREFER_SERVER_CIPHERS;
+	int client_verify = CONFIG->CLIENT_VERIFY;
 
 	if (fa != NULL) {
 		CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
@@ -983,6 +984,8 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 			pref_srv_ciphers = fa->prefer_server_ciphers;
 		if (fa->ciphersuites_tlsv13)
 			ciphersuites = fa->ciphersuites_tlsv13;
+		if (fa->client_verify != -1)
+			client_verify = fa->client_verify;
 	}
 
 	long ssloptions = SSL_OP_NO_SSLv2 | SSL_OP_ALL |
@@ -1040,10 +1043,12 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 #else
 	(void) ciphersuites;
 #endif
-	if (CONFIG->CLIENT_VERIFY != SSL_VERIFY_NONE) {
-		AN(CONFIG->CLIENT_VERIFY_CA);
-		if (client_vfy_init(ctx, CONFIG->CLIENT_VERIFY,
-			CONFIG->CLIENT_VERIFY_CA))
+	if (client_verify != SSL_VERIFY_NONE) {
+		const char *ca = CONFIG->CLIENT_VERIFY_CA;
+		if (fa && fa->client_verify_ca)
+			ca = fa->client_verify_ca;
+		AN(ca);
+		if (client_vfy_init(ctx, client_verify, ca))
 			return (NULL);
 	}
 
