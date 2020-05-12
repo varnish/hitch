@@ -189,6 +189,15 @@ For supporting legacy protocol versions you may also need to lower the
 `MinProtocol` property in your OpenSSL configuration (typically
 `/etc/ssl/openssl.cnf`).
 
+## TCP Fast Open Support
+
+TCP Fast Open saves up to one full round-trip time (RTT) over 
+the standard three-way connection handshake during a TCP session.
+
+Since kernel version 3.13, the TCP Fast Open is enabled by default.
+However, it must be explcitly enabled in the configuration file:
+
+    tcp-fastopen = on
 
 ## Uninterrupted configuration reload
 
