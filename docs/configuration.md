@@ -181,6 +181,15 @@ disabled. The recommended way to to select protocols is to use
 The following tokens are available for the `tls-protos` option:
 `SSLv3`, `TLSv1.0`, `TLSv1.1` and `TLSv1.2`.
 
+## TCP Fast Open Support
+
+TCP Fast Open saves up to one full round-trip time (RTT) over 
+the standard three-way connection handshake during a TCP session.
+
+Since kernel version 3.13, the TCP Fast Open is enabled by default.
+However, it must be explcitly enabled in the configuration file:
+
+    tcp-fastopen = on
 
 ## Uninterrupted configuration reload
 
