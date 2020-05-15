@@ -186,8 +186,8 @@ The following tokens are available for the `tls-protos` option:
 TCP Fast Open saves up to one full round-trip time (RTT) over 
 the standard three-way connection handshake during a TCP session.
 
-Since kernel version 3.13, the TCP Fast Open is enabled by default.
-However, it must be explcitly enabled in the configuration file:
+On a system which supports TCP Fast Open, Hitch is able to reduce 
+network latency with the following in the configuration file:
 
     tcp-fastopen = on
 
