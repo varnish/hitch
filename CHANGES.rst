@@ -4,6 +4,21 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.6.0-beta1 (2020-05-27)
+------------------------------
+
+* TLSv1.3 cipher suites can now be configured via the ``ciphersuites``
+  configuration file setting.
+* Added ``ecdh-curve`` configuration file setting for specifying the
+  list of supported TLS curves.
+* Default ``log-level`` is now set to 1, making Hitch slightly more
+  chatty by default.
+* Added support for client certificate validation. This is specified
+  via the new ``client-verify`` and ``client-verify-ca`` configuration
+  settings. See hitch.conf(5) for more details.
+* Fixed a very minor memory leak, and a few other minor code cleanups.
+
+
 hitch-1.5.2 (2019-11-27)
 ------------------------
 
