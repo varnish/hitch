@@ -4,6 +4,14 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.6.0~beta2 (2020-05-29)
+------------------------------
+
+* Added support for a few PROXY properties for client certificate
+  validation. When Hitch is used alongside Varnish, one may make use
+  of vmod-proxy's proxy.client_has_cert_sess(),
+  proxy.ssl_verify_result() and proxy.client_has_cert_conn().
+
 hitch-1.6.0-beta1 (2020-05-27)
 ------------------------------
 

@@ -449,7 +449,15 @@ Default is off.
 proxy-tlv = on|off
 ------------------
 
-Report the chosen cipher and protocol as part of the PROXYv2 header.
+Report extra information as part of the PROXYv2 header.
+
+Currently the following will be transmitted when proxy-tlv is enabled:
+
+ - Cipher
+ - Protocol version
+ - Client certificate verification result
+ - Whether the client transmitted a certificate as part of this
+   connection/session (PP2_CLIENT_CERT_CONN, PP2_CLIENT_CERT_SESS)
 
 Default is on.
 
