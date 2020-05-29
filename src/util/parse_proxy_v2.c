@@ -177,7 +177,7 @@ print_extensions(unsigned char *extensions, int extensions_len)
 			printf("PP2_TYPE_SSL client:\t0x%x\n",
 			    *((char *)extensions + i));
 			printf("PP2_TYPE_SSL verify:\t0x%x\n",
-			    *((uint32_t *)extensions + i + 1));
+			    *((uint32_t *)(extensions + i + 1)));
 			j = i + 5;
 			/*  Handle subtypes: */
 			while (j < i + l) {

@@ -152,6 +152,11 @@ typedef struct proxystate {
 						  * occuring */
 	int			npn_alpn_tried:1;/* NPN or ALPN was tried */
 
+	int			client_cert_conn:1; /* Client provided
+						     * a certificate
+						     * over the current
+						     * connection */
+
 	SSL			*ssl;		/* OpenSSL SSL state */
 
 	struct sockaddr_storage	remote_ip;	/* Remote ip returned

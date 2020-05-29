@@ -905,6 +905,20 @@ Find_issuer(X509 *subj, STACK_OF(X509) *chain)
        return (NULL);
 }
 
+static int
+client_vfy_cb(int preverify_ok, X509_STORE_CTX *storectx)
+{
+	proxystate *ps;
+	SSL *ssl;
+
+	ssl = X509_STORE_CTX_get_ex_data(storectx,
+	    SSL_get_ex_data_X509_STORE_CTX_idx());
+	CAST_OBJ_NOTNULL(ps, SSL_get_app_data(ssl), PROXYSTATE_MAGIC);
+	if (preverify_ok)
+		ps->client_cert_conn = 1;
+
+	return (preverify_ok);
+}
 
 static int
 client_vfy_init(SSL_CTX *ctx, int flags, const char *cafile)
@@ -954,7 +968,7 @@ client_vfy_init(SSL_CTX *ctx, int flags, const char *cafile)
 		}
 	}
 
-	SSL_CTX_set_verify(ctx, flags, NULL);
+	SSL_CTX_set_verify(ctx, flags, client_vfy_cb);
 
 	X509_STORE_free(vfy);
 	return (0);
@@ -2080,16 +2094,30 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 		}
 	}
 	if (CONFIG->PROXY_TLV) {
-		char *tlvp = base + len;
+		X509 *crt;
 		ssize_t sz = 0;
+		struct pp2_tlv_ssl *tlv;
+		char *tlvp = base + len;
 		const char *tmp;
 
 		tlvp[0] = PP2_TYPE_SSL;
 		/* tlvp[1..2] to be updated with payload length later */
 		len += 3;
+		tlv = (struct pp2_tlv_ssl *) (&base[len]);
+		tlv->client = PP2_CLIENT_SSL;
+		tlv->verify = 1;
 
-		base[len] = PP2_CLIENT_SSL;
-		base[len + 1] = 1;
+		/* PP2_CLIENT_CERT_SESS */
+		crt = SSL_get_peer_certificate(ps->ssl);
+		if (crt) {
+			tlv->client |= PP2_CLIENT_CERT_SESS;
+			tlv->verify = htonl(SSL_get_verify_result(ps->ssl));
+			X509_free(crt);
+		}
+
+		/* PP2_CLIENT_CERT_CONN */
+		if (ps->client_cert_conn)
+			tlv->client |= PP2_CLIENT_CERT_CONN;
 		len += 5;
 		sz += 5;
 
