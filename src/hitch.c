@@ -1069,6 +1069,9 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	if (pref_srv_ciphers)
 		SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
 
+	AN(SSL_CTX_set_session_id_context(ctx, (const unsigned char *) "hitch",
+		strlen("hitch")));
+
 	ALLOC_OBJ(sc, SSLCTX_MAGIC);
 	AN(sc);
 	sc->filename = strdup(cf->filename);
