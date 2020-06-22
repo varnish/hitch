@@ -4,6 +4,13 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.6.0~beta3 (2020-06-22)
+------------------------------
+
+* Fix a bug related to session resumption with client certificate
+  verification enabled, where some clients would fail resumption with
+  a "session id context uninitialized" error message.
+
 hitch-1.6.0~beta2 (2020-05-29)
 ------------------------------
 
