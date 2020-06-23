@@ -171,15 +171,23 @@ transmit the selected protocol as part of its PROXY header.
 
 ## SSL/TLS protocol setting
 
-Hitch supports TLS (1.0, 1.1 and 1.2) and SSL 3. By default, only TLS
-versions 1.1 and 1.2 are enabled, while TLS 1.0 and SSLv3 are
-disabled. The recommended way to to select protocols is to use
-`tls-protos` in the configuration file:
+Hitch supports TLS (1.0, 1.1, 1.2, 1.3) and SSL 3. By default, only
+TLS versions 1.2 and 1.3 are enabled, while the older protocol
+versions are disabled. The recommended way to to select protocols is
+to use `tls-protos` in the configuration file:
 
-    tls-protos = TLSv1.1 TLSv1.2
+    tls-protos = TLSv1.2 TLSv1.3
 
 The following tokens are available for the `tls-protos` option:
-`SSLv3`, `TLSv1.0`, `TLSv1.1` and `TLSv1.2`.
+`SSLv3`, `TLSv1.0`, `TLSv1.1`, `TLSv1.2` and `TLSv1.3`.
+
+The availability of protocl versions depend on OpenSSL version and
+system configuration. In particular for TLS 1.3, openssl 1.1.1 or
+later is required.
+
+For supporting legacy protocol versions you may also need to lower the
+`MinProtocol` property in your OpenSSL configuration (typically
+`/etc/ssl/openssl.cnf`).
 
 
 ## Uninterrupted configuration reload
