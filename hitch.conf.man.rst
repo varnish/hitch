@@ -375,7 +375,7 @@ used, the three TLS protocol versions will be used. Turning on SSLv3
 and TLSv1.0 is not recommended - support for these protocols are only
 kept for backwards compatibility.
 
-The availability of protocl versions depend on OpenSSL version and
+The availability of protocol versions depend on OpenSSL version and
 system configuration. In particular for TLS 1.3, openssl 1.1.1 or
 later is required.
 

@@ -181,7 +181,7 @@ to use `tls-protos` in the configuration file:
 The following tokens are available for the `tls-protos` option:
 `SSLv3`, `TLSv1.0`, `TLSv1.1`, `TLSv1.2` and `TLSv1.3`.
 
-The availability of protocl versions depend on OpenSSL version and
+The availability of protocol versions depend on OpenSSL version and
 system configuration. In particular for TLS 1.3, openssl 1.1.1 or
 later is required.
 
