@@ -259,14 +259,22 @@ pem-file = <string>
 Specify a SSL x509 certificate file. Server Name Indication (SNI) is
 supported by using one certificate file per SNI name.
 
-Certificates are used in the order they are listed; the last
-certificate listed will be used if none of the others match.
-
 A file suitable for Hitch is a concatenation of a private key and a
 corresponding certificate or certificate chain.
 
 At least one PEM file is needed for Hitch to start, but it can be
 supplied on the command line.
+
+Certificates are used in the order they are listed; the last
+certificate listed will be used if none of the others match.
+
+In the event that we have multiple certificates that provide the same
+SNI string, an error will be logged. The last loaded certificate will
+in that case take precendence.
+
+For partial overlap in names, e.g. if one certificate provides
+"www.example.com" and another one "*.example.com", the most specific
+match will always take precendence at SNI lookup.
 
 This option is also available in a frontend declaration, to make a
 certificate only available for a specific listen endpoint.
