@@ -273,7 +273,7 @@ SNI string, an error will be logged. The last loaded certificate will
 in that case take precendence.
 
 For partial overlap in names, e.g. if one certificate provides
-"www.example.com" and another one "*.example.com", the most specific
+"www.example.com" and another one "\*.example.com", the most specific
 match will always take precendence at SNI lookup.
 
 This option is also available in a frontend declaration, to make a
