@@ -301,6 +301,9 @@ curl_hitch() {
 # executions are expected to yield a non-zero exit status, in that case just
 # negate the result.
 #
+# A special -delay=<seconds> option can be used as the first argument to
+# prevent races from `openssl s_client` that could lead to missing output.
+#
 # Expect a success:
 #
 # s_client [...]
@@ -309,7 +312,7 @@ curl_hitch() {
 #
 # ! s_client [...]
 #
-# When we expect a failure, it usually to then inspect the output, and for
+# When we expect a failure, it's usually to then inspect the output, and for
 # convenience the standard error is redirected to the standard output.
 #
 # Should not be used in a sub-shell.
@@ -325,12 +328,10 @@ s_client() {
 		# ignore non-option arguments
 		test "${ARG#-}" = "$ARG" && continue
 
-		test "$ARG" = -connect && HAS_CONNECT_OPT=true
+		# ignore -delay=<seconds> homebrew option
+		test "${ARG#-delay=}" != "$ARG" && continue
 
-		if echo $ARG | grep -q -- "-delay="; then
-		    DELAY=$(echo $ARG | awk -F= '{print $2}')
-		    continue
-		fi
+		test "$ARG" = -connect && HAS_CONNECT_OPT=true
 
 		openssl s_client -help 2>&1 |
 		grep -q -e "$ARG" ||
@@ -344,10 +345,14 @@ s_client() {
 		return $?
 	fi
 
-	S_CLIENT_OPTS=$(echo $@ | sed -e 's/-delay=[^[:space:]]*//')
+	if [ "${1#-delay=}" != "$1" ]
+	then
+		DELAY=${1#-delay=}
+		shift
+	fi
 
-	(sleep $DELAY; printf '\n') |
-	openssl s_client -prexit $S_CLIENT_OPTS 2>&1
+	(sleep "$DELAY"; printf '\n') |
+	openssl s_client -prexit "$@" 2>&1
 }
 
 s_client_parse() {
