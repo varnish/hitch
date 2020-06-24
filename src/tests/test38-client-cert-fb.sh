@@ -25,13 +25,10 @@ HITCH_HOST1=$(hitch_hosts | sed -n 1p)
 HITCH_HOST2=$(hitch_hosts | sed -n 2p)
 
 # listen endpoint #1: no client verification configured:
-(sleep 1; printf '\n') |
-    openssl s_client -connect "$HITCH_HOST1" -prexit
+s_client -delay=1 -connect "$HITCH_HOST1"
 
 
 # listen endpoint #2: client-verify configured, requires client cert
-! (sleep 1; printf '\n') |
-    openssl s_client -connect "$HITCH_HOST2" -prexit
+! s_client -delay=1 -connect "$HITCH_HOST2"
 
-(sleep 1; printf '\n') |
-    openssl s_client -connect "$HITCH_HOST2" -prexit -cert "${CERTSDIR}/client-cert01.pem"
+s_client -delay=1 -connect "$HITCH_HOST2" -cert "${CERTSDIR}/client-cert01.pem"
