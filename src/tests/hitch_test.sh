@@ -318,6 +318,7 @@ s_client() {
 	printf 'Running: s_client %s\n' "$*" >&2
 
 	HAS_CONNECT_OPT=false
+	DELAY=0
 
 	for ARG
 	do
@@ -325,6 +326,11 @@ s_client() {
 		test "${ARG#-}" = "$ARG" && continue
 
 		test "$ARG" = -connect && HAS_CONNECT_OPT=true
+
+		if echo $ARG | grep -q -- "-delay="; then
+		    DELAY=$(echo $ARG | awk -F= '{print $2}')
+		    continue
+		fi
 
 		openssl s_client -help 2>&1 |
 		grep -q -e "$ARG" ||
@@ -338,8 +344,10 @@ s_client() {
 		return $?
 	fi
 
-	printf '\n' |
-	openssl s_client -prexit "$@" 2>&1
+	S_CLIENT_OPTS=$(echo $@ | sed -e 's/-delay=[^[:space:]]*//')
+
+	(sleep $DELAY; printf '\n') |
+	openssl s_client -prexit $S_CLIENT_OPTS 2>&1
 }
 
 s_client_parse() {
