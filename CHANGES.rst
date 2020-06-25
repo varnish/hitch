@@ -4,6 +4,28 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.6.0 (2020-06-25)
+------------------------
+
+* Added support for client certificate validation. This is specified
+  via the new ``client-verify`` and ``client-verify-ca`` configuration
+  settings. See hitch.conf(5) for more details.
+* Added support for a few PROXY properties for client certificate
+  validation. When Hitch is used alongside Varnish, one may make use
+  of vmod-proxy's proxy.client_has_cert_sess(),
+  proxy.ssl_verify_result() and proxy.client_has_cert_conn().
+* TLSv1.3 cipher suites can now be configured via the ``ciphersuites``
+  configuration file setting.
+* Added ``ecdh-curve`` configuration file setting for specifying the
+  list of supported TLS curves.
+* Default ``log-level`` is now set to 1, making Hitch slightly more
+  chatty by default.
+* Fixed a bug related to session resumption with client certificate
+  verification enabled, where some clients would fail resumption with
+  a "session id context uninitialized" error message.
+* Fixed a very minor memory leak, and a few other minor code cleanups.
+* Various minor documentation fixes
+
 hitch-1.6.0~beta3 (2020-06-22)
 ------------------------------
 
