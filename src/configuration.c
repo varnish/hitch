@@ -1651,7 +1651,7 @@ CFG_ON('s', CFG_SYSLOG);
 #else
 		/* No support for ALPN / NPN support in OpenSSL */
 		if (multi_proto ||
-		    0 != strncmp(cfg->ALPN_PROTOS_LV, "\x8http/1.1", 9)) {
+		    0 != strncmp((char *)cfg->ALPN_PROTOS_LV, "\x8http/1.1", 9)) {
 			config_error_set("This is compiled against OpenSSL version"
 			    " %lx, which does not have NPN or ALPN support,"
 			    " yet alpn-protos has been set to %s.",

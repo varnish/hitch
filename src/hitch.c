@@ -1984,6 +1984,7 @@ start_handshake(proxystate *ps, int err)
 	ev_timer_start(loop, &ps->ev_t_handshake);
 }
 
+#if defined(OPENSSL_WITH_NPN) || defined(OPENSSL_WITH_ALPN)
 static void
 get_alpn(proxystate *ps, const unsigned char **selected, unsigned *len) {
 	*selected = NULL;
@@ -1996,6 +1997,7 @@ get_alpn(proxystate *ps, const unsigned char **selected, unsigned *len) {
 		SSL_get0_next_proto_negotiated(ps->ssl, selected, len);
 #endif
 }
+#endif /* OPENSSL_WITH_NPN || OPENSSL_WITH_ALPN */
 
 static int
 proxy_tlv_append(char *dst, ssize_t dstlen, unsigned type,
