@@ -2032,7 +2032,7 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 
 	CHECK_OBJ_NOTNULL(ps, PROXYSTATE_MAGIC);
 	base = ringbuffer_write_ptr(&ps->ring_ssl2clear);
-	p = (struct pp2_hdr *)base; /* XXX: is this endian-safe? */
+	p = (struct pp2_hdr *)base;
 	l = (union addr *) local;
 	r = (union addr *) &ps->remote_ip;
 	maxlen = ps->ring_ssl2clear.data_len;
@@ -2110,7 +2110,7 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 		len += 3;
 		tlv = (struct pp2_tlv_ssl *) (&base[len]);
 		tlv->client = PP2_CLIENT_SSL;
-		tlv->verify = 1;
+		tlv->verify = htonl(1);
 
 		/* PP2_CLIENT_CERT_SESS */
 		crt = SSL_get_peer_certificate(ps->ssl);

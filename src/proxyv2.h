@@ -27,7 +27,7 @@ union pp2_addr {
 		uint8_t		rc_addr[108];
 		uint8_t		st_addr[108];
 	} local;
-};
+}__attribute__((packed));
 
 struct pp2_hdr {
 	uint8_t		sig[12];
@@ -35,7 +35,7 @@ struct pp2_hdr {
 	uint8_t		fam;
 	uint16_t	len;	/* number of following bytes of the header */
 	union pp2_addr	addr;
-};
+}__attribute__((packed));
 
 const uint8_t PP2_SIG[12] = {
     0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D,
@@ -71,7 +71,7 @@ struct pp2_tlv {
 	uint8_t	length_hi;
 	uint8_t	length_lo;
 	uint8_t	value[];
-};
+}__attribute__((packed));
 
 #define PP2_TYPE_ALPN		0x01
 #define PP2_TYPE_AUTHORITY	0x02
@@ -98,7 +98,7 @@ struct pp2_tlv_ssl {
 	uint8_t		client;
 	uint32_t	verify;
 	struct pp2_tlv	sub_tlv[];
-};
+}__attribute__((packed));
 
 #define PP2_CLIENT_SSL		0x01
 #define PP2_CLIENT_CERT_CONN	0x02
