@@ -4,6 +4,15 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.6.1 (2020-08-31)
+------------------------
+
+* Fix an issue in our PROXYv2 handling that caused us to sometimes
+  transmit a wrong 'verify' status code for client certificate
+  validation.
+* Fix build for OpenSSL without NPN/APLN support. Thanks to Wataru
+  Ashihara.
+
 hitch-1.6.0 (2020-06-25)
 ------------------------
 
