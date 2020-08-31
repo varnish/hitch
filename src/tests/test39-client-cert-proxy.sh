@@ -32,4 +32,4 @@ s_client -delay=1
 ! grep ERROR proxy.dump
 cat proxy.dump
 run_cmd grep "PP2_TYPE_SSL client" proxy.dump | grep -q "0x1"
-! run_cmd grep "PP2_TYPE_SSL verify" proxy.dump | grep -q "0x0"
+run_cmd grep "PP2_TYPE_SSL verify" proxy.dump | grep -q "0x1"
