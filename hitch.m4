@@ -24,7 +24,7 @@ AC_DEFUN([_HITCH_CHECK_FLAG], [
 	AC_MSG_CHECKING([whether the compiler accepts $2])
 	hitch_save_CFLAGS=$CFLAGS
 	CFLAGS="[$]$1 $2 $CFLAGS"
-	AC_RUN_IFELSE(
+	AC_LINK_IFELSE(
 		[AC_LANG_SOURCE([int main(void) { return (0); }])],
 		[AC_MSG_RESULT([yes]); $1="[$]$1 $2"],
 		[AC_MSG_RESULT([no])])
