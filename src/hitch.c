@@ -2026,11 +2026,10 @@ proxy_tlv_cert(struct proxystate *ps, char *dst, ssize_t dstlen)
 	if (crt == NULL)
 		return (0);
 
-	bm->length = 0;
+	memset(bm, 0, sizeof(*bm));
 	/* set aside the first three bytes for PROXY tlv type and size */
 	bm->data = dst + 3;
 	bm->max = dstlen - 3;
-	bm->flags = 0;
 	bio = BIO_new(BIO_s_mem());
 	AN(bio);		/* this should only fail if OOM */
 	BIO_set_mem_buf(bio, bm, BIO_NOCLOSE);
