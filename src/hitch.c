@@ -324,6 +324,7 @@ init_dh(SSL_CTX *ctx, const char *cert)
 
 	LOG("{core} Using DH parameters from %s\n", cert);
 	if (!SSL_CTX_set_tmp_dh(ctx, dh)) {
+		DH_free(dh);
 		log_ssl_error(NULL, "{core} Error setting temp DH params");
 		return (-1);
 	}
