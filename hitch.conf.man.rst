@@ -477,6 +477,21 @@ Currently the following will be transmitted when proxy-tlv is enabled:
 
 Default is on.
 
+proxy-client-cert = on|off
+--------------------------
+
+Transmit the authenticated client certificate as part of the PROXYv2
+header.
+
+The PEM-formatted client certificate will be transmitted as a TLV
+field of type 0xe0.
+
+This is a custom application-specific type, requiring a a custom
+handler at the recipient end. Note that using this feature will
+inflate the size of the PROXY header substantially, possibly also
+requiring tweaking at the receiving end.
+
+
 tcp-fastopen = on|off
 ---------------------
 

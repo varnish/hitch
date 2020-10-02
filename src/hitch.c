@@ -2015,6 +2015,46 @@ proxy_tlv_append(char *dst, ssize_t dstlen, unsigned type,
 	return (len + 3);
 }
 
+static int
+proxy_tlv_cert(struct proxystate *ps, char *dst, ssize_t dstlen)
+{
+	X509 *crt;
+	BIO *bio;
+	struct buf_mem_st bm[1];
+
+	crt = SSL_get_peer_certificate(ps->ssl);
+	if (crt == NULL)
+		return (0);
+
+	bm->length = 0;
+	/* set aside the first three bytes for PROXY tlv type and size */
+	bm->data = dst + 3;
+	bm->max = dstlen - 3;
+	bm->flags = 0;
+	bio = BIO_new(BIO_s_mem());
+	AN(bio);		/* this should only fail if OOM */
+	BIO_set_mem_buf(bio, bm, BIO_NOCLOSE);
+
+	if (PEM_write_bio_X509_AUX(bio, crt) == 0) {
+		BIO_free(bio);
+		X509_free(crt);
+		log_ssl_error(ps,
+		    "proxy-client-cert (PEM_write_bio_X509_AUX) failed");
+		return (0);
+	}
+	X509_free(crt);
+	AN(BIO_free(bio));
+
+	/* Type flag. Types 0xe0-0xef are available for custom
+	 * application-specific use. */
+	dst[0] = 0xe0;
+
+	dst[1] = (bm->length >> 8) & 0xff;
+	dst[2] = bm->length & 0xff;
+
+	return (bm->length + 3);
+}
+
 static void
 write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 {
@@ -2099,6 +2139,9 @@ write_proxy_v2(proxystate *ps, const struct sockaddr *local)
 			len += i;
 		}
 	}
+	if (CONFIG->PROXY_CLIENT_CERT)
+		len += proxy_tlv_cert(ps, base + len, maxlen - len);
+
 	if (CONFIG->PROXY_TLV) {
 		X509 *crt;
 		ssize_t sz = 0;

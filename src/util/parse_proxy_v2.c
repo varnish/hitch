@@ -198,6 +198,10 @@ print_extensions(unsigned char *extensions, int extensions_len)
 				j += sublen;
 			}
 			break;
+		case 0xe0:
+			printf("TLV 0xe0: len=%d\n", l);
+			printf("%*s\n", l, extensions + i);
+			break;
 		default:
 			printf("ERROR:\tUnknown extension %d\n", type);
 			break;
@@ -214,14 +218,15 @@ print_extensions(unsigned char *extensions, int extensions_len)
 int
 main(int argc, const char **argv)
 {
-	unsigned char proxy_header[PP2_HEADER_MAX + 1];
+	unsigned char proxy_header[BUFSIZ];
 	ssize_t n = 0;
 	int address_len = 0;
 
 	if (argc == 1)
-		n = read(STDIN_FILENO, proxy_header, PP2_HEADER_MAX);
+		n = read(STDIN_FILENO, proxy_header, sizeof(proxy_header));
 	else if (argc == 2)
-		n = read_from_socket(argv[1], proxy_header, PP2_HEADER_MAX);
+		n = read_from_socket(argv[1], proxy_header,
+		    sizeof(proxy_header));
 	else {
 		fprintf(stderr, "Usage: parse_proxy_v2 [port]\n");
 		return (1);

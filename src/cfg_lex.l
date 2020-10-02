@@ -70,6 +70,7 @@ char input_line[512];
 "write-proxy-v2"		{ return (TOK_WRITE_PROXY_V2); }
 "proxy-tlv"			{ return (TOK_PROXY_TLV); }
 "proxy-authority"		{ return (TOK_PROXY_AUTHORITY); }
+"proxy-client-cert"		{ return (TOK_PROXY_CCERT); }
 "pem-file"			{ return (TOK_PEM_FILE); }
 "proxy-proxy"			{ return (TOK_PROXY_PROXY); }
 "alpn-protos"			{ return (TOK_ALPN_PROTOS); }

@@ -13,6 +13,7 @@ pem-file = "${CERTSDIR}/default.example.com"
 client-verify = optional
 client-verify-ca = "${CERTSDIR}/client-ca.pem"
 write-proxy = on
+proxy-client-cert = on
 EOF
 
 start_hitch --config=hitch.cfg
@@ -23,6 +24,7 @@ cat proxy.dump
 ! grep ERROR proxy.dump
 run_cmd grep "PP2_TYPE_SSL client" proxy.dump | grep -q "0x7"
 run_cmd grep "PP2_TYPE_SSL verify" proxy.dump | grep -q "0x0"
+run_cmd grep "TLV 0xe0: len=1870" proxy.dump
 
 
 parse_proxy_v2 $BACKENDPORT >proxy.dump &
@@ -33,3 +35,4 @@ s_client -delay=1
 cat proxy.dump
 run_cmd grep "PP2_TYPE_SSL client" proxy.dump | grep -q "0x1"
 run_cmd grep "PP2_TYPE_SSL verify" proxy.dump | grep -q "0x1"
+! run_cmd grep "TLV 0xe0" proxy.dump
