@@ -342,9 +342,12 @@ config_param_val_bool(char *val, int *res)
 
 	if (strcasecmp(val, CFG_BOOL_ON) == 0 || strcasecmp(val, "yes") == 0 ||
 	    strcasecmp(val, "y") == 0 || strcasecmp(val, "true") == 0 ||
-	    strcasecmp(val, "t") == 0 || strcasecmp(val, "1") == 0) {
+	    strcasecmp(val, "t") == 0 || strcasecmp(val, "1") == 0)
 		*res = 1;
-	}
+	else if (strcasecmp(val, "off") == 0 || strcasecmp(val, "no") == 0
+	    || strcasecmp(val, "n") == 0 || strcasecmp(val, "false") == 0
+	    || strcasecmp(val, "f") == 0 || strcasecmp(val, "0") == 0)
+		*res = 0;
 
 	return (1);
 }
@@ -832,7 +835,7 @@ front_arg_add(hitch_config *cfg, struct front_arg *fa)
 }
 
 int
-config_param_validate(char *k, char *v, hitch_config *cfg,
+config_param_validate(const char *k, char *v, hitch_config *cfg,
     char *file, int line)
 {
 	int r = 1;
@@ -1239,7 +1242,7 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "      --ssl                   SSLv3 (enables SSLv3)\n");
 	fprintf(out, "  -c  --ciphers=SUITE         Sets allowed ciphers (Default: \"%s\")\n", config_disp_str(cfg->CIPHERS_TLSv12));
 	fprintf(out, "  -e  --ssl-engine=NAME       Sets OpenSSL engine (Default: \"%s\")\n", config_disp_str(cfg->ENGINE));
-	fprintf(out, "  -O  --prefer-server-ciphers Prefer server list order\n");
+	fprintf(out, "  -O  --prefer-server-ciphers[=on|off] Prefer server list order\n");
 	fprintf(out, "\n");
 	fprintf(out, "SOCKET:\n");
 	fprintf(out, "\n");
@@ -1278,7 +1281,7 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "                             of sessions (Default: %d)\n", cfg->SHARED_CACHE);
 #endif
 #ifdef TCP_FASTOPEN_WORKS
-	fprintf(out, "      --enable-tcp-fastopen  Enable client-side TCP Fast Open. (Default: %s)\n", config_disp_bool(cfg->TFO));
+	fprintf(out, "      --enable-tcp-fastopen[=on|off]  Enable client-side TCP Fast Open. (Default: %s)\n", config_disp_bool(cfg->TFO));
 #endif
 
 	fprintf(out, "\n");
@@ -1289,31 +1292,31 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "  -g  --group=GROUP          Set gid after binding the socket (Default: \"%s\")\n", config_disp_gid(cfg->GID));
 	fprintf(out, "\n");
 	fprintf(out, "LOGGING:\n");
-	fprintf(out, "  -q  --quiet                Be quiet; emit only error messages (deprecated, use 'log-level')\n");
+	fprintf(out, "  -q  --quiet[=on|off]       Be quiet; emit only error messages (deprecated, use 'log-level')\n");
 	fprintf(out, "  -L  --log-level=NUM        Log level. 0=silence, 1=err, 2=info/debug (Default: %d)\n",
 		cfg->LOG_LEVEL);
 	fprintf(out, "  -l  --log-filename=FILE    Send log message to a logfile instead of stderr/stdout\n");
-	fprintf(out, "  -s  --syslog               Send log message to syslog in addition to stderr/stdout\n");
+	fprintf(out, "  -s  --syslog[=on|off]      Send log message to syslog in addition to stderr/stdout\n");
 	fprintf(out, "      --syslog-facility=FACILITY    Syslog facility to use (Default: \"%s\")\n", config_disp_log_facility(cfg->SYSLOG_FACILITY));
 	fprintf(out, "\n");
 	fprintf(out, "OTHER OPTIONS:\n");
-	fprintf(out, "      --daemon               Fork into background and become a daemon (Default: %s)\n", config_disp_bool(cfg->DAEMONIZE));
-	fprintf(out, "      --write-ip             Write 1 octet with the IP family followed by the IP\n");
+	fprintf(out, "      --daemon[=on|off]      Fork into background and become a daemon (Default: %s)\n", config_disp_bool(cfg->DAEMONIZE));
+	fprintf(out, "      --write-ip[=on|off]    Write 1 octet with the IP family followed by the IP\n");
 	fprintf(out, "                             address in 4 (IPv4) or 16 (IPv6) octets little-endian\n");
 	fprintf(out, "                             to backend before the actual data\n");
 	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->WRITE_IP_OCTET));
-	fprintf(out, "      --write-proxy-v1       Write HaProxy's PROXY v1 (IPv4 or IPv6) protocol line\n" );
+	fprintf(out, "      --write-proxy-v1[=on|off]  Write HaProxy's PROXY v1 (IPv4 or IPv6) protocol line\n" );
 	fprintf(out, "                             before actual data\n");
 	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->WRITE_PROXY_LINE_V1));
-	fprintf(out, "      --write-proxy-v2       Write HaProxy's PROXY v2 binary (IPv4 or IPv6)  protocol line\n" );
+	fprintf(out, "      --write-proxy-v2[=on|off]  Write HaProxy's PROXY v2 binary (IPv4 or IPv6)  protocol line\n" );
 	fprintf(out, "                             before actual data\n");
 	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->WRITE_PROXY_LINE_V2));
-	fprintf(out, "      --write-proxy          Equivalent to --write-proxy-v2. For PROXY version 1 use\n");
+	fprintf(out, "      --write-proxy[=on|off] Equivalent to --write-proxy-v2. For PROXY version 1 use\n");
 	fprintf(out, "                              --write-proxy-v1 explicitly\n");
-	fprintf(out, "      --proxy-proxy          Proxy HaProxy's PROXY (IPv4 or IPv6) protocol line\n" );
+	fprintf(out, "      --proxy-proxy[=on|off]  Proxy HaProxy's PROXY (IPv4 or IPv6) protocol line\n" );
 	fprintf(out, "                             before actual data (PROXY v1 only)\n");
 	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->PROXY_PROXY_LINE));
-	fprintf(out, "      --sni-nomatch-abort    Abort handshake when client "
+	fprintf(out, "      --sni-nomatch-abort[=on|off]  Abort handshake when client "
 			"submits an unrecognized SNI server name\n" );
 	fprintf(out, "                             (Default: %s)\n",
 			config_disp_bool(cfg->SNI_NOMATCH_ABORT));
@@ -1402,7 +1405,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 		{ "ssl", 0, &ssl, 1},
 		{ "client", 0, &client, 1},
 		{ CFG_CIPHERS, 1, NULL, 'c' },
-		{ CFG_PREFER_SERVER_CIPHERS, 0, NULL, 'O' },
+		{ CFG_PREFER_SERVER_CIPHERS, 2, NULL, 'O' },
 		{ CFG_BACKEND, 1, NULL, 'b' },
 		{ CFG_FRONTEND, 1, NULL, 'f' },
 		{ CFG_WORKERS, 1, NULL, 'n' },
@@ -1419,24 +1422,24 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 		{ CFG_CHROOT, 1, NULL, 'r' },
 		{ CFG_USER, 1, NULL, 'u' },
 		{ CFG_GROUP, 1, NULL, 'g' },
-		{ CFG_QUIET, 0, NULL, 'q' },
+		{ CFG_QUIET, 2, NULL, 'q' },
 		{ CFG_LOG_FILENAME, 1, NULL, 'l' },
 		{ CFG_LOG_LEVEL, 1, NULL, 'L' },
-		{ CFG_SYSLOG, 0, NULL, 's' },
+		{ CFG_SYSLOG, 2, NULL, 's' },
 		{ CFG_SYSLOG_FACILITY, 1, NULL, CFG_PARAM_SYSLOG_FACILITY },
 		{ CFG_SEND_BUFSIZE, 1, NULL, CFG_PARAM_SEND_BUFSIZE },
 		{ CFG_RECV_BUFSIZE, 1, NULL, CFG_PARAM_RECV_BUFSIZE },
 #ifdef TCP_FASTOPEN_WORKS
-		{ CFG_TFO, 0, &cfg->TFO, 1 },
+		{ CFG_TFO, 2, NULL, 1 },
 #endif
-		{ CFG_DAEMON, 0, &cfg->DAEMONIZE, 1 },
-		{ CFG_WRITE_IP, 0, &cfg->WRITE_IP_OCTET, 1 },
-		{ CFG_WRITE_PROXY_V1, 0, &cfg->WRITE_PROXY_LINE_V1, 1 },
-		{ CFG_WRITE_PROXY_V2, 0, &cfg->WRITE_PROXY_LINE_V2, 1 },
-		{ CFG_WRITE_PROXY, 0, &cfg->WRITE_PROXY_LINE_V2, 1 },
-		{ CFG_PROXY_PROXY, 0, &cfg->PROXY_PROXY_LINE, 1 },
+		{ CFG_DAEMON, 2, NULL, 1 },
+		{ CFG_WRITE_IP, 2, NULL, 1 },
+		{ CFG_WRITE_PROXY_V1, 2, NULL, 1 },
+		{ CFG_WRITE_PROXY_V2, 2, NULL, 1 },
+		{ CFG_WRITE_PROXY, 2, NULL, 1 },
+		{ CFG_PROXY_PROXY, 2, NULL, 1 },
 		{ CFG_ALPN_PROTOS, 1, NULL, CFG_PARAM_ALPN_PROTOS },
-		{ CFG_SNI_NOMATCH_ABORT, 0, &cfg->SNI_NOMATCH_ABORT, 1 },
+		{ CFG_SNI_NOMATCH_ABORT, 2, NULL, 1 },
 		{ CFG_OCSP_DIR, 1, NULL, 'o' },
 		{ "test", 0, NULL, 't' },
 		{ "version", 0, NULL, 'V' },
@@ -1491,14 +1494,16 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 		case CFG_PARAM_CFGFILE:
 			/* Handled above */
 			break;
-#define CFG_ARG(opt, key)							\
-		case opt:							\
-			ret = config_param_validate(key, optarg, cfg, NULL, 0);	\
+#define CFG_ARG(opt, key)						\
+			case opt:					\
+			ret = config_param_validate(key,		\
+			    optarg, cfg, NULL, 0);			\
 			break;
-#define CFG_ON(opt, key)							\
-		case opt:							\
-			ret = config_param_validate(key, CFG_BOOL_ON, cfg, 	\
-			    NULL, 0);						\
+#define CFG_BOOL(opt, key)						\
+			case opt:					\
+			ret = config_param_validate(key,		\
+			    optarg ? optarg : CFG_BOOL_ON,		\
+			    cfg, NULL, 0);				\
 			break;
 CFG_ARG(CFG_PARAM_SYSLOG_FACILITY, CFG_SYSLOG_FACILITY);
 CFG_ARG(CFG_PARAM_SEND_BUFSIZE, CFG_SEND_BUFSIZE);
@@ -1523,13 +1528,31 @@ CFG_ARG('r', CFG_CHROOT);
 CFG_ARG('u', CFG_USER);
 CFG_ARG('g', CFG_GROUP);
 CFG_ARG('o', CFG_OCSP_DIR);
-CFG_ON('O', CFG_PREFER_SERVER_CIPHERS);
-CFG_ON('q', CFG_QUIET);
+CFG_BOOL('O', CFG_PREFER_SERVER_CIPHERS);
+CFG_BOOL('q', CFG_QUIET);
 CFG_ARG('l', CFG_LOG_FILENAME);
 CFG_ARG('L', CFG_LOG_LEVEL);
-CFG_ON('s', CFG_SYSLOG);
+CFG_BOOL('s', CFG_SYSLOG);
 #undef CFG_ARG
-#undef CFG_ON
+#undef CFG_BOOL
+		case 1:
+			assert (option_index > 0);
+			if (optarg != NULL) {
+				if (strcmp(optarg, "on") &&
+				    strcmp(optarg, "off")) {
+					config_error_set(
+						"Invalid argument '%s' for option '%s': "
+						    "expected one of 'on' or 'off",
+						    optarg,
+						    long_options[option_index].name);
+					return (1);
+				}
+			}
+			ret = config_param_validate(
+				long_options[option_index].name,
+				    optarg ? optarg : CFG_BOOL_ON,
+				    cfg, NULL, 0);
+			break;
 		case 't':
 			cfg->TEST = 1;
 			break;
