@@ -1234,100 +1234,171 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "This is hitch, The Scalable TLS Unwrapping Daemon.\n\n");
 	fprintf(out, "CONFIGURATION:\n");
 	fprintf(out, "\n");
-	fprintf(out, "        --config=FILE      Load configuration from specified file.\n");
+	fprintf(out, "\t--config=FILE\n");
+	fprintf(out, "\t\tLoad configuration from specified file.\n");
 	fprintf(out, "\n");
 	fprintf(out, "ENCRYPTION METHODS:\n");
 	fprintf(out, "\n");
-	fprintf(out, "      --tls                   TLSv1 (default. No SSLv3)\n");
-	fprintf(out, "      --ssl                   SSLv3 (enables SSLv3)\n");
-	fprintf(out, "  -c  --ciphers=SUITE         Sets allowed ciphers (Default: \"%s\")\n", config_disp_str(cfg->CIPHERS_TLSv12));
-	fprintf(out, "  -e  --ssl-engine=NAME       Sets OpenSSL engine (Default: \"%s\")\n", config_disp_str(cfg->ENGINE));
-	fprintf(out, "  -O  --prefer-server-ciphers[=on|off] Prefer server list order\n");
+	fprintf(out, "\t--tls\n");
+	fprintf(out, "\t\tTLSv1 (default. No SSLv3)\n");
+	fprintf(out, "\t--ssl\n");
+	fprintf(out, "\t\tSSLv3 (enables SSLv3)\n");
+	fprintf(out, "\t-c  --ciphers=SUITE\n");
+	fprintf(out, "\t\tSets allowed ciphers (Default: \"%s\")\n",
+	    config_disp_str(cfg->CIPHERS_TLSv12));
+	fprintf(out, "\t-e  --ssl-engine=NAME\n");
+	fprintf(out, "\t\tSets OpenSSL engine (Default: \"%s\")\n",
+	    config_disp_str(cfg->ENGINE));
+	fprintf(out, "\t-O  --prefer-server-ciphers[=on|off]\n");
+	fprintf(out, "\t\tPrefer server list order (Default: \"%s\")\n",
+	    config_disp_bool(cfg->PREFER_SERVER_CIPHERS));
 	fprintf(out, "\n");
 	fprintf(out, "SOCKET:\n");
 	fprintf(out, "\n");
-	fprintf(out, "      --client                Enable client proxy mode\n");
-	fprintf(out, "  -b  --backend=[HOST]:PORT   Backend [connect] (default is \"%s\")\n", config_disp_hostport(cfg->BACK_IP, cfg->BACK_PORT));
-	fprintf(out, "                              The -b argument can also take a UNIX domain socket path\n");
-	fprintf(out, "                              E.g. --backend=\"/path/to/sock\"\n");
-	fprintf(out, "  -f  --frontend=[HOST]:PORT[+CERT]    Frontend [bind] (default is \"%s\")\n", config_disp_hostport(cfg->LISTEN_DEFAULT->ip, cfg->LISTEN_DEFAULT->port));
-	fprintf(out, "                                (Note: brackets are mandatory in endpoint specifiers.)\n");
-	fprintf(out, "      --recv-bufsize=SIZE    Receive buffer size on client socket (Default: %d)\n", cfg->RECV_BUFSIZE);
-	fprintf(out, "      --send-bufsize=SIZE    Send buffer size on client socket (Default: %d)\n", cfg->SEND_BUFSIZE);
+	fprintf(out, "\t--client\n");
+	fprintf(out, "\t\tEnable client proxy mode\n");
+	fprintf(out, "\t-b  --backend=[HOST]:PORT\n");
+	fprintf(out, "\t\tBackend endpoint (default is \"%s\")\n",
+	    config_disp_hostport(cfg->BACK_IP, cfg->BACK_PORT));
+	fprintf(out,
+	    "\t\tThe -b argument can also take a UNIX domain socket path\n");
+	fprintf(out, "\t\tE.g. --backend=\"/path/to/sock\"\n");
+	fprintf(out, "\t-f  --frontend=[HOST]:PORT[+CERT]\n");
+	fprintf(out, "\t\tFrontend listen endpoint (default is \"%s\")\n",
+	    config_disp_hostport(cfg->LISTEN_DEFAULT->ip,
+		cfg->LISTEN_DEFAULT->port));
+	fprintf(out,
+	    "\t\t(Note: brackets are mandatory in endpoint specifiers.)\n");
+	fprintf(out, "\t--recv-bufsize=SIZE\n");
+	fprintf(out, "\t\tReceive buffer size on client socket (Default: %d)\n",
+	    cfg->RECV_BUFSIZE);
+	fprintf(out, "\t--send-bufsize=SIZE\n");
+	fprintf(out, "\t\tSend buffer size on client socket (Default: %d)\n",
+	    cfg->SEND_BUFSIZE);
 
 #ifdef USE_SHARED_CACHE
 	fprintf(out, "\n");
-	fprintf(out, "  -U  --shared-cache-listen=[HOST]:PORT\n");
-	fprintf(out, "                              Accept cache updates on UDP (Default: \"%s\")\n", config_disp_hostport(cfg->SHCUPD_IP, cfg->SHCUPD_PORT));
-	fprintf(out, "                              NOTE: This option requires enabled SSL session cache.\n");
-	fprintf(out, "  -P  --shared-cache-peer=[HOST]:PORT\n");
-	fprintf(out, "                              Send cache updates to specified peer\n");
-	fprintf(out, "                              NOTE: This option can be specified multiple times.\n");
-	fprintf(out, "  -M  --shared-cache-if=IFACE[,TTL]\n");
-	fprintf(out, "                              Force iface and ttl to receive and send multicast updates\n");
+	fprintf(out, "\t-U  --shared-cache-listen=[HOST]:PORT\n");
+	fprintf(out, "\t\tAccept cache updates on UDP (Default: \"%s\")\n",
+	    config_disp_hostport(cfg->SHCUPD_IP, cfg->SHCUPD_PORT));
+	fprintf(out,
+	    "\t\tNOTE: This option requires enabled SSL session cache.\n");
+	fprintf(out, "\t-P  --shared-cache-peer=[HOST]:PORT\n");
+	fprintf(out, "\t\tSend cache updates to specified peer\n");
+	fprintf(out,
+	    "\t\tNOTE: This option can be specified multiple times.\n");
+	fprintf(out, "\t-M  --shared-cache-if=IFACE[,TTL]\n");
+	fprintf(out,
+	    "\t\tForce iface and ttl to receive and send multicast updates\n");
 #endif
 
 	fprintf(out, "\n");
 	fprintf(out, "PERFORMANCE:\n");
 	fprintf(out, "\n");
-	fprintf(out, "  -n  --workers=NUM          Number of worker processes (Default: %ld)\n", cfg->NCORES);
-	fprintf(out, "  -B  --backlog=NUM          Set listen backlog size (Default: %d)\n", cfg->BACKLOG);
-	fprintf(out, "  -k  --keepalive=SECS       TCP keepalive on client socket (Default: %d)\n", cfg->TCP_KEEPALIVE_TIME);
-	fprintf(out, "  -R  --backend-refresh=SECS Periodic backend IP lookup, 0 to disable (Default: %d)\n", cfg->BACKEND_REFRESH_TIME);
-
+	fprintf(out, "\t-n  --workers=NUM\n");
+	fprintf(out, "\t\tNumber of worker processes (Default: %ld)\n",
+	    cfg->NCORES);
+	fprintf(out, "\t-B  --backlog=NUM\n");
+	fprintf(out, "\t\tSet listen backlog size (Default: %d)\n", cfg->BACKLOG);
+	fprintf(out, "\t-k  --keepalive=SECS\n");
+	fprintf(out, "\t\tTCP keepalive on client socket (Default: %d)\n",
+	    cfg->TCP_KEEPALIVE_TIME);
+	fprintf(out, "\t-R  --backend-refresh=SECS\n");
+	fprintf(out, "\t\tPeriodic backend IP lookup, 0 to disable (Default: %d)\n",
+	    cfg->BACKEND_REFRESH_TIME);
 
 #ifdef USE_SHARED_CACHE
-	fprintf(out, "  -C  --session-cache=NUM    Enable and set SSL session cache to specified number\n");
-	fprintf(out, "                             of sessions (Default: %d)\n", cfg->SHARED_CACHE);
+	fprintf(out, "\t-C  --session-cache=NUM\n");
+	fprintf(out,
+	    "\t\tEnable and set SSL session cache to specified number\n");
+	fprintf(out, "\t\tof sessions (Default: %d)\n", cfg->SHARED_CACHE);
 #endif
 #ifdef TCP_FASTOPEN_WORKS
-	fprintf(out, "      --enable-tcp-fastopen[=on|off]  Enable client-side TCP Fast Open. (Default: %s)\n", config_disp_bool(cfg->TFO));
+	fprintf(out, "\t--enable-tcp-fastopen[=on|off]\n");
+	fprintf(out, "\t\tEnable client-side TCP Fast Open. (Default: %s)\n",
+	    config_disp_bool(cfg->TFO));
 #endif
-
 	fprintf(out, "\n");
 	fprintf(out, "SECURITY:\n");
 	fprintf(out, "\n");
-	fprintf(out, "  -r  --chroot=DIR           Sets chroot directory (Default: \"%s\")\n", config_disp_str(cfg->CHROOT));
-	fprintf(out, "  -u  --user=USER            Set uid/gid after binding the socket (Default: \"%s\")\n", config_disp_uid(cfg->UID));
-	fprintf(out, "  -g  --group=GROUP          Set gid after binding the socket (Default: \"%s\")\n", config_disp_gid(cfg->GID));
+	fprintf(out, "\t-r  --chroot=DIR\n");
+	fprintf(out, "\t\tSets chroot directory (Default: \"%s\")\n",
+	    config_disp_str(cfg->CHROOT));
+	fprintf(out, "\t-u  --user=USER\n ");
+	fprintf(out,
+	    "\t\tSet uid/gid after binding the socket (Default: \"%s\")\n",
+	    config_disp_uid(cfg->UID));
+	fprintf(out, "\t-g  --group=GROUP\n");
+	fprintf(out, "\t\tSet gid after binding the socket (Default: \"%s\")\n",
+	    config_disp_gid(cfg->GID));
 	fprintf(out, "\n");
 	fprintf(out, "LOGGING:\n");
-	fprintf(out, "  -q  --quiet[=on|off]       Be quiet; emit only error messages (deprecated, use 'log-level')\n");
-	fprintf(out, "  -L  --log-level=NUM        Log level. 0=silence, 1=err, 2=info/debug (Default: %d)\n",
+	fprintf(out, "\t-q  --quiet[=on|off]\n");
+	fprintf(out, "\t\tBe quiet; emit only error messages "
+	    "(deprecated, use 'log-level')\n");
+	fprintf(out, "\t-L  --log-level=NUM\n");
+	fprintf(out, "\t\tLog level. 0=silence, 1=err, 2=info/debug (Default: %d)\n",
 		cfg->LOG_LEVEL);
-	fprintf(out, "  -l  --log-filename=FILE    Send log message to a logfile instead of stderr/stdout\n");
-	fprintf(out, "  -s  --syslog[=on|off]      Send log message to syslog in addition to stderr/stdout\n");
-	fprintf(out, "      --syslog-facility=FACILITY    Syslog facility to use (Default: \"%s\")\n", config_disp_log_facility(cfg->SYSLOG_FACILITY));
+	fprintf(out, "\t-l  --log-filename=FILE \n");
+	fprintf(out,
+	    "\t\tSend log message to a logfile instead of stderr/stdout\n");
+	fprintf(out, "\t-s  --syslog[=on|off]   \n");
+	fprintf(out,
+	    "\t\tSend log message to syslog in addition to stderr/stdout\n");
+	fprintf(out, "\t--syslog-facility=FACILITY\n");
+	fprintf(out, "\t\tSyslog facility to use (Default: \"%s\")\n",
+	    config_disp_log_facility(cfg->SYSLOG_FACILITY));
 	fprintf(out, "\n");
 	fprintf(out, "OTHER OPTIONS:\n");
-	fprintf(out, "      --daemon[=on|off]      Fork into background and become a daemon (Default: %s)\n", config_disp_bool(cfg->DAEMONIZE));
-	fprintf(out, "      --write-ip[=on|off]    Write 1 octet with the IP family followed by the IP\n");
-	fprintf(out, "                             address in 4 (IPv4) or 16 (IPv6) octets little-endian\n");
-	fprintf(out, "                             to backend before the actual data\n");
-	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->WRITE_IP_OCTET));
-	fprintf(out, "      --write-proxy-v1[=on|off]  Write HaProxy's PROXY v1 (IPv4 or IPv6) protocol line\n" );
-	fprintf(out, "                             before actual data\n");
-	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->WRITE_PROXY_LINE_V1));
-	fprintf(out, "      --write-proxy-v2[=on|off]  Write HaProxy's PROXY v2 binary (IPv4 or IPv6)  protocol line\n" );
-	fprintf(out, "                             before actual data\n");
-	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->WRITE_PROXY_LINE_V2));
-	fprintf(out, "      --write-proxy[=on|off] Equivalent to --write-proxy-v2. For PROXY version 1 use\n");
-	fprintf(out, "                              --write-proxy-v1 explicitly\n");
-	fprintf(out, "      --proxy-proxy[=on|off]  Proxy HaProxy's PROXY (IPv4 or IPv6) protocol line\n" );
-	fprintf(out, "                             before actual data (PROXY v1 only)\n");
-	fprintf(out, "                             (Default: %s)\n", config_disp_bool(cfg->PROXY_PROXY_LINE));
-	fprintf(out, "      --sni-nomatch-abort[=on|off]  Abort handshake when client "
-			"submits an unrecognized SNI server name\n" );
-	fprintf(out, "                             (Default: %s)\n",
+	fprintf(out, "\t--daemon[=on|off]\n");
+	fprintf(out, "\t\tFork into background and become a daemon (Default: %s)\n",
+	    config_disp_bool(cfg->DAEMONIZE));
+	fprintf(out, "\t--write-ip[=on|off]\n");
+	fprintf(out,
+	    "\t\tWrite 1 octet with the IP family followed by the IP\n");
+	fprintf(out,
+	    "\t\taddress in 4 (IPv4) or 16 (IPv6) octets little-endian\n");
+	fprintf(out,
+	    "\t\tto backend before the actual data\n");
+	fprintf(out,
+	    "\t\t(Default: %s)\n", config_disp_bool(cfg->WRITE_IP_OCTET));
+	fprintf(out, "\t--write-proxy-v1[=on|off]\n");
+	fprintf(out,
+	    "\t\tWrite HAProxy's PROXY v1 (IPv4 or IPv6) protocol line\n");
+	fprintf(out, "\t\tbefore actual data\n");
+	fprintf(out, "\t\t(Default: %s)\n",
+	    config_disp_bool(cfg->WRITE_PROXY_LINE_V1));
+	fprintf(out, "\t--write-proxy-v2[=on|off]\n");
+	fprintf(out, "\t\tWrite HAProxy's PROXY v2 binary (IPv4 or IPv6)\n");
+	fprintf(out, "\t\t protocol line before actual data\n");
+	fprintf(out, "\t\t(Default: %s)\n",
+	    config_disp_bool(cfg->WRITE_PROXY_LINE_V2));
+	fprintf(out, "\t--write-proxy[=on|off]\n");
+	fprintf(out, "\t\tEquivalent to --write-proxy-v2. For PROXY \n");
+	fprintf(out, "\t\tversion 1 use --write-proxy-v1 explicitly\n");
+	fprintf(out, "\t--proxy-proxy[=on|off]\n");
+	fprintf(out, "\t\tProxy HAProxy's PROXY (IPv4 or IPv6) protocol\n");
+	fprintf(out, "\t\tline before actual data (PROXY v1 only)\n");
+	fprintf(out, "\t\t(Default: %s)\n",
+	    config_disp_bool(cfg->PROXY_PROXY_LINE));
+	fprintf(out, "\t--sni-nomatch-abort[=on|off]\n");
+	fprintf(out, "\t\tAbort handshake when client submits an\n");
+	fprintf(out, "\t\tunrecognized SNI server name\n" );
+	fprintf(out, "\t\t(Default: %s)\n",
 			config_disp_bool(cfg->SNI_NOMATCH_ABORT));
-	fprintf(out, "      --ocsp-dir=DIR         Set OCSP staple cache directory\n");
-	fprintf(out, "                             This enables automated retrieval and stapling of OCSP responses\n");
-	fprintf(out, "                             (Default: \"%s\")\n", config_disp_str(cfg->OCSP_DIR));
+	fprintf(out, "\t--ocsp-dir=DIR\n");
+	fprintf(out, "\t\tSet OCSP staple cache directory\n");
+	fprintf(out, "\t\tThis enables automated retrieval and stapling of OCSP responses\n");
+	fprintf(out, "\t\t(Default: \"%s\")\n", config_disp_str(cfg->OCSP_DIR));
 	fprintf(out, "\n");
-	fprintf(out, "  -t  --test                 Test configuration and exit\n");
-	fprintf(out, "  -p  --pidfile=FILE         PID file\n");
-	fprintf(out, "  -V  --version              Print program version and exit\n");
-	fprintf(out, "  -h  --help                 This help message\n");
+	fprintf(out, "\t-t  --test\n");
+	fprintf(out, "\t\tTest configuration and exit\n");
+	fprintf(out, "\t-p  --pidfile=FILE\n");
+	fprintf(out, "\t\tPID file\n");
+	fprintf(out, "\t-V  --version\n");
+	fprintf(out, "\t\tPrint program version and exit\n");
+	fprintf(out, "\t-h  --help\n");
+	fprintf(out, "\t\tThis help message\n");
 
 	config_destroy(cfg);
 }
