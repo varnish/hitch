@@ -1386,9 +1386,13 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "\t\tunrecognized SNI server name\n" );
 	fprintf(out, "\t\t(Default: %s)\n",
 			config_disp_bool(cfg->SNI_NOMATCH_ABORT));
+	fprintf(out, "\t--alpn-protos=LIST\n");
+	fprintf(out, "\t\tSets the protocols for ALPN/NPN negotiation,\n");
+	fprintf(out, "\t\tprovided as a list of comma-separated tokens\n");
 	fprintf(out, "\t--ocsp-dir=DIR\n");
 	fprintf(out, "\t\tSet OCSP staple cache directory\n");
-	fprintf(out, "\t\tThis enables automated retrieval and stapling of OCSP responses\n");
+	fprintf(out, "\t\tThis enables automated retrieval and stapling\n"
+	    "\t\tof OCSP responses\n");
 	fprintf(out, "\t\t(Default: \"%s\")\n", config_disp_str(cfg->OCSP_DIR));
 	fprintf(out, "\n");
 	fprintf(out, "\t-t  --test\n");
