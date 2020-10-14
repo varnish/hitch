@@ -38,11 +38,10 @@ typedef struct shcupd_peer_opt {
 #endif
 
 typedef enum {
-	SSLv3_PROTO	= 0x01,
-	TLSv1_0_PROTO	= 0x02,
-	TLSv1_1_PROTO	= 0x04,
-	TLSv1_2_PROTO	= 0x08,
-	TLSv1_3_PROTO	= 0x10
+#define TLS_PROTO(e, n, s)			\
+	e = n,
+#include "tls_proto_tbl.h"
+
 } TLS_PROTOCOL;
 
 #define DEFAULT_TLS_PROTOS (TLSv1_2_PROTO | TLSv1_3_PROTO)

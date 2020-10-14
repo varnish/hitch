@@ -27,6 +27,7 @@ nobase_noinst_HEADERS = \
 	shctx.h \
 	ssl_err.h \
 	sysl_tbl.h \
+	tls_proto_tbl.h \
 	foreign/asn_gentm.h \
 	foreign/flopen.h \
 	foreign/miniobj.h \

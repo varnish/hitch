@@ -78,6 +78,7 @@
 #define CFG_SNI_NOMATCH_ABORT "sni-nomatch-abort"
 #define CFG_OCSP_DIR "ocsp-dir"
 #define CFG_TLS_PROTOS "tls-protos"
+#define CFG_PARAM_TLS_PROTOS 11018
 #ifdef TCP_FASTOPEN_WORKS
 	#define CFG_TFO "enable-tcp-fastopen"
 #endif
@@ -1034,6 +1035,16 @@ config_param_validate(const char *k, char *v, hitch_config *cfg,
 	} else if (strcmp(k, CFG_TFO) == 0) {
 		config_param_val_bool(v, &cfg->TFO);
 #endif
+	} else if (strcmp(k, CFG_TLS_PROTOS) == 0) {
+		cfg->SELECTED_TLS_PROTOS = 0;
+#define TLS_PROTO(u, i, s)				\
+		if (strcasestr(v, s))			\
+			cfg->SELECTED_TLS_PROTOS |= i;
+#include "tls_proto_tbl.h"
+		if (cfg->SELECTED_TLS_PROTOS == 0) {
+			config_error_set("Invalid 'tls-protos' option '%s'", v);
+			return (1);
+		}
 	} else {
 		fprintf(
 			stderr,
@@ -1239,6 +1250,10 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "\n");
 	fprintf(out, "ENCRYPTION METHODS:\n");
 	fprintf(out, "\n");
+	fprintf(out, "\t--tls-protos=LIST\n");
+	fprintf(out, "\t\tSpecifies which SSL/TLS protocols to use.\n");
+	fprintf(out, "\t\tAvailable tokens are SSLv3, TLSv1.0, TLSv1.1\n");
+	fprintf(out, "\t\tTLSv1.2 and TLSv1.3. (Default: \"TLSv1.2 TLSv1.3\"\n)");
 	fprintf(out, "\t--tls\n");
 	fprintf(out, "\t\tTLSv1 (default. No SSLv3)\n");
 	fprintf(out, "\t--ssl\n");
@@ -1516,6 +1531,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 		{ CFG_ALPN_PROTOS, 1, NULL, CFG_PARAM_ALPN_PROTOS },
 		{ CFG_SNI_NOMATCH_ABORT, 2, NULL, 1 },
 		{ CFG_OCSP_DIR, 1, NULL, 'o' },
+		{ CFG_TLS_PROTOS, 1, NULL, CFG_PARAM_TLS_PROTOS },
 		{ "test", 0, NULL, 't' },
 		{ "version", 0, NULL, 'V' },
 		{ "help", 0, NULL, 'h' },
@@ -1584,6 +1600,7 @@ CFG_ARG(CFG_PARAM_SYSLOG_FACILITY, CFG_SYSLOG_FACILITY);
 CFG_ARG(CFG_PARAM_SEND_BUFSIZE, CFG_SEND_BUFSIZE);
 CFG_ARG(CFG_PARAM_RECV_BUFSIZE, CFG_RECV_BUFSIZE);
 CFG_ARG(CFG_PARAM_ALPN_PROTOS, CFG_ALPN_PROTOS);
+CFG_ARG(CFG_PARAM_TLS_PROTOS, CFG_TLS_PROTOS);
 CFG_ARG('c', CFG_CIPHERS);
 CFG_ARG('e', CFG_SSL_ENGINE);
 CFG_ARG('b', CFG_BACKEND);
