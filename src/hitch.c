@@ -202,7 +202,8 @@ struct frontend {
 	struct sni_name_s	*sni_names;
 	struct sslctx_s		*ssl_ctxs;
 	struct sslctx_s		*default_ctx;
-	char			*pspec;
+	const struct front_arg	*arg;
+	struct addrinfo		*addrs;
 	struct listen_sock_head	socks;
 	VTAILQ_ENTRY(frontend)	list;
 };
@@ -1408,32 +1409,38 @@ destroy_frontend(struct frontend *fr)
 	}
 
 	AZ(HASH_COUNT(fr->sni_names));
-	free(fr->pspec);
 	FREE_OBJ(fr);
 }
 
 /* Create the bound socket in the parent process */
 static int
-frontend_listen(const struct front_arg *fa, struct listen_sock_head *slist)
+frontend_listen(const struct front_arg *fa, struct frontend *fr)
 {
 	struct addrinfo *ai, hints, *it;
 	struct listen_sock *ls, *lstmp;
+	struct listen_sock_head *slist;
 	char buf[INET6_ADDRSTRLEN+20];
 	char abuf[INET6_ADDRSTRLEN];
 	char pbuf[8];
 	int r, count = 0;
 
 	CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
-	r = getaddrinfo(fa->ip, fa->port,
-	    &hints, &ai);
-	if (r != 0) {
-		ERR("{getaddrinfo-listen}: %s: %s\n", fa->pspec,
-		    gai_strerror(r));
-		return (-1);
+	CHECK_OBJ_NOTNULL(fr, FRONTEND_MAGIC);
+	slist = &fr->socks;
+
+	ai = fr->addrs;
+	if (ai == NULL) {
+		memset(&hints, 0, sizeof hints);
+		hints.ai_family = AF_UNSPEC;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
+		r = getaddrinfo(fa->ip, fa->port,
+		    &hints, &ai);
+		if (r != 0) {
+			ERR("{getaddrinfo-listen}: %s: %s\n", fa->pspec,
+			    gai_strerror(r));
+			return (-1);
+		}
 	}
 
 	for (it = ai; it != NULL; it = it->ai_next) {
@@ -1554,20 +1561,28 @@ frontend_listen(const struct front_arg *fa, struct listen_sock_head *slist)
 		}
 		ls->name = strdup(buf);
 		AN(ls->name);
-		LOG("{core} Listening on %s\n", ls->name);
+		if (getpid() != master_pid)
+			LOG("{core} Listening on %s\n", ls->name);
 	}
 
-	freeaddrinfo(ai);
+	if (fr->addrs == NULL) {
+		assert(getpid() == master_pid);
+		VTAILQ_FOREACH_SAFE(ls, slist, list, lstmp) {
+			VTAILQ_REMOVE(slist, ls, list);
+			destroy_lsock(ls);
+		}
+		fr->addrs = ai;
+	} else {
+		fr->addrs = NULL;
+		freeaddrinfo(ai);
+	}
 	return (count);
 
 creat_frontend_err:
 	freeaddrinfo(ai);
 	VTAILQ_FOREACH_SAFE(ls, slist, list, lstmp) {
 		VTAILQ_REMOVE(slist, ls, list);
-		free(ls->name);
-		if (ls->sock > 0)
-			(void) close(ls->sock);
-		FREE_OBJ(ls);
+		destroy_lsock(ls);
 	}
 
 	return (-1);
@@ -1587,12 +1602,12 @@ create_frontend(const struct front_arg *fa)
 	VTAILQ_INIT(&fr->socks);
 	AN(fr);
 
-	fr->pspec = strdup(fa->pspec);
+	fr->arg = fa;
 	fr->match_global_certs = fa->match_global_certs;
 	fr->sni_nomatch_abort = fa->sni_nomatch_abort;
 
 	VTAILQ_INIT(&tmp_list);
-	count = frontend_listen(fa, &fr->socks);
+	count = frontend_listen(fa, fr);
 	if (count < 0) {
 		destroy_frontend(fr);
 		return (NULL);
@@ -3293,6 +3308,7 @@ void
 start_workers(int start_index, int count)
 {
 	struct worker_proc *c;
+	struct frontend *fr;
 	int pfd[2];
 
 	/* don't do anything if we're not allowed to create new workers */
@@ -3314,6 +3330,10 @@ start_workers(int start_index, int count)
 		} else if (c->pid == 0) { /* child */
 			close(pfd[1]);
 			FREE_OBJ(c);
+			VTAILQ_FOREACH(fr, &frontends, list) {
+				CHECK_OBJ_NOTNULL(fr->arg, FRONT_ARG_MAGIC);
+				assert(frontend_listen(fr->arg, fr) > 0);
+			}
 			if (CONFIG->CHROOT && CONFIG->CHROOT[0])
 				change_root();
 			if (CONFIG->UID >= 0 || CONFIG->GID >= 0)
@@ -3708,7 +3728,7 @@ frontend_query(struct front_arg *new_set, struct cfg_tpc_obj_head *cfg_objs)
 	struct cfg_tpc_obj *o;
 
 	VTAILQ_FOREACH(fr, &frontends, list) {
-		HASH_FIND_STR(new_set, fr->pspec, fa);
+		HASH_FIND_STR(new_set, fr->arg->pspec, fa);
 		if (fa != NULL) {
 			fa->mark = 1;
 			o = make_cfg_obj(CFG_FRONTEND, CFG_TPC_KEEP, fr, NULL,
@@ -3948,19 +3968,26 @@ reconfigure(int argc, char **argv)
 		}
 	}
 
-	/* Rewire default sslctx for each frontend after a reload */
+	/* Rewire default sslctx and front_arg for each frontend after
+	 * a reload */
 	VTAILQ_FOREACH(fr, &frontends, list) {
 		struct front_arg *fa;
 		struct cfg_cert_file *cf;
 		sslctx *sc;
+
+		HASH_FIND_STR(cfg_new->LISTEN_ARGS, fr->arg->pspec, fa);
+		CHECK_OBJ_NOTNULL(fa, FRONT_ARG_MAGIC);
+
+		/* rewire fr->arg: the previous value will be freed
+		 * below when we config_destroy() the old
+		 * configuration set. */
+		fr->arg = fa;
 
 		if (HASH_COUNT(fr->ssl_ctxs) == 0) {
 			fr->default_ctx = NULL;
 			continue;
 		}
 
-		HASH_FIND_STR(cfg_new->LISTEN_ARGS, fr->pspec, fa);
-		AN(fa);
 		cf = fa->certs;
 		CHECK_OBJ_NOTNULL(cf, CFG_CERT_FILE_MAGIC);
 		while (cf->hh.next != NULL)
@@ -4032,6 +4059,7 @@ main(int argc, char **argv)
 	// initialize configuration
 	struct front_arg *fa, *ftmp;
 
+	master_pid = getpid();
 	CONFIG = config_new();
 
 	// parse command line
@@ -4127,6 +4155,7 @@ main(int argc, char **argv)
 		}
 	}
 
+	/* Reset master_pid in case we daemonized */
 	master_pid = getpid();
 
 	if (CONFIG->PIDFILE) {

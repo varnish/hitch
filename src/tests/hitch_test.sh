@@ -197,6 +197,16 @@ hitch_pid() {
 	cat "$TEST_TMPDIR/hitch.pid"
 }
 
+#
+# Usage: hitch_cld_pid
+#
+# Print the PID of a hitch child process
+#
+
+hitch_cld_pid() {
+	pgrep -P "$(hitch_pid)" | head -1
+}
+
 #-
 # Usage: hitch_hosts
 #
@@ -206,7 +216,7 @@ hitch_pid() {
 hitch_hosts() {
 	if cmd lsof
 	then
-		lsof -F -P -n -a -p "$(hitch_pid)" -i 4 -i TCP -s TCP:LISTEN |
+		lsof -F -P -n -a -p "$(hitch_cld_pid)" -i 4 -i TCP -s TCP:LISTEN |
 		awk '/^n/ {
 			sub("\\*", "127.0.0.1", $1)
 			print substr($1,2)
@@ -217,7 +227,7 @@ hitch_hosts() {
 	if cmd sockstat && test "$(uname)" = FreeBSD
 	then
 		sockstat -P tcp -4 |
-		awk '$3 == '"$(hitch_pid)"' {
+		awk '$3 == '"$(hitch_cld_pid)"' {
 			sub("\\*", "127.0.0.1", $6)
 			print $6
 		}'
@@ -226,7 +236,7 @@ hitch_hosts() {
 
 	if cmd fstat && test "$(uname)" = OpenBSD
 	then
-		fstat -p "$(hitch_pid)" |
+		fstat -p "$(hitch_cld_pid)" |
 		awk '$5 == "internet" && $7 == "tcp" && NF == 9 {
 			sub("\\*", "127.0.0.1", $9)
 			print $9
