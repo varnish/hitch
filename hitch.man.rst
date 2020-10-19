@@ -75,8 +75,8 @@ Command line arguments
                          (Default: off)
   --write-proxy          Equivalent to --write-proxy-v2. For PROXY version 1 use
                           --write-proxy-v1 explicitly
-  --proxy-proxy          Proxy HaProxy's PROXY (IPv4 or IPv6) protocol line
-                         before actual data (PROXY v1 only)
+  --proxy-proxy          Proxy HAProxy's PROXY (IPv4 or IPv6) protocol line
+                         before actual data (PROXYv1 and PROXYv2)
                          (Default: off)
   --alpn-protos=LIST     Sets the protocols for ALPN/NPN negotiation, given by a comma
                          separated list. If this is not set explicitly, ALPN/NPN will

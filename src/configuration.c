@@ -1389,7 +1389,7 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "\t\tversion 1 use --write-proxy-v1 explicitly\n");
 	fprintf(out, "\t--proxy-proxy[=on|off]\n");
 	fprintf(out, "\t\tProxy HAProxy's PROXY (IPv4 or IPv6) protocol\n");
-	fprintf(out, "\t\tline before actual data (PROXY v1 only)\n");
+	fprintf(out, "\t\tbefore actual data (PROXYv1 and PROXYv2)\n");
 	fprintf(out, "\t\t(Default: %s)\n",
 	    config_disp_bool(cfg->PROXY_PROXY_LINE));
 	fprintf(out, "\t--sni-nomatch-abort[=on|off]\n");

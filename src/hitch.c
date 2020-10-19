@@ -223,8 +223,6 @@ static unsigned char shared_secret[SHA_DIGEST_LENGTH];
 int create_workers;
 static struct vpf_fh *pfh = NULL;
 
-static char tcp_proxy_line[128] = "";
-
 /* What agent/state requests the shutdown--for proper half-closed
  * handling */
 typedef enum _SHUTDOWN_REQUESTOR {
@@ -2369,51 +2367,121 @@ static void end_handshake(proxystate *ps) {
 		ev_io_start(loop, &ps->ev_w_ssl);
 }
 
+
+static int
+client_proxy_proxy2(struct proxystate *ps, BIO *b, char *buf, int c)
+{
+	struct pp2_hdr hdr;
+	char *ring, *p;
+	int n, sz, rlen;
+
+	memcpy(&hdr, buf, c);
+	p = (char *) &hdr;
+	p += c;
+
+	n = BIO_read(b, p, PP2_HDR_LEN - c);
+	if (n <= 0 || n != PP2_HDR_LEN - c) {
+		LOG("{client} Unexpected read error in proxy-proxyv2: "
+		    "BIO_read: %d\n", n);
+		shutdown_proxy(ps, SHUTDOWN_SSL);
+		return (1);
+	}
+
+	sz = ntohs(hdr.len);
+	AN(ringbuffer_is_empty(&ps->ring_ssl2clear));
+	rlen = ps->ring_ssl2clear.data_len;
+	if (sz + PP2_HDR_LEN > rlen) {
+		/* we have 32k of space, so this should relly never occur. */
+		LOG("{client} PROXYv2 overflow: header too long\n");
+		shutdown_proxy(ps, SHUTDOWN_SSL);
+		return (1);
+	}
+
+	ring = ringbuffer_write_ptr(&ps->ring_ssl2clear);
+	memcpy(ring, &hdr, PP2_HDR_LEN);
+	n = BIO_read(b, ring + PP2_HDR_LEN, sz);
+	if (n != sz) {
+		LOG("{client} proxy-proxyv2: Short read: %d\n", n);
+		shutdown_proxy(ps, SHUTDOWN_SSL);
+		return (1);
+	}
+	ringbuffer_write_append(&ps->ring_ssl2clear, n + PP2_HDR_LEN);
+	return (0);
+}
+
+static int
+client_proxy_proxy1(struct proxystate *ps, BIO *b, char *buf, int n)
+{
+	char *begin, *end, *p;
+	int t;
+
+	assert(ringbuffer_is_empty(&ps->ring_ssl2clear));
+	begin = ringbuffer_write_ptr(&ps->ring_ssl2clear);
+
+	/* PROXY spec says 107 bytes is the maximum size */
+	end = begin + 108;
+	memcpy(begin, buf, n);
+	p = begin + n;
+
+	// Copy characters one-by-one until we hit a \n or an error
+	while (p != end && (t = BIO_read(b, p, 1)) == 1) {
+		if (*p++ == '\n')
+			break;
+	}
+
+	if (p == end) {
+		LOG("{client} Unexpectedly long PROXY line. Malformed req?\n");
+		shutdown_proxy(ps, SHUTDOWN_SSL);
+		return (1);
+	} else if (t != 1) {
+		LOG("{client} Unexpected error reading PROXY line\n");
+		shutdown_proxy(ps, SHUTDOWN_SSL);
+		return (1);
+
+	}
+
+	ringbuffer_write_append(&ps->ring_ssl2clear,
+	    p - begin);
+	return (0);
+}
+
 static void
 client_proxy_proxy(struct ev_loop *loop, ev_io *w, int revents)
 {
-	(void)revents;
-	int t;
-	char *proxy = tcp_proxy_line;
-	char *end = tcp_proxy_line + sizeof(tcp_proxy_line);
 	proxystate *ps;
 	BIO *b;
+	char buf[32];
+	int n;
+
+	(void) revents;
 
 	CAST_OBJ_NOTNULL(ps, w->data, PROXYSTATE_MAGIC);
 	b = SSL_get_rbio(ps->ssl);
 
-	// Copy characters one-by-one until we hit a \n or an error
-	while (proxy != end && (t = BIO_read(b, proxy, 1)) == 1) {
-		if (*proxy++ == '\n')
-			break;
+	/* PROXYv1: 'PROXY ' */
+	/* PROXYv2:  PP2_SIG, (12 octets) */
+
+	n = BIO_read(b, buf, 12);
+	if (n != 12) {
+		LOG("{client} Unexpected read error in proxy-proxyv2: "
+		    "BIO_read: %d\n", n);
+		shutdown_proxy(ps, SHUTDOWN_SSL);
+		return;
 	}
 
-	if (proxy == end) {
-		LOG("{client} Unexpectedly long PROXY line. Malformed req?");
-		shutdown_proxy(ps, SHUTDOWN_SSL);
-	} else if (t == 1) {
-		if (ringbuffer_is_full(&ps->ring_ssl2clear)) {
-			LOG("{client} Error writing PROXY line");
-			shutdown_proxy(ps, SHUTDOWN_SSL);
+	if (memcmp(buf, "PROXY ", 6) == 0) {
+		if (client_proxy_proxy1(ps, b, buf, n))
 			return;
-		}
-
-		char *ring = ringbuffer_write_ptr(&ps->ring_ssl2clear);
-		memcpy(ring, tcp_proxy_line, proxy - tcp_proxy_line);
-		ringbuffer_write_append(&ps->ring_ssl2clear,
-		    proxy - tcp_proxy_line);
-
-		// Finished reading the PROXY header
-		if (*(proxy - 1) == '\n') {
-			ev_io_stop(loop, &ps->ev_proxy);
-
-			// Start the real handshake
-			start_handshake(ps, SSL_ERROR_WANT_READ);
-		}
-	} else if (!BIO_should_retry(b)) {
-		LOG("{client} Unexpected error reading PROXY line");
+	} else if (memcmp(buf, PP2_SIG, 12) == 0) {
+		if (client_proxy_proxy2(ps, b, buf, n))
+			return;
+	} else {
+		LOG("{client} Received invalid PROXY/PROXYv2 header\n");
 		shutdown_proxy(ps, SHUTDOWN_SSL);
 	}
+
+	ev_io_stop(loop, &ps->ev_proxy);
+	start_handshake(ps, SSL_ERROR_WANT_READ);
 }
 
 /* The libev I/O handler during the OpenSSL handshake phase.  Basically, just

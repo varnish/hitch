@@ -136,7 +136,7 @@ typedef struct proxystate {
 
 	ev_io			ev_r_clear;	/* Clear stream write event */
 	ev_io			ev_w_clear;	/* Clear stream read event */
-	ev_io			ev_proxy;	/* proxy read event */
+	ev_io			ev_proxy;	/* PROXY read event */
 
 	int			fd_up;		/* Upstream (client) socket */
 	int			fd_down;	/* Downstream (backend)
