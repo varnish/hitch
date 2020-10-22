@@ -333,8 +333,8 @@ Default is off.
 proxy-proxy = on|off
 --------------------
 
-Proxy an existing PROXY protocol header through this request. At the
-moment this is equivalent to write-proxy-v2.
+Proxy an incoming PROXY protocol header through to the
+backend. Supports both version 1 and 2 of the PROXY protocol.
 
 This option is mutually exclusive with option write-proxy-v2, write-ip
 and write-proxy-v1.
