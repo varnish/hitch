@@ -4,6 +4,31 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.7.0 (2020-10-23)
+------------------------
+
+* The following command line settings now accept a '--<setting>=on' or
+  '--<setting>=off' option: ``--prefer-server-ciphers``,
+  ``--enable-tcp-fastopen``, ``--quiet``, ``--syslog``, ``--daemon``,
+  ``--write-ip``, ``--write-proxy-v1``, ``--write-proxy-v2``,
+  ``--write-proxy``, ``--proxy-proxy`` and ``--sni-nomatch-abort``.
+* Added command line option ``--tls-protos``. This is equivalent to
+  the configuration file setting ``tls-protos``, and lets you specify
+  which TLS protocols to configure. The default setting is
+  ``--tls-protos="TLSv1.2 TLSv1.3"``.
+* Fixed an issue relating to imbalanced load distribution when running
+  with multiple worker processes. Hitch will now distribute work much
+  more evenly in multi-worker setups. (Issue: 142_)
+* The ``--proxy-proxy`` setting will now also parse and forward
+  PROXYv2 (Issue: 249_).
+* Added PROXY setting ``proxy-client-cert``, which will amend the
+  PROXYv2 header with the full PEM-formatted client certificate as a
+  custom TLV value (0xe0).
+
+.. _142: https://github.com/varnish/hitch/issues/142
+.. _249: https://github.com/varnish/hitch/issues/249
+
+
 hitch-1.6.1 (2020-08-31)
 ------------------------
 
