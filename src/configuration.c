@@ -79,6 +79,8 @@
 #define CFG_OCSP_DIR "ocsp-dir"
 #define CFG_TLS_PROTOS "tls-protos"
 #define CFG_PARAM_TLS_PROTOS 11018
+#define CFG_DBG_LISTEN "dbg-listen"
+#define CFG_PARAM_DBG_LISTEN 11019
 #ifdef TCP_FASTOPEN_WORKS
 	#define CFG_TFO "enable-tcp-fastopen"
 #endif
@@ -1045,6 +1047,8 @@ config_param_validate(const char *k, char *v, hitch_config *cfg,
 			config_error_set("Invalid 'tls-protos' option '%s'", v);
 			return (1);
 		}
+	} else if (strcmp(k, CFG_DBG_LISTEN) == 0) {
+		config_assign_str(&cfg->DEBUG_LISTEN_ADDR, v);
 	} else {
 		fprintf(
 			stderr,
@@ -1528,6 +1532,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 		{ CFG_SNI_NOMATCH_ABORT, 2, NULL, 1 },
 		{ CFG_OCSP_DIR, 1, NULL, 'o' },
 		{ CFG_TLS_PROTOS, 1, NULL, CFG_PARAM_TLS_PROTOS },
+		{ CFG_DBG_LISTEN, 1, NULL, CFG_PARAM_DBG_LISTEN },
 		{ "test", 0, NULL, 't' },
 		{ "version", 0, NULL, 'V' },
 		{ "help", 0, NULL, 'h' },
@@ -1597,6 +1602,7 @@ CFG_ARG(CFG_PARAM_SEND_BUFSIZE, CFG_SEND_BUFSIZE);
 CFG_ARG(CFG_PARAM_RECV_BUFSIZE, CFG_RECV_BUFSIZE);
 CFG_ARG(CFG_PARAM_ALPN_PROTOS, CFG_ALPN_PROTOS);
 CFG_ARG(CFG_PARAM_TLS_PROTOS, CFG_TLS_PROTOS);
+CFG_ARG(CFG_PARAM_DBG_LISTEN, CFG_DBG_LISTEN);
 CFG_ARG('c', CFG_CIPHERS);
 CFG_ARG('e', CFG_SSL_ENGINE);
 CFG_ARG('b', CFG_BACKEND);

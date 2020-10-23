@@ -163,6 +163,7 @@ start_hitch() {
 		--pidfile="$TEST_TMPDIR/hitch.pid" \
 		--log-filename=hitch.log \
 		--daemon \
+		--dbg-listen="$TEST_TMPDIR/hitch_hosts" \
 		$HITCH_USER \
 		"$@"
 }
@@ -197,16 +198,6 @@ hitch_pid() {
 	cat "$TEST_TMPDIR/hitch.pid"
 }
 
-#
-# Usage: hitch_cld_pid
-#
-# Print the PID of a hitch child process
-#
-
-hitch_cld_pid() {
-	pgrep -P "$(hitch_pid)" | head -1
-}
-
 #-
 # Usage: hitch_hosts
 #
@@ -214,37 +205,13 @@ hitch_cld_pid() {
 # a loop. Only IPv4 listen addresses are listed.
 
 hitch_hosts() {
-	if cmd lsof
+	if [ -f "$TEST_TMPDIR/hitch_hosts" ]
 	then
-		lsof -F -P -n -a -p "$(hitch_cld_pid)" -i 4 -i TCP -s TCP:LISTEN |
-		awk '/^n/ {
-			sub("\\*", "127.0.0.1", $1)
-			print substr($1,2)
-		}'
+		cat "$TEST_TMPDIR/hitch_hosts"
 		return
 	fi
 
-	if cmd sockstat && test "$(uname)" = FreeBSD
-	then
-		sockstat -P tcp -4 |
-		awk '$3 == '"$(hitch_cld_pid)"' {
-			sub("\\*", "127.0.0.1", $6)
-			print $6
-		}'
-		return
-	fi
-
-	if cmd fstat && test "$(uname)" = OpenBSD
-	then
-		fstat -p "$(hitch_cld_pid)" |
-		awk '$5 == "internet" && $7 == "tcp" && NF == 9 {
-			sub("\\*", "127.0.0.1", $9)
-			print $9
-		}'
-		return
-	fi
-
-	fail "none of supported lsof, sockstat or fstat available"
+	fail "$TEST_TMPDIR/hitch_hosts not found. Hitch started without --dbg-listen?"
 }
 
 #-

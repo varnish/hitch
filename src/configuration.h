@@ -150,6 +150,7 @@ struct __hitch_config {
 	double			OCSP_RESP_TMO;
 	double			OCSP_CONN_TMO;
 	int			OCSP_REFRESH_INTERVAL;
+	char 			*DEBUG_LISTEN_ADDR;
 #ifdef TCP_FASTOPEN_WORKS
 	int			TFO;
 #endif

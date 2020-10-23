@@ -3991,6 +3991,42 @@ notify_workers(struct worker_update *wu)
 	}
 }
 
+/*
+ * Print Hitch's listen enpoints to a file.
+ * Used for testing purposes.
+ */
+int
+listen_endpoint_print(const char *fn)
+{
+	FILE *fp;
+	int n;
+	struct frontend *fr;
+	struct addrinfo *it;
+	char hostbuf[NI_MAXHOST];
+	char servbuf[NI_MAXSERV];
+
+	fp = fopen(fn, "w");
+	if (fp == NULL) {
+		perror("fopen");
+		return (1);
+	}
+
+	VTAILQ_FOREACH(fr, &frontends, list) {
+		for (it = fr->addrs; it != NULL; it = it->ai_next) {
+			if (it->ai_addr->sa_family != AF_INET)
+				continue;
+			n = getnameinfo(it->ai_addr, it->ai_addrlen,
+			    hostbuf, sizeof(hostbuf), servbuf, sizeof(servbuf),
+			    NI_NUMERICHOST|NI_NUMERICSERV);
+			AZ(n);
+			fprintf(fp, "%s:%s\n", hostbuf, servbuf);
+		}
+	}
+
+	fclose(fp);
+	return (0);
+}
+
 static void
 reconfigure(int argc, char **argv)
 {
@@ -4077,6 +4113,9 @@ reconfigure(int argc, char **argv)
 	worker_gen++;
 	start_workers(0, CONFIG->NCORES);
 
+	if (CONFIG->DEBUG_LISTEN_ADDR)
+		listen_endpoint_print(CONFIG->DEBUG_LISTEN_ADDR);
+
 	wu.type = WORKER_GEN;
 	wu.payload.gen = worker_gen;
 	notify_workers(&wu);
@@ -4118,6 +4157,7 @@ sleep_and_refresh(hitch_config *CONFIG)
 		}
 	}
 }
+
 
 /* Process command line args, create the bound socket,
  * spawn child (worker) processes, and respawn if any die */
@@ -4239,6 +4279,10 @@ main(int argc, char **argv)
 	}
 
 	start_workers(0, CONFIG->NCORES);
+
+	if (CONFIG->DEBUG_LISTEN_ADDR) {
+		listen_endpoint_print(CONFIG->DEBUG_LISTEN_ADDR);
+	}
 
 	if (CONFIG->OCSP_DIR != NULL)
 		start_ocsp_proc();
