@@ -10,5 +10,5 @@ start_hitch \
 	"${CERTSDIR}/site1.example.com"
 
 s_client >s_client.dump
-subj_name_eq "site1.example.com" s_client.dump
+subject_field_eq CN "site1.example.com" s_client.dump
 curl_hitch

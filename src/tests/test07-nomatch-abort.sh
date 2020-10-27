@@ -39,12 +39,12 @@ fi
 
 # No SNI - should not be affected.
 s_client -connect localhost:$LISTENPORT $NOSNI >no-sni.dump
-subj_name_eq "default.example.com" no-sni.dump
+subject_field_eq CN "default.example.com" no-sni.dump
 
 # SNI request w/ valid servername
 s_client -servername site1.example.com \
 	-connect localhost:$LISTENPORT >valid-sni.dump
-subj_name_eq "site1.example.com" valid-sni.dump
+subject_field_eq CN "site1.example.com" valid-sni.dump
 
 # SNI w/ unknown servername
 ! s_client -servername invalid.example.com \
@@ -54,12 +54,12 @@ run_cmd grep 'unrecognized name' unknown-sni.dump
 # SNI request w/ valid servername
 s_client -servername site1.example.com \
 	-connect localhost:$PORT2 >valid-sni-2.dump
-subj_name_eq "site3.example.com" valid-sni-2.dump
+subject_field_eq CN "site3.example.com" valid-sni-2.dump
 
 # SNI w/ unknown servername
 s_client -servername invalid.example.com \
 	-connect localhost:$PORT2 >unknown-sni-2.dump
-subj_name_eq "site3.example.com" unknown-sni-2.dump
+subject_field_eq CN "site3.example.com" unknown-sni-2.dump
 
 # Ancient curl versions may not support --resolve
 # This would skip this test, keep it last

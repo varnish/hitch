@@ -15,6 +15,6 @@ start_hitch \
 for host in $(hitch_hosts)
 do
 	s_client -connect "$host" >"$host.dump"
-	subj_name_eq "site1.example.com" "$host.dump"
+	subject_field_eq CN "site1.example.com" "$host.dump"
 	curl_hitch -- "https://$host/"
 done

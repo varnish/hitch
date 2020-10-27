@@ -332,24 +332,32 @@ s_client() {
 	openssl s_client -prexit "$@" 2>&1
 }
 
-s_client_parse() {
-
-    # input examples we need to support here:
-    #
-    # openssl < 1.1.1:
-    #   subject=/CN=site1.example.com
-    #   subject=/C=NO/ST=Oslo/O=Varnish Software/L=Oslo/CN=*.example.com/OU=Varnish Software/emailAddress=foobar@example.com
-    # openssl >= 1.1.1:
-    #   subject=CN = site1.example.com
-    #   subject=C = NO, ST = Oslo, O = Varnish Software, L = Oslo, CN = *.example.com, OU = Varnish Software, emailAddress = foobar@example.com
-    #
-    # subject=/C=NO/ST=Oslo/O=Varnish Software/L=Oslo/CN=*.example.com/OU=Varnish Software/emailAddress=foobar@example.com
-
-    SUBJECT_NAME=$(grep "subject=" $1 | head -1 | cut -d= -f2- | sed -e 's/[,/]/\n/g' |
-			  grep CN | cut -d'=' -f2 | tr -d '[:space:]')
+# Extract a field from a subject line read from standard input.
+#
+# openssl < 1.1.1:
+#   subject=/CN=site1.example.com
+#   subject=/C=NO/ST=Oslo/O=Varnish Software/L=Oslo/CN=*.example.com/OU=...
+# openssl >= 1.1.1:
+#   subject=CN = site1.example.com
+#   subject=C = NO, ST = Oslo, O = Varnish Software, L = Oslo, CN = *.example.com, ...
+#
+_subject_field() {
+	sed -n 's/ *subject=//p' |
+	tr ,/ '\n' |
+	awk -F '[= ]*' -v RS='\n *' -v FIELD="$1" '$1 == FIELD {print $2; exit}'
 }
 
-subj_name_eq() {
-    s_client_parse "$2"
-    test "$SUBJECT_NAME" = "$1"
+#-
+# Usage: subject_field_eq FIELD VALUE FILE
+#
+# Extract the field FIELD from a subject line found in FILE and compare it
+# with VALUE.
+#
+# Example:
+#
+# subject_field_eq CN site1.example.com client.dump
+
+subject_field_eq() {
+	SUBJECT_NAME=$(_subject_field "$1" <"$3")
+	run_cmd test "$SUBJECT_NAME" = "$2"
 }

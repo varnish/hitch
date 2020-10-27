@@ -13,13 +13,11 @@ start_hitch \
 	"${CERTSDIR}/default.example.com"
 
 s_client -connect localhost:$LISTENPORT >s_client1.dump
-s_client_parse s_client1.dump
-run_cmd test "$SUBJECT_NAME" = "site1.example.com"
+subject_field_eq CN site1.example.com s_client1.dump
 
 # Second listen port.
 s_client -connect localhost:$PORT2 >s_client2.dump
-s_client_parse s_client2.dump
-run_cmd test "$SUBJECT_NAME" = "site2.example.com"
+subject_field_eq CN site2.example.com s_client2.dump
 
 for host in $(hitch_hosts)
 do

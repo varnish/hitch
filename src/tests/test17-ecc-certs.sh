@@ -9,5 +9,5 @@ start_hitch \
 	"${CERTSDIR}/ecc.example.com.pem"
 
 s_client >s_client.dump
-subj_name_eq "ecc.example.com" s_client.dump
+subject_field_eq CN "ecc.example.com" s_client.dump
 curl_hitch

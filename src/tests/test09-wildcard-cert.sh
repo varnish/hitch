@@ -9,4 +9,4 @@ start_hitch \
 	"${CERTSDIR}/default.example.com"
 
 s_client -servername foo.example.com >s_client.dump
-subj_name_eq "*.example.com" s_client.dump
+subject_field_eq CN "*.example.com" s_client.dump
