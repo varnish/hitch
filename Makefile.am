@@ -2,14 +2,16 @@ ACLOCAL_AMFLAGS = -I .
 
 SUBDIRS = src/util src
 
-if ENABLE_DOCUMENTATION
 dist_man_MANS = hitch.8 hitch.conf.5
 
+if ENABLE_DOCUMENTATION
 hitch.8: hitch.man.rst
 	${RST2MAN} --halt=2 $(srcdir)/hitch.man.rst $@
 
 hitch.conf.5: hitch.conf.man.rst
 	${RST2MAN} --halt=2 $(srcdir)/hitch.conf.man.rst $@
+
+endif
 
 check-recursive: hitch.conf.example
 
@@ -25,4 +27,3 @@ dist_doc_DATA = hitch.conf.example CHANGES.rst README.md
 
 EXTRA_DIST = LICENSE hitch.man.rst hitch.conf.man.rst docs
 CLEANFILES = hitch.conf.example
-endif
