@@ -231,6 +231,7 @@ PEM_DIR_GLOB: TOK_PEM_DIR_GLOB '=' STRING {
 };
 
 OCSP_DIR: TOK_OCSP_DIR '=' STRING {
+	free(cfg->OCSP_DIR);
 	if ($3)
 		cfg->OCSP_DIR = strdup($3);
 	else
@@ -477,12 +478,14 @@ SNI_NOMATCH_ABORT_REC : TOK_SNI_NOMATCH_ABORT '=' BOOL {
 
 CIPHERS_REC: TOK_CIPHERS '=' STRING {
 	if ($3) {
+		free(cfg->CIPHERS_TLSv12);
 		cfg->CIPHERS_TLSv12 = strdup($3);
 	}
 };
 
 CIPHERSUITES_REC: TOK_CIPHERSUITES '=' STRING {
 	if ($3) {
+		free(cfg->CIPHERSUITES_TLSv13);
 		cfg->CIPHERSUITES_TLSv13 = strdup($3);
 	}
 };
@@ -616,6 +619,7 @@ BACKEND_REFRESH_REC: TOK_BACKEND_REFRESH '=' UINT {
 
 ECDH_CURVE_REC: TOK_ECDH_CURVE '=' STRING {
 	if ($3) {
+		free(cfg->ECDH_CURVE);
 		cfg->ECDH_CURVE = strdup($3);
 	}
 };
@@ -645,6 +649,7 @@ CLIENT_VERIFY_OPT
 	};
 
 CLIENT_VERIFY_CA_REC: TOK_CLIENT_VERIFY_CA '=' STRING {
+	free(cfg->CLIENT_VERIFY_CA);
 	cfg->CLIENT_VERIFY_CA = strdup($3);
 };
 
