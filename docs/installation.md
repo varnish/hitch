@@ -12,7 +12,7 @@ It has been tested the most heavily on Linux/x86_64.
 
 Install prerequisites on Debian based systems:
 
-    $ sudo apt-get install libev-dev libssl-dev automake python-docutils flex bison pkg-config
+    $ sudo apt-get install libev-dev libssl-dev automake python-docutils flex bison pkg-config make
 
 To install `hitch`:
 

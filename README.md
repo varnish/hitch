@@ -9,5 +9,3 @@ unencrypted traffic to some backend. It's designed to handle 10s of thousands of
 connections efficiently on multicore machines.
 
 See the [web page](https://hitch-tls.org) for more information.
-
-
