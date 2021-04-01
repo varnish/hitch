@@ -1,0 +1,14 @@
+FROM archlinux
+
+RUN set -e; \
+	pacman -Sy --noconfirm \
+	    base-devel \
+	    ca-certificates \
+	    libev \
+	    openssl \
+	    automake \
+	    python-docutils \
+	    flex \
+	    bison \
+	    pkg-config \
+	    make
