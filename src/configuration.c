@@ -1742,18 +1742,6 @@ CFG_BOOL('s', CFG_SYSLOG);
 				    cfg->ALPN_PROTOS);
 			return (1);
 		}
-		AN(cfg->ALPN_PROTOS_LV);
-		int multi_proto =
-		    cfg->ALPN_PROTOS_LV[0] != cfg->ALPN_PROTOS_LV_LEN - 1;
-		if (multi_proto && !cfg->WRITE_PROXY_LINE_V2) {
-			config_error_set("alpn-protos is specified with"
-			    " more than one protocol while proxy-v2 is "
-			    " not selected. This is a configuration"
-			    " error.");
-			return (1);
-			/* Note that this test was carried out indepenently of
-			   the availability of ALPN / NPN */
-		}
 #if defined(OPENSSL_WITH_NPN) || defined(OPENSSL_WITH_ALPN)
 		/*
 		if (cfg->WRITE_PROXY_LINE_V2)
@@ -1767,6 +1755,9 @@ CFG_BOOL('s', CFG_SYSLOG);
 		    " support.\n");
 #  endif
 #else
+		AN(cfg->ALPN_PROTOS_LV);
+		int multi_proto =
+		    cfg->ALPN_PROTOS_LV[0] != cfg->ALPN_PROTOS_LV_LEN - 1;
 		/* No support for ALPN / NPN support in OpenSSL */
 		if (multi_proto ||
 		    0 != strncmp((char *)cfg->ALPN_PROTOS_LV, "\x8http/1.1", 9)) {
