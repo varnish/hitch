@@ -4,6 +4,14 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.7.1 (2021-04-19)
+------------------------
+
+* Drop the requirement that PROXYv2 needs to be configured in order to
+  use ALPN.
+* Minor (inconsequential) memory leak fixed.
+* Minor build-related fixes.
+
 hitch-1.7.0 (2020-10-23)
 ------------------------
 
