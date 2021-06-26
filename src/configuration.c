@@ -1180,6 +1180,7 @@ config_scan_pem_dir(char *pemdir, hitch_config *cfg)
 	int n, i, plen;
 	int retval = 0;
 	struct dirent **d;
+	struct stat st;
 
 	n = scandir(pemdir, &d, NULL, alphasort);
 	if (n < 0) {
@@ -1197,7 +1198,7 @@ config_scan_pem_dir(char *pemdir, hitch_config *cfg)
 			if (fnmatch(cfg->PEM_DIR_GLOB, d[i]->d_name, 0))
 				continue;
 		}
-		if (d[i]->d_type != DT_REG)
+		if (d[i]->d_type != DT_UNKNOWN && d[i]->d_type != DT_REG)
 			continue;
 
 		fpath = malloc(plen);
@@ -1209,6 +1210,20 @@ config_scan_pem_dir(char *pemdir, hitch_config *cfg)
 			free(fpath);
 			retval = 1;
 			break;
+		}
+
+		if (d[i]->d_type == DT_UNKNOWN) {
+			/* The underlying filesystem does not support d_type. */
+			if (lstat(fpath, &st) < 0) {
+				fprintf(stderr, "Warning: unable to stat '%s': %s. Skipping.\n",
+				    fpath, strerror(errno));
+				free(fpath);
+				continue;
+			}
+			if (!S_ISREG(st.st_mode)) {
+				free(fpath);
+				continue;
+			}
 		}
 
 		cert = cfg_cert_file_new();
