@@ -429,10 +429,11 @@ user = <string>
 User to run as. If Hitch is started as root, it will insist on
 changing to a user with lower rights after binding to sockets.
 
-workers = <number>
+workers = <number>|auto
 ------------------
 
 Number of worker processes. One per CPU core is recommended.
+Using auto value creates 1 worker per CPU core
 
 write-ip = on|off
 -----------------

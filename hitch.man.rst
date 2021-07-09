@@ -84,10 +84,11 @@ also take a UNIX domain socket path E.g. --backend="/path/to/sock"
 Frontend listen endpoint (default is "[*]:8443") (Note: brackets are
 mandatory in endpoint specifiers.)
 
-``-n  --workers=NUM``
+``-n  --workers=NUM|auto``
 ---------------------
 
 Number of worker processes (Default: 1)
+Using auto value creates 1 worker per CPU core
 
 ``-B  --backlog=NUM``
 ---------------------

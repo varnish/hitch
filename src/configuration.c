@@ -8,6 +8,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/sysinfo.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -545,6 +546,21 @@ config_param_val_long(char *str, long *dst, int non_negative)
 	return (1);
 }
 
+static int
+config_param_val_workers(char *str, long *dst, int non_negative)
+{
+	assert(str != NULL);
+
+	if (strcasecmp(str, "auto") == 0) {
+		/* Get number of active CPU */
+		*dst = get_nprocs_conf();
+	}
+	else {
+		return config_param_val_long(str, dst, non_negative);
+	}
+	return (1);
+}
+
 static double
 mtim2double(const struct stat *sb)
 {
@@ -918,7 +934,7 @@ config_param_validate(const char *k, char *v, hitch_config *cfg,
 		r = config_param_host_port(v, &cfg->BACK_IP, &cfg->BACK_PORT,
 		    &cfg->BACK_PATH);
 	} else if (strcmp(k, CFG_WORKERS) == 0) {
-		r = config_param_val_long(v, &cfg->NCORES, 1);
+		r = config_param_val_workers(v, &cfg->NCORES, 1);
 	} else if (strcmp(k, CFG_BACKLOG) == 0) {
 		r = config_param_val_int(v, &cfg->BACKLOG, 0);
 	} else if (strcmp(k, CFG_KEEPALIVE) == 0) {
