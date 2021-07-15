@@ -549,13 +549,17 @@ config_param_val_workers(char *str, long *dst, int non_negative)
 {
 	assert(str != NULL);
 
-#if SC_NPROCESSORS_ONLN_WORKS
 	if (strcasecmp(str, "auto") == 0) {
+#if SC_NPROCESSORS_ONLN_WORKS
 		/* Get number of active CPU */
 		*dst = sysconf(_SC_NPROCESSORS_ONLN);
+#else
+		*dst = 1;
+		fprintf(stderr, "Warning: could not determine number of active CPU."
+			" Defaulting to 1 single worker.\n");
+#endif
 		return (1);
 	}
-#endif
 	return config_param_val_long(str, dst, non_negative);
 }
 
