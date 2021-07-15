@@ -142,6 +142,25 @@ if test "$ac_cv_so_reuseport_works" = yes; then
   AC_DEFINE([SO_REUSEPORT_WORKS], [1], [Define if SO_REUSEPORT works])
 fi
 
+AC_CACHE_CHECK([whether sysconf(_SC_NPROCESSORS_ONLN) works],
+  [ac_cv_sysconf_nprocs_works],
+  [AC_RUN_IFELSE(
+    [AC_LANG_PROGRAM([[
+#include <unistd.h>
+    ]], [[
+	if (sysconf(_SC_NPROCESSORS_ONLN) > 0)
+	  return (0);
+	return (1);
+]])],
+  [ac_cv_sysconf_nprocs_works=yes],
+  [ac_cv_sysconf_nprocs_works=no])
+  ]
+)
+
+if test "$ac_cv_sysconf_nprocs_works" = yes; then
+  AC_DEFINE([SC_NPROCESSORS_ONLN_WORKS], [1], [Define if sysconf(_SC_NPROCESSORS_ONLN) works])
+fi
+
 AC_ARG_ENABLE(tcp-fastopen,
 	AC_HELP_STRING([--enable-tcp-fastopen],
 		[Enable TCP Fast Open. (default is auto)]),

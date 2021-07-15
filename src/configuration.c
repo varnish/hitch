@@ -549,14 +549,14 @@ config_param_val_workers(char *str, long *dst, int non_negative)
 {
 	assert(str != NULL);
 
+#if SC_NPROCESSORS_ONLN_WORKS
 	if (strcasecmp(str, "auto") == 0) {
 		/* Get number of active CPU */
-		*dst = get_nprocs_conf();
+		*dst = sysconf(_SC_NPROCESSORS_ONLN);
+		return (1);
 	}
-	else {
-		return config_param_val_long(str, dst, non_negative);
-	}
-	return (1);
+#endif
+	return config_param_val_long(str, dst, non_negative);
 }
 
 static double

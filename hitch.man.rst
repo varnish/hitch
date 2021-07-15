@@ -85,10 +85,10 @@ Frontend listen endpoint (default is "[*]:8443") (Note: brackets are
 mandatory in endpoint specifiers.)
 
 ``-n  --workers=NUM|auto``
----------------------
+--------------------------
 
 Number of worker processes (Default: 1)
-Using auto value creates 1 worker per CPU core
+Using auto value creates 1 worker per CPU core.
 
 ``-B  --backlog=NUM``
 ---------------------
