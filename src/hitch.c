@@ -1085,10 +1085,6 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 	    (sc-> staple_vfy < 0 && CONFIG->OCSP_VFY))
 		AN(SSL_CTX_set_default_verify_paths(ctx));
 
-	if (CONFIG->PMODE == SSL_CLIENT)
-		return (sc);
-
-	/* SSL_SERVER Mode stuff */
 	if (SSL_CTX_use_certificate_chain_file(ctx, cf->filename) <= 0) {
 		log_ssl_error(NULL,
 		    "Error loading certificate file %s\n", cf->filename);
@@ -1123,6 +1119,10 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 		return (NULL);
 	}
 
+	if (CONFIG->PMODE == SSL_CLIENT)
+		return (sc);
+
+	/* SSL_SERVER Mode stuff */
 #ifndef OPENSSL_NO_DH
 	init_dh(ctx, cf->filename);
 	init_ecdh(ctx, CONFIG->ECDH_CURVE);
