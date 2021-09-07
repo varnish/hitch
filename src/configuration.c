@@ -1272,7 +1272,7 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "\t--tls-protos=LIST\n");
 	fprintf(out, "\t\tSpecifies which SSL/TLS protocols to use.\n");
 	fprintf(out, "\t\tAvailable tokens are SSLv3, TLSv1.0, TLSv1.1\n");
-	fprintf(out, "\t\tTLSv1.2 and TLSv1.3. (Default: \"TLSv1.2 TLSv1.3\"\n)");
+	fprintf(out, "\t\tTLSv1.2 and TLSv1.3. (Default: \"TLSv1.2 TLSv1.3\")\n");
 	fprintf(out, "\t-c  --ciphers=SUITE\n");
 	fprintf(out, "\t\tSets allowed ciphers (Default: \"%s\")\n",
 	    config_disp_str(cfg->CIPHERS_TLSv12));
