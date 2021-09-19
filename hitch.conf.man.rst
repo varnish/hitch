@@ -270,11 +270,11 @@ certificate listed will be used if none of the others match.
 
 In the event that we have multiple certificates that provide the same
 SNI string, an error will be logged. The last loaded certificate will
-in that case take precendence.
+in that case take precedence.
 
 For partial overlap in names, e.g. if one certificate provides
 "www.example.com" and another one "\*.example.com", the most specific
-match will always take precendence at SNI lookup.
+match will always take precedence at SNI lookup.
 
 This option is also available in a frontend declaration, to make a
 certificate only available for a specific listen endpoint.
