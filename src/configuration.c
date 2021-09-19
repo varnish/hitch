@@ -1205,7 +1205,7 @@ config_scan_pem_dir(char *pemdir, hitch_config *cfg)
 		AN(fpath);
 
 		if (snprintf(fpath, plen, "%s%s", pemdir, d[i]->d_name) < 0) {
-			config_error_set("An error occured while "
+			config_error_set("An error occurred while "
 			    "combining path");
 			free(fpath);
 			retval = 1;
