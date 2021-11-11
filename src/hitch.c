@@ -2479,6 +2479,7 @@ client_proxy_proxy(struct ev_loop *loop, ev_io *w, int revents)
 	} else {
 		LOG("{client} Received invalid PROXY/PROXYv2 header\n");
 		shutdown_proxy(ps, SHUTDOWN_SSL);
+		return;
 	}
 
 	ev_io_stop(loop, &ps->ev_proxy);
