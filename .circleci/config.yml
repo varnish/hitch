@@ -22,7 +22,7 @@ workflows:
           docker-img: varnish/dist-vcp-centos-7
           src-commit: << pipeline.parameters.src-commit >>
           tarball-cmd: |
-            yum install -y libev-devel byacc flex
+            yum install -y libev-devel byacc flex python-docutils
             git checkout << pipeline.parameters.src-commit >>
             ./bootstrap
             make dist -j 16
