@@ -4,6 +4,17 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+
+hitch-1.7.2 (2021-11-29)
+------------------------
+
+* pem-dir now works correctly also for file systems without proper
+  file type classification in readdir(). Thanks got Xavier G
+  (@xavierog).
+* Fix an issue in ``proxy-proxy`` error handling.
+* Minor build-related fixes.
+
+
 hitch-1.7.1 (2021-04-19)
 ------------------------
 
