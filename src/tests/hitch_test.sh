@@ -166,6 +166,7 @@ start_hitch() {
 		--dbg-listen="$TEST_TMPDIR/hitch_hosts" \
 		$HITCH_USER \
 		"$@"
+	run_cmd sleep 1
 }
 
 #-
