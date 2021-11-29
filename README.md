@@ -1,7 +1,7 @@
 hitch TLS proxy
 ===============
 
-[![Build Status](https://travis-ci.org/varnish/hitch.svg?branch=master)](https://travis-ci.org/varnish/hitch)
+[![CircleCI Build Status](https://circleci.com/gh/varnish/hitch/tree/master.svg?style=svg)](https://circleci.com/gh/varnish/hitch/tree/master)
 [![Coverity Scan Build Status](https://scan.coverity.com/projects/5137/badge.svg)](https://scan.coverity.com/projects/hitch)
 
 `hitch` is a network proxy that terminates TLS/SSL connections and forwards the
