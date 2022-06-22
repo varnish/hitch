@@ -24,7 +24,7 @@ multiple "pem-file = cert.pem" stances in a configuration file instead.
 
 ## Legacy clients
 
-To support older clients, you need to add multiple `--frontend=` stances to your configuration
+To support older clients, you need to add multiple `--frontend=` stanzas to your configuration
 file (or command line) and a separate PEM file for each of them. Usually this
 means that you need many IP addresses assigned to the hitch server as well.
 
