@@ -4,6 +4,11 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.7.3 (2022-09-14)
+------------------------
+
+* Fixes build for OpenSSL 3.0.
+
 
 hitch-1.7.2 (2021-11-29)
 ------------------------
