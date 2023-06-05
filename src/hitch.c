@@ -734,6 +734,21 @@ load_privatekey(SSL_CTX *ctx, const char *file)
 	return (pkey);
 }
 
+static int
+client_vfy_cb(int preverify_ok, X509_STORE_CTX *storectx)
+{
+	proxystate *ps;
+	SSL *ssl;
+
+	ssl = X509_STORE_CTX_get_ex_data(storectx,
+	    SSL_get_ex_data_X509_STORE_CTX_idx());
+	CAST_OBJ_NOTNULL(ps, SSL_get_app_data(ssl), PROXYSTATE_MAGIC);
+	if (preverify_ok)
+		ps->client_cert_conn = 1;
+
+	return (preverify_ok);
+}
+
 #ifndef OPENSSL_NO_TLSEXT
 static int
 sni_match(const sni_name *sn, const char *srvname)
@@ -789,6 +804,8 @@ sni_try_lookup(SSL *ssl, const char *sni_key, const struct sni_name_s *sn_tab)
 
 	CHECK_OBJ(sc, SSLCTX_MAGIC);
 	SSL_set_SSL_CTX(ssl, sc->ctx);
+	SSL_set_verify(ssl, SSL_CTX_get_verify_mode(sc->ctx),
+		    client_vfy_cb);
 	return (1);
 }
 
@@ -907,21 +924,6 @@ Find_issuer(X509 *subj, STACK_OF(X509) *chain)
 }
 
 static int
-client_vfy_cb(int preverify_ok, X509_STORE_CTX *storectx)
-{
-	proxystate *ps;
-	SSL *ssl;
-
-	ssl = X509_STORE_CTX_get_ex_data(storectx,
-	    SSL_get_ex_data_X509_STORE_CTX_idx());
-	CAST_OBJ_NOTNULL(ps, SSL_get_app_data(ssl), PROXYSTATE_MAGIC);
-	if (preverify_ok)
-		ps->client_cert_conn = 1;
-
-	return (preverify_ok);
-}
-
-static int
 client_vfy_init(SSL_CTX *ctx, int flags, const char *cafile)
 {
 	X509_STORE *vfy;
@@ -1003,6 +1005,9 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 			client_verify = fa->client_verify;
 	}
 
+	if (cf->client_verify != -1)
+		client_verify = cf->client_verify;
+
 	long ssloptions = SSL_OP_NO_SSLv2 | SSL_OP_ALL |
 	    SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION;
 
@@ -1062,6 +1067,8 @@ make_ctx_fr(const struct cfg_cert_file *cf, const struct frontend *fr,
 		const char *ca = CONFIG->CLIENT_VERIFY_CA;
 		if (fa && fa->client_verify_ca)
 			ca = fa->client_verify_ca;
+		if (cf->client_verify != -1 && cf->client_verify_ca)
+			ca = cf->client_verify_ca;
 		AN(ca);
 		if (client_vfy_init(ctx, client_verify, ca))
 			return (NULL);
