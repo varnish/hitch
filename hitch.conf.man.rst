@@ -131,9 +131,12 @@ permit connections that do not present one.
 For settings ``optional`` and ``required``, we also require that the
 ``client-verify-ca`` is configured.
 
-This option is also available in frontend blocks. If specified in a
-frontend block, the client verification setting will only apply to the
-``pem-file`` records for that particular frontend.
+This option is also available in ``frontend`` blocks and ``pem-file``
+blocks. If specified in a ``frontend`` block, the client verification
+setting will only apply to the ``pem-file`` records for that
+particular frontend. This can also be further refined by using the
+option in a ``pem-file`` block, which has the effect of having it only
+apply to that particular ``pem-file`` record.
 
 client-verify-ca = <string>
 ---------------------------
@@ -144,7 +147,7 @@ used to verify a client certificate.
 For multiple CAs, this file can be a concatenation of multiple
 pem-files for the relevant certificate authorities.
 
-This option is also available in frontend blocks.
+This option is also available in frontend blocks and in pem-file blocks.
 
 daemon = on|off
 ---------------

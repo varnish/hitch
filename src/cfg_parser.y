@@ -191,6 +191,8 @@ PB_REC
 	| PB_OCSP_RESP_FILE;
 	| OCSP_VERIFY
 	| PRIVATE_KEY
+	| PB_CLIENT_VERIFY
+	| PB_CLIENT_VERIFY_CA
 	;
 
 PB_CERT: TOK_PB_CERT '=' STRING { if ($3) cur_pem->filename = strdup($3); };
@@ -209,6 +211,11 @@ OCSP_VERIFY: TOK_OCSP_VERIFY '=' BOOL {
 
 PRIVATE_KEY: TOK_PRIVATE_KEY '=' STRING {
 	if ($3) cur_pem->priv_key_filename = strdup($3);
+};
+
+PB_CLIENT_VERIFY: TOK_CLIENT_VERIFY '=' CLIENT_VERIFY_OPT;
+PB_CLIENT_VERIFY_CA: TOK_CLIENT_VERIFY_CA '=' STRING {
+	cur_pem->client_verify_ca = strdup($3);
 };
 
 PEM_DIR: TOK_PEM_DIR '=' STRING {
@@ -630,19 +637,26 @@ CLIENT_VERIFY_REC: TOK_CLIENT_VERIFY '=' CLIENT_VERIFY_OPT;
 
 CLIENT_VERIFY_OPT
 	: TOK_VERIFY_NONE {
-		if (cur_fa)
+		if (cur_pem)
+			cur_pem->client_verify = SSL_VERIFY_NONE;
+		else if (cur_fa)
 			cur_fa->client_verify = SSL_VERIFY_NONE;
 		else
 			cfg->CLIENT_VERIFY = SSL_VERIFY_NONE;
 	}
 	| TOK_VERIFY_OPT {
-		if (cur_fa)
+		if (cur_pem)
+			cur_pem->client_verify = SSL_VERIFY_PEER;
+		else if (cur_fa)
 			cur_fa->client_verify = SSL_VERIFY_PEER;
 		else
 			cfg->CLIENT_VERIFY = SSL_VERIFY_PEER;
 	}
 	| TOK_VERIFY_REQ {
-		if (cur_fa)
+		if (cur_pem)
+			cur_pem->client_verify =
+			    SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+		else if (cur_fa)
 			cur_fa->client_verify =
 			    SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
 		else

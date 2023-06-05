@@ -565,6 +565,7 @@ cfg_cert_file_new(void)
 	ALLOC_OBJ(cert, CFG_CERT_FILE_MAGIC);
 	AN(cert);
 	cert->ocsp_vfy = -1;
+	cert->client_verify = -1;
 	return (cert);
 }
 
@@ -577,6 +578,7 @@ cfg_cert_file_free(struct cfg_cert_file **cfptr)
 	cf = *cfptr;
 	free(cf->filename);
 	free(cf->ocspfn);
+	free(cf->client_verify_ca);
 	FREE_OBJ(cf);
 	*cfptr = NULL;
 }
@@ -638,6 +640,27 @@ cfg_cert_vfy(struct cfg_cert_file *cf)
 
 		d = mtim2double(&st);
 		cf->mtim = cf->mtim > d ? cf->mtim : d;
+	}
+
+	if (cf->client_verify != -1) {
+		if (cf->client_verify_ca == NULL) {
+			config_error_set("Setting 'client-verify-ca' is "
+			    "required when configuring client-verify");
+			return (0);
+		}
+
+		if (stat(cf->client_verify_ca, &st) != 0) {
+			config_error_set("Unable to stat client_verify_ca file "
+			    "'%s': %s", cf->client_verify_ca,
+			    strerror(errno));
+			return (0);
+		}
+
+		if (!S_ISREG(st.st_mode)) {
+			config_error_set("Invalid client_verify_ca file "
+			    "'%s': Not a file.", cf->priv_key_filename);
+			return (0);
+		}
 	}
 	return (1);
 }

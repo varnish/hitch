@@ -64,6 +64,8 @@ struct cfg_cert_file {
 	int		mark;
 	int		ocsp_vfy;
 	double		mtim;
+	int		client_verify;
+	char		*client_verify_ca;
 	UT_hash_handle	hh;
 };
 
