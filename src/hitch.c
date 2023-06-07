@@ -4188,10 +4188,17 @@ main(int argc, char **argv)
 			exit(2);
 		}
 		logfile = f;
-		if (CONFIG->UID >=0 || CONFIG->GID >= 0) {
-			AZ(fchown(fileno(logfile), CONFIG->UID, CONFIG->GID));
-		}
 		AZ(fstat(fileno(logfile), &logf_st));
+		if (CONFIG->UID >=0 || CONFIG->GID >= 0) {
+			if (!(logf_st.st_mode & S_IWOTH) &&
+			    !(logf_st.st_gid == (gid_t)CONFIG->GID &&
+			        (logf_st.st_mode & S_IWGRP)) &&
+			    !(logf_st.st_uid == (uid_t)CONFIG->UID &&
+			        (logf_st.st_mode & S_IWUSR))) {
+				AZ(fchown(fileno(logfile),
+					CONFIG->UID, CONFIG->GID));
+			}
+		}
 		logf_check_t = time(NULL);
 	} else {
 		logfile = stderr;
