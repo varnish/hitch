@@ -143,16 +143,16 @@ typedef struct proxystate {
 						 * socket */
 	struct backend		*backend;
 
-	int			want_shutdown:1; /* Connection is
+	unsigned		want_shutdown:1; /* Connection is
 						  * half-shutdown */
-	int			handshaked:1;	/* Initial handshake happened */
-	int			clear_connected:1; /* Clear stream is
+	unsigned		handshaked:1;	/* Initial handshake happened */
+	unsigned		clear_connected:1; /* Clear stream is
 						    * connected */
-	int			renegotiation:1; /* Renegotation is
+	unsigned		renegotiation:1; /* Renegotation is
 						  * occuring */
-	int			npn_alpn_tried:1;/* NPN or ALPN was tried */
+	unsigned		npn_alpn_tried:1;/* NPN or ALPN was tried */
 
-	int			client_cert_conn:1; /* Client provided
+	unsigned		client_cert_conn:1; /* Client provided
 						     * a certificate
 						     * over the current
 						     * connection */
