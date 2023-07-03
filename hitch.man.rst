@@ -203,6 +203,11 @@ comma-separated tokens.
 Set OCSP staple cache directory This enables automated retrieval and
 stapling of OCSP responses (Default: "/var/lib/hitch/")
 
+``--backend-connect-timeout=SECS``
+----------------------------------
+
+Backend connect timeout.
+
 ``-t  --test``
 --------------
 

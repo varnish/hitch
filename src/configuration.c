@@ -67,6 +67,7 @@
 #define CFG_ALPN_PROTOS "alpn-protos"
 #define CFG_PARAM_ALPN_PROTOS 48173
 #define CFG_BACKEND_CONNECT_TIMEOUT "backend-connect-timeout"
+#define CFG_PARAM_BACKEND_CONNECT_TIMEOUT 48174
 #define CFG_SSL_HANDSHAKE_TIMEOUT "ssl-handshake-timeout"
 #define CFG_RECV_BUFSIZE "recv-bufsize"
 #define CFG_SEND_BUFSIZE "send-bufsize"
@@ -1305,6 +1306,9 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "\t--send-bufsize=SIZE\n");
 	fprintf(out, "\t\tSend buffer size on client socket (Default: %d)\n",
 	    cfg->SEND_BUFSIZE);
+	fprintf(out, "\t--backend-connect-timeout=SECS\n");
+	fprintf(out, "\t\tBackend connect timeout (Default: %d)\n",
+	    cfg->BACKEND_CONNECT_TIMEOUT);
 
 #ifdef USE_SHARED_CACHE
 	fprintf(out, "\n");
@@ -1548,6 +1552,8 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 		{ CFG_OCSP_DIR, 1, NULL, 'o' },
 		{ CFG_TLS_PROTOS, 1, NULL, CFG_PARAM_TLS_PROTOS },
 		{ CFG_DBG_LISTEN, 1, NULL, CFG_PARAM_DBG_LISTEN },
+		{ CFG_BACKEND_CONNECT_TIMEOUT, 1, NULL,
+		  CFG_PARAM_BACKEND_CONNECT_TIMEOUT},
 		{ "test", 0, NULL, 't' },
 		{ "version", 0, NULL, 'V' },
 		{ "help", 0, NULL, 'h' },
@@ -1618,6 +1624,7 @@ CFG_ARG(CFG_PARAM_RECV_BUFSIZE, CFG_RECV_BUFSIZE);
 CFG_ARG(CFG_PARAM_ALPN_PROTOS, CFG_ALPN_PROTOS);
 CFG_ARG(CFG_PARAM_TLS_PROTOS, CFG_TLS_PROTOS);
 CFG_ARG(CFG_PARAM_DBG_LISTEN, CFG_DBG_LISTEN);
+CFG_ARG(CFG_PARAM_BACKEND_CONNECT_TIMEOUT, CFG_BACKEND_CONNECT_TIMEOUT);
 CFG_ARG('c', CFG_CIPHERS);
 CFG_ARG('e', CFG_SSL_ENGINE);
 CFG_ARG('b', CFG_BACKEND);
