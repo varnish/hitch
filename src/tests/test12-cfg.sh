@@ -4,6 +4,7 @@
 
 cat >hitch.cfg <<EOF
 backend = "[hitch-tls.org]:80"
+backend-connect-timeout = 20
 frontend = {
 	 host = "*"
 	 port = "$LISTENPORT"

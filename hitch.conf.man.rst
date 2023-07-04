@@ -499,6 +499,11 @@ Enable TCP Fast Open.
 
 Default is off.
 
+backend-connect-timeout = <number>
+----------------------------------
+
+Configures the backend connect timeout.
+
 
 Example
 =======
