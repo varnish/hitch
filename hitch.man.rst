@@ -78,6 +78,12 @@ Enable client proxy mode
 Backend endpoint (default is "[127.0.0.1]:8000") The -b argument can
 also take a UNIX domain socket path E.g. --backend="/path/to/sock"
 
+If ``--chroot`` is also specified, the UNIX domain socket path will be
+at runtime resolved from within the chroot, and must be specified with
+the path it is accessible from within the chroot. I.e. for a
+``/run/hitch`` chroot and a ``/run/hitch/sock`` UNIX domain socket,
+configure the backend argument as ``/sock``.
+
 ``-f  --frontend=[HOST]:PORT[+CERT]``
 -------------------------------------
 

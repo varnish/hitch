@@ -359,28 +359,48 @@ config_param_val_bool(char *val, int *res)
 }
 
 static int
-config_param_uds(const char *str, char **path)
+config_uds_verify(hitch_config *cfg)
 {
 	struct stat st;
+	struct vsb *vsb;
+	int ret = 0;
+	char *s;
 
-	AN(path);
-
-	if (strlen(str) > 104) {
-		config_error_set("UNIX domain socket path too long.");
+	if (!cfg->BACK_PATH)
 		return (0);
+
+	s = strdup(cfg->BACK_PATH);
+	if (cfg->CHROOT && *cfg->CHROOT) {
+		vsb = VSB_new_auto();
+		AN(vsb);
+		VSB_cat(vsb, cfg->CHROOT);
+		if (cfg->CHROOT[strlen(cfg->CHROOT) - 1] != '/' &&
+		    cfg->BACK_PATH[0] != '/')
+			VSB_cat(vsb, "/");
+		VSB_cat(vsb, cfg->BACK_PATH);
+		AZ(VSB_finish(vsb));
+		REPLACE(s, VSB_data(vsb));
+		VSB_delete(vsb);
 	}
 
-	if (stat(str, &st)) {
-		config_error_set("Unable to stat path '%s': %s", str,
+	if (stat(s, &st)) {
+		config_error_set("Unable to stat path '%s': %s", s,
 		    strerror(errno));
-		return (0);
+		ret = 1;
+	} else if (!S_ISSOCK(st.st_mode)) {
+		config_error_set("Invalid path '%s': Not a socket.",
+		    s);
+		ret = 1;
 	}
 
-	if (!S_ISSOCK(st.st_mode)) {
-		config_error_set("Invalid path '%s': Not a socket.", str);
-		return (0);
-	}
+	free(s);
+	return (ret);
+}
 
+static int
+config_param_uds(const char *str, char **path)
+{
+	AN(path);
 	*path = strdup(str);
 	return (1);
 }
@@ -1890,6 +1910,9 @@ CFG_BOOL('s', CFG_SYSLOG);
 			}
 		}
 	}
+
+	if (config_uds_verify(cfg))
+		return (1);
 
 	return (0);
 }

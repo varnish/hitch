@@ -71,6 +71,11 @@ Or it can be specified as a path to a UNIX domain socket::
 
   backend = "/path/to/sock"
 
+If the ``chroot`` setting is in effect, the UNIX domain socket path
+will be at runtime resolved from within the chroot, and must be
+specified with the path it is accessible from within the
+chroot. I.e. for a ``/run/hitch`` chroot and a ``/run/hitch/sock``
+UNIX domain socket, configure the backend argument as ``/sock``.
 
 backlog = <number>
 ------------------
