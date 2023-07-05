@@ -69,6 +69,7 @@
 #define CFG_BACKEND_CONNECT_TIMEOUT "backend-connect-timeout"
 #define CFG_PARAM_BACKEND_CONNECT_TIMEOUT 48174
 #define CFG_SSL_HANDSHAKE_TIMEOUT "ssl-handshake-timeout"
+#define CFG_PARAM_SSL_HANDSHAKE_TIMEOUT 48175
 #define CFG_RECV_BUFSIZE "recv-bufsize"
 #define CFG_SEND_BUFSIZE "send-bufsize"
 #define CFG_LOG_FILENAME "log-filename"
@@ -1309,6 +1310,9 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "\t--backend-connect-timeout=SECS\n");
 	fprintf(out, "\t\tBackend connect timeout (Default: %d)\n",
 	    cfg->BACKEND_CONNECT_TIMEOUT);
+	fprintf(out, "\t--ssl-handshake-timeout=SECS\n");
+	fprintf(out, "\t\tTLS handshake timeout (Default: %d)\n",
+	    cfg->SSL_HANDSHAKE_TIMEOUT);
 
 #ifdef USE_SHARED_CACHE
 	fprintf(out, "\n");
@@ -1554,6 +1558,8 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 		{ CFG_DBG_LISTEN, 1, NULL, CFG_PARAM_DBG_LISTEN },
 		{ CFG_BACKEND_CONNECT_TIMEOUT, 1, NULL,
 		  CFG_PARAM_BACKEND_CONNECT_TIMEOUT},
+		{ CFG_SSL_HANDSHAKE_TIMEOUT, 1, NULL,
+		  CFG_PARAM_SSL_HANDSHAKE_TIMEOUT},
 		{ "test", 0, NULL, 't' },
 		{ "version", 0, NULL, 'V' },
 		{ "help", 0, NULL, 'h' },
@@ -1625,6 +1631,7 @@ CFG_ARG(CFG_PARAM_ALPN_PROTOS, CFG_ALPN_PROTOS);
 CFG_ARG(CFG_PARAM_TLS_PROTOS, CFG_TLS_PROTOS);
 CFG_ARG(CFG_PARAM_DBG_LISTEN, CFG_DBG_LISTEN);
 CFG_ARG(CFG_PARAM_BACKEND_CONNECT_TIMEOUT, CFG_BACKEND_CONNECT_TIMEOUT);
+CFG_ARG(CFG_PARAM_SSL_HANDSHAKE_TIMEOUT, CFG_SSL_HANDSHAKE_TIMEOUT);
 CFG_ARG('c', CFG_CIPHERS);
 CFG_ARG('e', CFG_SSL_ENGINE);
 CFG_ARG('b', CFG_BACKEND);

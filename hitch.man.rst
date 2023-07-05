@@ -208,6 +208,11 @@ stapling of OCSP responses (Default: "/var/lib/hitch/")
 
 Backend connect timeout.
 
+``--ssl-handshake-timeout=SECS``
+--------------------------------
+
+TLS handshake timeout.
+
 ``-t  --test``
 --------------
 
