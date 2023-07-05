@@ -504,6 +504,11 @@ backend-connect-timeout = <number>
 
 Configures the backend connect timeout.
 
+ssl-handshake-timeout = <number>
+--------------------------------
+
+Configures the TLS handshake timeout.
+
 
 Example
 =======
