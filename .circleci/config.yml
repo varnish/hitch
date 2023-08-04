@@ -51,7 +51,6 @@ workflows:
                 - centos-7
                 - almalinux-8
                 - almalinux-9
-                - centos-8
                 - amazonlinux-2
       - main/collect-packages:
           requires:
