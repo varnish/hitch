@@ -60,7 +60,7 @@ extern char input_line[512];
 %token TOK_OCSP_REFRESH_INTERVAL TOK_PEM_DIR TOK_PEM_DIR_GLOB
 %token TOK_LOG_LEVEL TOK_PROXY_TLV TOK_PROXY_AUTHORITY TOK_TFO
 %token TOK_CLIENT_VERIFY TOK_VERIFY_NONE TOK_VERIFY_OPT TOK_VERIFY_REQ
-%token TOK_CLIENT_VERIFY_CA TOK_PROXY_CCERT
+%token TOK_CLIENT_VERIFY_CA TOK_PROXY_CCERT TOK_AUTO
 
 %parse-param { hitch_config *cfg }
 
@@ -379,7 +379,12 @@ QUIET_REC: TOK_QUIET '=' BOOL {
 		cfg->LOG_LEVEL = 1;
 };
 
-WORKERS_REC: TOK_WORKERS '=' UINT { cfg->NCORES = $3; };
+WORKERS_REC: TOK_WORKERS '=' UINT { cfg->NCORES = $3; }
+	| TOK_WORKERS '=' TOK_AUTO {
+	if (config_param_validate("workers", "auto", cfg, "",
+		yyget_lineno()) != 0)
+		YYABORT;
+};
 
 BACKLOG_REC: TOK_BACKLOG '=' UINT { cfg->BACKLOG = $3; };
 

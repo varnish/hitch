@@ -104,6 +104,7 @@ char input_line[512];
 "backend-refresh"		{ return (TOK_BACKEND_REFRESH); }
 "tcp-fastopen"			{ return (TOK_TFO); }
 "ecdh-curve"			{ return (TOK_ECDH_CURVE); }
+"auto"				{ return (TOK_AUTO); }
 
 (?i:"yes"|"y"|"on"|"true"|"t"|\"yes\"|\"y\"|\"on\"|\"true\"|\"t\") {
 	yylval.i = 1;
