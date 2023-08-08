@@ -4,6 +4,30 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
+hitch-1.8.0 (unreleased)
+------------------------
+
+* Added command line option ``--backend-connect-timeout`` and
+  corresponding configuration file setting
+  ``backend-connect-timeout``.
+* Added command line option ``--ssl-handshake-timeout`` and
+  corresponding configuration file setting ``ssl-handshake-timeout``.
+* The ``client-verify`` configuration file setting can now also be
+  applied at the ``pem-file`` level, making it only apply if that
+  particular certificate is chosen.
+* Fixed a bug where we would change file ownership of the output log
+  file also when not needed. (Issue: 371_)
+* Number of worker processes can now be specified as ``auto``, which
+  will automatically create one worker per CPU on the system. This
+  setting is available both for the ``--workers`` command line option
+  and for the ``workers`` configuration file setting. Thanks to
+  Thierry Magnien (@tmagnien) for the contribution.
+* Fixed a bug that prevented configuring a UNIX domain socket backend
+  when the ``--chroot`` setting was specified.
+
+.. _371: https://github.com/varnish/hitch/issues/371
+
+
 hitch-1.7.3 (2022-09-14)
 ------------------------
 
