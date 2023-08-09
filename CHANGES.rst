@@ -4,7 +4,7 @@ List of changes
 This file contains the running log of changes applied to each released hitch
 version.
 
-hitch-1.8.0 (unreleased)
+hitch-1.8.0 (2023-08-09)
 ------------------------
 
 * Added command line option ``--backend-connect-timeout`` and
