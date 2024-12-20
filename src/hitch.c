@@ -3992,10 +3992,6 @@ notify_workers(struct worker_update *wu)
 					break;
 				}
 			} while (i == -1 && errno == EINTR);
-
-			if (wu->type == WORKER_GEN)
-				(void)close(c->pfd);
-
 		}
 	}
 }
