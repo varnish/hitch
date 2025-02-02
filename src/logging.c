@@ -87,9 +87,7 @@ void
 VWLOG(int level, const char *fmt, va_list ap)
 {
 	struct timeval tv;
-	struct tm tm;
 	char buf[1024];
-	int n;
 	va_list ap1;
 
 	va_copy(ap1, ap);
@@ -101,6 +99,7 @@ VWLOG(int level, const char *fmt, va_list ap)
 		va_end(ap1);
 		return;
 	}
+
 	AZ(gettimeofday(&tv, NULL));
 	if (logfile != stdout && logfile != stderr
 	    && tv.tv_sec >= logf_check_t + LOG_REOPEN_INTERVAL) {
@@ -118,10 +117,7 @@ VWLOG(int level, const char *fmt, va_list ap)
 		logf_check_t = tv.tv_sec;
 	}
 
-	AN(localtime_r(&tv.tv_sec, &tm));
-	n = strftime(buf, sizeof(buf), "%Y%m%dT%H%M%S", &tm);
-	snprintf(buf + n, sizeof(buf) - n, ".%06d [%5d] %s",
-	    (int) tv.tv_usec, getpid(), fmt);
+	snprintf(buf, sizeof(buf), "%s", fmt);
 	vfprintf(logfile, buf, ap1);
 	va_end(ap1);
 }
