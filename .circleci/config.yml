@@ -19,10 +19,10 @@ workflows:
   build:
     jobs:
       - main/dist:
-          docker-img: varnish/dist-vcp-centos-7
+          docker-img: varnish/dist-vcp-almalinux-9
           src-commit: << pipeline.parameters.src-commit >>
           tarball-cmd: |
-            yum install -y libev-devel byacc flex python-docutils
+            dnf install -y libev-devel byacc flex python-docutils
             git checkout << pipeline.parameters.src-commit >>
             ./bootstrap
             make dist -j 16
