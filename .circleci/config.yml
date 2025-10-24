@@ -52,6 +52,7 @@ workflows:
                 - almalinux-8
                 - almalinux-9
                 - rockylinux-8
+                - almalinux-10
                 - amazonlinux-2023
       - main/collect-packages:
           requires:
