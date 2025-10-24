@@ -47,7 +47,6 @@ workflows:
                 - ubuntu-focal
                 - ubuntu-jammy
                 - debian-stretch
-                - debian-buster
                 - debian-bullseye
                 - centos-7
                 - almalinux-8
