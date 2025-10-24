@@ -42,16 +42,17 @@ workflows:
           matrix:
             parameters:
               platform:
-                - ubuntu-xenial
-                - ubuntu-bionic
                 - ubuntu-focal
                 - ubuntu-jammy
-                - debian-stretch
+                - ubuntu-noble
+                - debian-bookworm
                 - debian-bullseye
+                - debian-trixie
                 - centos-7
                 - almalinux-8
                 - almalinux-9
-                - amazonlinux-2
+                - rockylinux-8
+                - amazonlinux-2023
       - main/collect-packages:
           requires:
             - main/package
