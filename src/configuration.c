@@ -923,7 +923,13 @@ config_param_validate(const char *k, char *v, hitch_config *cfg,
 		}
 	} else if (strcmp(k, CFG_SSL_ENGINE) == 0) {
 		if (strlen(v) > 0) {
+#ifndef HAVE_OPENSSL_ENGINE
+			config_error_set("ssl-engine setting is not available"
+			    " for this version of OpenSSL");
+			r = 0;
+#else
 			config_assign_str(&cfg->ENGINE, v);
+#endif
 		}
 	} else if (strcmp(k, CFG_PREFER_SERVER_CIPHERS) == 0) {
 		r = config_param_val_bool(v, &cfg->PREFER_SERVER_CIPHERS);
@@ -1341,9 +1347,11 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "\t-c  --ciphers=SUITE\n");
 	fprintf(out, "\t\tSets allowed ciphers (Default: \"%s\")\n",
 	    config_disp_str(cfg->CIPHERS_TLSv12));
+#ifdef HAVE_OPENSSL_ENGINE
 	fprintf(out, "\t-e  --ssl-engine=NAME\n");
 	fprintf(out, "\t\tSets OpenSSL engine (Default: \"%s\")\n",
 	    config_disp_str(cfg->ENGINE));
+#endif
 	fprintf(out, "\t-O  --prefer-server-ciphers[=on|off]\n");
 	fprintf(out, "\t\tPrefer server list order (Default: \"%s\")\n",
 	    config_disp_bool(cfg->PREFER_SERVER_CIPHERS));

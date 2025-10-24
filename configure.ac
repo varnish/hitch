@@ -234,6 +234,12 @@ HITCH_CHECK_FUNC([X509_OBJECT_get0_X509], [$CRYPTO_LIBS], [
 		[OpenSSL has X509_OBJECT_get0_X509()])
 ])
 
+AC_CHECK_DECLS([ENGINE_init],
+	[AC_DEFINE([HAVE_OPENSSL_ENGINE], [1],
+	    [Defined if we have openssl ENGINE support])],
+	[],
+	[[#include <openssl/engine.h>]])
+
 AC_CHECK_MEMBERS([struct ssl_st.s3], [], [], [[#include <openssl/ssl.h>]])
 
 AS_VERSION_COMPARE([$($PKG_CONFIG --modversion openssl)], [1.1.1],
