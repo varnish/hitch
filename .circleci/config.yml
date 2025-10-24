@@ -1,7 +1,7 @@
 version: 2.1
 
 orbs:
-  main: varnish/orb@0.0.5
+  main: varnish/orb@0.0.8
 
 
 parameters:
