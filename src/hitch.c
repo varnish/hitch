@@ -1332,6 +1332,7 @@ init_openssl(void)
 	SSL_load_error_strings();
 	OpenSSL_add_all_digests();
 
+#ifdef HAVE_OPENSSL_ENGINE
 	if (CONFIG->ENGINE) {
 		ENGINE *e = NULL;
 		ENGINE_load_builtin_engines();
@@ -1352,6 +1353,7 @@ init_openssl(void)
 			ENGINE_free(e);
 		}
 	}
+#endif
 }
 
 static void
