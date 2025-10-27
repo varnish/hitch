@@ -8,7 +8,9 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/sysinfo.h>
+#ifdef __linux__
+  #include <sys/sysinfo.h>
+#endif
 
 #include <stdio.h>
 #include <string.h>

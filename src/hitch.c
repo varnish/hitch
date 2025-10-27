@@ -949,7 +949,11 @@ client_vfy_init(SSL_CTX *ctx, int flags, const char *cafile)
 		return (1);
 	}
 
-	SSL_CTX_set1_verify_cert_store(ctx, vfy);
+#ifdef LIBRESSL_VERSION_NUMBER
+  SSL_CTX_set1_cert_store(ctx, vfy);
+#else
+  SSL_CTX_set1_verify_cert_store(ctx, vfy);
+#endif
 
 #ifdef HAVE_X509_STORE_GET0_OBJECTS
 	objs = X509_STORE_get0_objects(vfy);
