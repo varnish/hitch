@@ -756,7 +756,7 @@ sni_match(const sni_name *sn, const char *srvname)
 	if (!sn->is_wildcard)
 		return (strcasecmp(srvname, sn->sni_key) == 0);
 	else {
-		char *s = strchr(srvname, '.');
+		const char *s = strchr(srvname, '.');
 		if (s == NULL)
 			return (0);
 		return (strcasecmp(s, sn->sni_key + 1) == 0);
@@ -773,7 +773,7 @@ sni_lookup(const char *sni_key, const sni_name *sn_tab)
 
 	HASH_FIND_STR(sn_tab, sni_key, sn);
 	if (sn == NULL) {
-		char *s;
+		const char *s;
 		/* attempt another lookup for wildcard matches */
 		s = strchr(sni_key, '.');
 		if (s != NULL)
