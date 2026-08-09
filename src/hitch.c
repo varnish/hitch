@@ -39,7 +39,9 @@
 
 #include <openssl/x509.h>
 #include <openssl/x509_vfy.h>
+#ifdef HAVE_OPENSSL_ENGINE
 #include <openssl/engine.h>
+#endif
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
