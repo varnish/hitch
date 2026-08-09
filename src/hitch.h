@@ -42,7 +42,9 @@
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <openssl/asn1.h>
+#ifdef HAVE_OPENSSL_ENGINE
 #include <openssl/engine.h>
+#endif
 #include <openssl/evp.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
