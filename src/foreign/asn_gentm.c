@@ -129,13 +129,20 @@ int asn1_generalizedtime_to_tm(struct tm *tm, const ASN1_GENERALIZEDTIME *d)
 {
 	static const int min[9] = { 0, 0, 1, 1, 0, 0, 0, 0, 0 };
 	static const int max[9] = { 99, 99, 12, 31, 23, 59, 59, 12, 59 };
-	char *a;
+	const char *a;
 	int n, i, l, o;
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 	if (d->type != V_ASN1_GENERALIZEDTIME)
 		return (0);
 	l = d->length;
-	a = (char *)d->data;
+	a = (const char *)d->data;
+#else
+	if (ASN1_STRING_type(d) != V_ASN1_GENERALIZEDTIME)
+		return (0);
+	l = ASN1_STRING_length(d);
+	a = (const char *)ASN1_STRING_get0_data(d);
+#endif
 	o = 0;
 	/*
 	 * GENERALIZEDTIME is similar to UTCTIME except the year is represented
