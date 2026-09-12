@@ -349,6 +349,19 @@ and write-proxy-v1.
 
 Default is off.
 
+proxy-proxy-fallback = on|off
+-----------------------------
+
+When ``proxy-proxy`` is on, also accept connections that arrive without
+a PROXY protocol header (e.g. direct client connections). For those
+connections, a PROXYv2 header is synthesized from the TCP source address
+and written to the backend, exactly as ``write-proxy-v2`` would do.
+
+This allows a single Hitch listener to serve both an L4 load balancer
+that prepends a PROXY header and direct clients simultaneously.
+
+Requires ``proxy-proxy = on``. Default is off.
+
 log-level = <num>
 -----------------
 

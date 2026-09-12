@@ -73,6 +73,7 @@ char input_line[512];
 "proxy-client-cert"		{ return (TOK_PROXY_CCERT); }
 "pem-file"			{ return (TOK_PEM_FILE); }
 "proxy-proxy"			{ return (TOK_PROXY_PROXY); }
+"proxy-proxy-fallback"		{ return (TOK_PROXY_PROXY_FALLBACK); }
 "alpn-protos"			{ return (TOK_ALPN_PROTOS); }
 "backend-connect-timeout"	{ return (TOK_BACKEND_CONNECT_TIMEOUT); }
 "ssl-handshake-timeout"		{ return (TOK_SSL_HANDSHAKE_TIMEOUT); }

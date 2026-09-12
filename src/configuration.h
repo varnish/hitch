@@ -96,6 +96,7 @@ struct __hitch_config {
 	int			WRITE_PROXY_LINE_V1;
 	int			WRITE_PROXY_LINE_V2;
 	int			PROXY_PROXY_LINE;
+	int			PROXY_PROXY_FALLBACK;
 	unsigned		PROXY_TLV;
 	unsigned		PROXY_AUTHORITY;
 	unsigned		PROXY_CLIENT_CERT;

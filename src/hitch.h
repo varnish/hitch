@@ -158,6 +158,10 @@ typedef struct proxystate {
 						     * a certificate
 						     * over the current
 						     * connection */
+	unsigned		proxy_proxy_fallback:1; /* No PROXY header
+							 * received; synthesize
+							 * PROXYv2 after
+							 * handshake */
 
 	SSL			*ssl;		/* OpenSSL SSL state */
 

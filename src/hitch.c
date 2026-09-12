@@ -2347,7 +2347,8 @@ static void end_handshake(proxystate *ps) {
 	/* Check if clear side is connected */
 	if (!ps->clear_connected) {
 		if (CONFIG->WRITE_PROXY_LINE_V1 ||
-		    CONFIG->WRITE_PROXY_LINE_V2) {
+		    CONFIG->WRITE_PROXY_LINE_V2 ||
+		    ps->proxy_proxy_fallback) {
 			struct sockaddr_storage local;
 			socklen_t slen = sizeof local;
 			AZ(getsockname(ps->fd_up, (struct sockaddr *) &local,
@@ -2477,20 +2478,28 @@ client_proxy_proxy(struct ev_loop *loop, ev_io *w, int revents)
 	/* PROXYv1: 'PROXY ' */
 	/* PROXYv2:  PP2_SIG, (12 octets) */
 
-	n = BIO_read(b, buf, 12);
+	/* Peek so that if no PROXY header is present the bytes remain
+	 * on the socket for OpenSSL to read as the TLS ClientHello. */
+	n = recv(ps->fd_up, buf, 12, MSG_PEEK);
 	if (n != 12) {
-		LOG("{client} Unexpected read error in proxy-proxyv2: "
-		    "BIO_read: %d\n", n);
+		LOG("{client} Unexpected read error in proxy-proxy: "
+		    "recv: %d\n", n);
 		shutdown_proxy(ps, SHUTDOWN_SSL);
 		return;
 	}
 
 	if (memcmp(buf, "PROXY ", 6) == 0) {
+		n = BIO_read(b, buf, 12);
 		if (client_proxy_proxy1(ps, b, buf, n))
 			return;
 	} else if (memcmp(buf, PP2_SIG, 12) == 0) {
+		n = BIO_read(b, buf, 12);
 		if (client_proxy_proxy2(ps, b, buf, n))
 			return;
+	} else if (CONFIG->PROXY_PROXY_FALLBACK) {
+		/* No PROXY header; synthesize one from TCP source after
+		 * the TLS handshake completes. */
+		ps->proxy_proxy_fallback = 1;
 	} else {
 		LOG("{client} Received invalid PROXY/PROXYv2 header\n");
 		shutdown_proxy(ps, SHUTDOWN_SSL);

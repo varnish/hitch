@@ -64,6 +64,7 @@
 #define CFG_WRITE_PROXY_V2 "write-proxy-v2"
 #define CFG_PEM_FILE "pem-file"
 #define CFG_PROXY_PROXY "proxy-proxy"
+#define CFG_PROXY_PROXY_FALLBACK "proxy-proxy-fallback"
 #define CFG_ALPN_PROTOS "alpn-protos"
 #define CFG_PARAM_ALPN_PROTOS 48173
 #define CFG_BACKEND_CONNECT_TIMEOUT "backend-connect-timeout"
@@ -200,6 +201,7 @@ config_new(void)
 	r->PROXY_AUTHORITY		= 1;
 	r->PROXY_CLIENT_CERT		= 0;
 	r->PROXY_PROXY_LINE		= 0;
+	r->PROXY_PROXY_FALLBACK		= 0;
 	r->ALPN_PROTOS			= NULL;
 	r->ALPN_PROTOS_LV		= NULL;
 	r->ALPN_PROTOS_LV_LEN		= 0;
@@ -1066,6 +1068,8 @@ config_param_validate(const char *k, char *v, hitch_config *cfg,
 		r = config_param_val_bool(v, &cfg->WRITE_PROXY_LINE_V2);
 	} else if (strcmp(k, CFG_PROXY_PROXY) == 0) {
 		r = config_param_val_bool(v, &cfg->PROXY_PROXY_LINE);
+	} else if (strcmp(k, CFG_PROXY_PROXY_FALLBACK) == 0) {
+		r = config_param_val_bool(v, &cfg->PROXY_PROXY_FALLBACK);
 	} else if (strcmp(k, CFG_ALPN_PROTOS) == 0) {
 		if (strlen(v) > 0) {
 			config_assign_str(&cfg->ALPN_PROTOS, v);
@@ -1489,6 +1493,12 @@ config_print_usage_fd(char *prog, FILE *out)
 	fprintf(out, "\t\tbefore actual data (PROXYv1 and PROXYv2)\n");
 	fprintf(out, "\t\t(Default: %s)\n",
 	    config_disp_bool(cfg->PROXY_PROXY_LINE));
+	fprintf(out, "\t--proxy-proxy-fallback[=on|off]\n");
+	fprintf(out, "\t\tWhen proxy-proxy is on, accept connections without\n");
+	fprintf(out, "\t\ta PROXY header and synthesize a PROXYv2 header\n");
+	fprintf(out, "\t\tfrom the TCP source address.\n");
+	fprintf(out, "\t\t(Default: %s)\n",
+	    config_disp_bool(cfg->PROXY_PROXY_FALLBACK));
 	fprintf(out, "\t--sni-nomatch-abort[=on|off]\n");
 	fprintf(out, "\t\tAbort handshake when client submits an\n");
 	fprintf(out, "\t\tunrecognized SNI server name\n" );
@@ -1621,6 +1631,7 @@ config_parse_cli(int argc, char **argv, hitch_config *cfg)
 		{ CFG_WRITE_PROXY_V2, 2, NULL, 1 },
 		{ CFG_WRITE_PROXY, 2, NULL, 1 },
 		{ CFG_PROXY_PROXY, 2, NULL, 1 },
+		{ CFG_PROXY_PROXY_FALLBACK, 2, NULL, 1 },
 		{ CFG_ALPN_PROTOS, 1, NULL, CFG_PARAM_ALPN_PROTOS },
 		{ CFG_SNI_NOMATCH_ABORT, 2, NULL, 1 },
 		{ CFG_OCSP_DIR, 1, NULL, 'o' },
@@ -1793,6 +1804,12 @@ CFG_BOOL('s', CFG_SYSLOG);
 		config_error_set("Options --write-ip, --write-proxy-proxy,"
 		    " --write-proxy-v1 and --write-proxy-v2 are"
 		    " mutually exclusive.");
+		return (1);
+	}
+
+	if (cfg->PROXY_PROXY_FALLBACK && !cfg->PROXY_PROXY_LINE) {
+		config_error_set("Option --proxy-proxy-fallback requires"
+		    " --proxy-proxy=on.");
 		return (1);
 	}
 
