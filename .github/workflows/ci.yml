@@ -90,6 +90,8 @@ jobs:
           # libev ships no pkg-config file
           export CPPFLAGS="-I$BREW/include"
           export LDFLAGS="-L$BREW/lib"
+          # daemon(3) is deprecated on macOS
+          export CFLAGS="-g -O2 -Wno-error=deprecated-declarations"
           .github/ci/build.sh
 
       - name: Upload logs
