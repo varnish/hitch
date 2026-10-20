@@ -21,4 +21,5 @@ s_client -servername default.example.com >s_client.dump
 
 ! grep ERROR proxy.dump
 cat proxy.dump
-run_cmd grep -Pq "Authority extension:\tdefault.example.com" proxy.dump
+TAB=$(printf '\t')
+run_cmd grep -q "Authority extension:${TAB}default.example.com" proxy.dump

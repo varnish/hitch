@@ -621,9 +621,11 @@ TFO: TOK_TFO '=' BOOL {
 #ifdef TCP_FASTOPEN_WORKS
 	{ cfg->TFO = $3; };
 #else
-	fprintf(stderr, "Hitch needs to be compiled with --enable-tfo"
-			"for '%s'", input_line);
-	YYABORT;
+	if ($3) {
+		fprintf(stderr, "Hitch needs to be compiled with --enable-tfo"
+				"for '%s'", input_line);
+		YYABORT;
+	}
 #endif
 };
 

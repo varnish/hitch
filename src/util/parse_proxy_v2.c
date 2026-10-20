@@ -49,6 +49,9 @@
 
 #include "proxyv2.h"
 
+/* 16 bytes of fixed header followed by up to 65535 bytes of payload */
+#define PROXY_HEADER_MAX	(16 + 65535)
+
 ssize_t
 read_from_socket(const char *port, unsigned char *buf, int len)
 {
@@ -218,15 +221,15 @@ print_extensions(unsigned char *extensions, int extensions_len)
 int
 main(int argc, const char **argv)
 {
-	unsigned char proxy_header[BUFSIZ];
+	unsigned char proxy_header[PROXY_HEADER_MAX + 1];
 	ssize_t n = 0;
 	int address_len = 0;
 
 	if (argc == 1)
-		n = read(STDIN_FILENO, proxy_header, sizeof(proxy_header));
+		n = read(STDIN_FILENO, proxy_header, sizeof(proxy_header) - 1);
 	else if (argc == 2)
 		n = read_from_socket(argv[1], proxy_header,
-		    sizeof(proxy_header));
+		    sizeof(proxy_header) - 1);
 	else {
 		fprintf(stderr, "Usage: parse_proxy_v2 [port]\n");
 		return (1);
