@@ -235,8 +235,10 @@ HITCH_CHECK_FUNC([X509_OBJECT_get0_X509], [$CRYPTO_LIBS], [
 ])
 
 HITCH_CHECK_FUNC([ENGINE_init], [$CRYPTO_LIBS], [
-	AC_DEFINE([HAVE_OPENSSL_ENGINE], [1],
-		[Defined if we have openssl ENGINE support])
+	AC_CHECK_DECL([ENGINE_init], [
+		AC_DEFINE([HAVE_OPENSSL_ENGINE], [1],
+			[Defined if we have openssl ENGINE support])
+	], [], [[#include <openssl/engine.h>]])
 ])
 
 AC_CHECK_MEMBERS([struct ssl_st.s3], [], [], [[#include <openssl/ssl.h>]])
