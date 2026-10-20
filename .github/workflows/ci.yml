@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - "**"
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: ${{ matrix.target }} ${{ matrix.arch.name }}
+    runs-on: ubuntu-24.04${{ matrix.arch.suffix }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - name: "amd64"
+            suffix: ""
+          - name: "arm64"
+            suffix: "-arm"
+        target:
+          - debian-bookworm
+          - debian-trixie
+          - ubuntu-jammy
+          - ubuntu-noble
+          - ubuntu-questing
+          - ubuntu-resolute
+          - almalinux-9
+          - almalinux-10
+          - amazonlinux-2023
+          - archlinux-latest
+        exclude:
+          - target: archlinux-latest
+            arch:
+              name: arm64
+              suffix: "-arm"
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      - name: Build and test
+        run: |
+          PARAM_DIST=$(echo ${{ matrix.target }} | cut -d- -f 1)
+          PARAM_RELEASE=$(echo ${{ matrix.target }} | cut -d- -f 2)
+
+          docker run \
+            --network host \
+            --rm \
+            --workdir /workdir \
+            -v "$(pwd)":/workdir \
+            "$PARAM_DIST:$PARAM_RELEASE" \
+            sh -c '.github/ci/install-deps.sh && .github/ci/build.sh'
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: logs-${{ matrix.target }}-${{ matrix.arch.name }}
+          path: |
+            config.log
+            src/tests/*.log
+
+  macos:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-15
+          - macos-15-intel
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      - name: Install dependencies
+        run: |
+          brew install autoconf automake bison docutils flex libev openssl@3 pkgconf
+
+      - name: Build and test
+        run: |
+          BREW=$(brew --prefix)
+          # the system bison and flex are too old
+          export PATH="$BREW/opt/bison/bin:$BREW/opt/flex/bin:$PATH"
+          export PKG_CONFIG_PATH="$BREW/opt/openssl@3/lib/pkgconfig"
+          # libev ships no pkg-config file
+          export CPPFLAGS="-I$BREW/include"
+          export LDFLAGS="-L$BREW/lib"
+          .github/ci/build.sh
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: logs-${{ matrix.os }}
+          path: |
+            config.log
+            src/tests/*.log
+
+  distcheck:
+    name: distcheck
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      - name: Make dist tarball
+        run: |
+          docker run \
+            --network host \
+            --rm \
+            --workdir /workdir \
+            -v "$(pwd)":/workdir \
+            debian:trixie \
+            sh -c '.github/ci/install-deps.sh && ./bootstrap && make distcheck'
+
+      - name: Upload tarball
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: hitch-*.tar.gz
