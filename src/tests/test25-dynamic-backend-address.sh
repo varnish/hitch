@@ -29,7 +29,20 @@ curl_hitch
 # run_cmd grep -q "<title>Hitch TLS proxy" backend_refresh1.dump
 
 echo "hitch_test varnish-cache.org" >hosts
-sleep 2
+
+# The refresh depends on a real DNS lookup, give it some slack instead of
+# relying on a fixed delay.
+HITCH_HOST=$(hitch_hosts | sed 1q)
+i=0
+while [ $i -lt 15 ]
+do
+	sleep 1
+	i=$((i + 1))
+	STATUS=$(curl --head --max-time 5 --silent --insecure \
+	    --output /dev/null --write-out '%{http_code}' \
+	    "https://$HITCH_HOST/") || continue
+	test "$STATUS" = 404 && break
+done
 
 CURL_STATUS=404
 curl_hitch
